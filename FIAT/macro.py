@@ -3,7 +3,8 @@ from itertools import chain, combinations
 import numpy
 
 from FIAT import expansions, polynomial_set, reference_element
-from FIAT.quadrature import FacetQuadratureRule, QuadratureRule
+from FIAT.quadrature import (FacetQuadratureRule, QuadratureRule,
+                             concatenate_quadratures)
 from FIAT.reference_element import (TRIANGLE, SimplicialComplex, lattice_iter,
                                     make_lattice)
 
@@ -400,12 +401,8 @@ class MacroQuadratureRule(QuadratureRule):
             top = ref_el.get_topology()
             facets = top[parent_dim]
 
-        pts = []
-        wts = []
-        for entity in facets:
-            Q_cur = FacetQuadratureRule(ref_el, parent_dim, entity, Q_ref)
-            pts.extend(Q_cur.pts)
-            wts.extend(Q_cur.wts)
+        rules = [FacetQuadratureRule(ref_el, parent_dim, entity, Q_ref) for entity in facets]
+        pts, wts = map(list, concatenate_quadratures(rules))
 
         # Collapse repeated points if any of them lie on facets
         atol = 1E-10

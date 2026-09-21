@@ -195,6 +195,29 @@ class CollapsedQuadratureTetrahedronRule(CollapsedQuadratureSimplexRule):
     pass
 
 
+def concatenate_quadratures(rules):
+    """Concatenate the points and weights of an iterable of QuadratureRule."""
+    rules = tuple(rules)
+    pts = tuple(itertools.chain.from_iterable(map(tuple, Q.get_points()) for Q in rules))
+    wts = tuple(itertools.chain.from_iterable(Q.get_weights().flat for Q in rules))
+    return pts, wts
+
+
+class CompositeQuadratureRule(QuadratureRule):
+    """Quadrature rule on a union of entities of a cell.
+
+    The points and weights of the given rules are concatenated, so that a
+    single functional may integrate over several entities at once.  Repeated
+    points are kept, hence the rules must meet on sets of measure zero.
+
+    :arg ref_el: a :class:`Cell`.
+    :arg rules: an iterable of :class:`QuadratureRule` whose points are given
+                in the coordinates of ``ref_el``.
+    """
+    def __init__(self, ref_el, rules):
+        super().__init__(ref_el, *concatenate_quadratures(rules))
+
+
 class FacetQuadratureRule(QuadratureRule):
     """A quadrature rule on a facet mapped from a reference quadrature rule.
     """
