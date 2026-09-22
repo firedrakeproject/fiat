@@ -10,10 +10,9 @@
 # transformation theory.
 
 from FIAT import finite_element, dual_set, polynomial_set, expansions
-from FIAT.bubble import make_projected_bubble_moment
 from FIAT.check_format_variant import parse_quadrature_scheme
 from FIAT.functional import ComponentPointEvaluation, FrobeniusIntegralMoment
-from FIAT.hierarchical import make_dual_bubbles
+from FIAT.hierarchical import make_dual_bubbles, make_projected_bubble_moment
 from FIAT.quadrature import FacetQuadratureRule
 
 import numpy
