@@ -9,6 +9,11 @@ from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import ufc_simplex
 
 
+@pytest.fixture(params=["moment", "point"])
+def variant(request):
+    return request.param
+
+
 @pytest.fixture(params=[0, 1], ids=["K1", "K2"])
 def cell(request):
     K = ufc_simplex(3)
@@ -29,9 +34,9 @@ def inner(u, v, wts):
     return numpy.dot(numpy.multiply(u, wts), v.T)
 
 
-def test_walkington_basis_functions(cell):
+def test_walkington_basis_functions(cell, variant):
     degree = 5
-    fe = Walkington(cell, degree)
+    fe = Walkington(cell, degree, variant=variant)
     space_dim = 45
 
     ref_el = fe.get_reference_element()
@@ -76,9 +81,9 @@ def span_greater_equal(A, B):
     return numpy.allclose(residual, 0)
 
 
-def test_walkington_space(cell):
+def test_walkington_space(cell, variant):
     degree = 5
-    fe = Walkington(cell, degree)
+    fe = Walkington(cell, degree, variant=variant)
     space_dim = 45
 
     V = fe.get_nodal_basis()
