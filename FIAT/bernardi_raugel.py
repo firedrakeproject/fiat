@@ -13,7 +13,6 @@ from FIAT import finite_element, dual_set, polynomial_set, expansions
 from FIAT.bubble import make_projected_bubble_moment
 from FIAT.check_format_variant import parse_quadrature_scheme
 from FIAT.functional import ComponentPointEvaluation, FrobeniusIntegralMoment
-from FIAT.hierarchical import make_dual_bubbles
 from FIAT.quadrature import FacetQuadratureRule
 
 import numpy
@@ -84,7 +83,15 @@ class BernardiRaugelDualSet(dual_set.DualSet):
                 scale = numpy.sum(bf_wts) / numpy.dot(ft_at_qpts, bf_wts)
                 scale /= ref_area
             else:
-                Qt_ref, phis = make_dual_bubbles(ref_facet, degree, codim=codim, scale=1)
+                Qt_ref = parse_quadrature_scheme(ref_facet, 2 * degree)
+                bubbles = polynomial_set.make_bubbles(ref_facet, degree,
+                                                      codim=codim, scale=1)
+                bubble_values = bubbles.expansion_set.tabulate(degree, Qt_ref.get_points())
+                bubble_moments = numpy.dot(numpy.multiply(bubble_values,
+                                                          Qt_ref.get_weights()),
+                                           bubble_values.T)
+                phis = numpy.linalg.solve(bubble_moments, bubble_values)
+                phis = numpy.dot(bubbles.get_coeffs(), phis)
                 ft_at_qpts = phis[-1]
                 scale = ref_area / numpy.dot(ft_at_qpts, Qt_ref.get_weights())
 

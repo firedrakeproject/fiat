@@ -92,8 +92,6 @@ def test_macro_quadrature(split, cell):
 
     degree = 3
     Q = create_quadrature(ref_el, 2*degree)
-    from FIAT.quadrature import CompositeQuadratureRule
-    assert isinstance(Q, CompositeQuadratureRule)
     pts, wts = Q.get_points(), Q.get_weights()
 
     Qcell = create_quadrature(cell, 2*degree)
@@ -572,7 +570,7 @@ def compare_macro_variant(element, K, degree, variant):
     # Compute Vandermonde matrix on the subcell
     P = fe_macro.get_nodal_basis()
     B = P.get_coeffs()
-    A = fe_ref.dual.to_riesz(P)
+    A = numpy.tensordot(fe_ref.dual.get_coeffs(), fe_ref.dual.to_riesz(P), axes=(1, 0))
     V = numpy.tensordot(A, B, axes=(range(1, A.ndim), range(1, B.ndim)))
 
     # Assert that V = permutation matrix

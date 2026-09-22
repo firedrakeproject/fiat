@@ -219,6 +219,98 @@ class CiarletElement(FiniteElement):
         return True
 
 
+class NonNodalElement(FiniteElement):
+    """Finite element with a prescribed, non-nodal polynomial basis.
+
+    The supplied polynomial basis is retained.  The degrees of freedom are
+    recombined by the inverse Vandermonde matrix so that their coefficients
+    represent functions in the prescribed basis.
+
+    Parameters
+    ----------
+    poly_set : PolynomialSet
+        The prescribed polynomial basis.
+    dual : DualSet
+        The uncombined degrees of freedom.
+    order : int
+        The polynomial order of the element.
+    formdegree : int, optional
+        The degree of the associated differential form.
+    mapping : str, optional
+        The mapping from the reference element to a physical element.
+    ref_complex : object, optional
+        The reference complex for macroelements.
+    """
+
+    def __init__(self, poly_set: PolynomialSet, dual: DualSet, order: int,
+                 formdegree: int | None = None, mapping: str = "affine",
+                 ref_complex: object | None = None) -> None:
+        ref_el = dual.get_reference_element()
+        ref_complex = ref_complex or poly_set.get_reference_element()
+        super().__init__(ref_el, dual, order, formdegree, mapping, ref_complex)
+
+        if len(poly_set) != len(dual):
+            raise ValueError(f"Dimension of function space is {len(poly_set)}, "
+                             f"but got {len(dual)} nodes.")
+
+        old_coeffs = poly_set.get_coeffs()
+        dualmat = dual.to_riesz(poly_set)
+        shp = dualmat.shape
+        A = dualmat.reshape((shp[0], -1))
+        B = old_coeffs.reshape((shp[0], -1))
+        V = numpy.dot(A, numpy.transpose(B))
+        self.V = V
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("error")
+            try:
+                coefficients = scipy.linalg.solve(V, numpy.eye(V.shape[0]))
+            except (scipy.linalg.LinAlgWarning, scipy.linalg.LinAlgError):
+                raise numpy.linalg.LinAlgError("Singular Vandermonde matrix")
+
+        self.poly_set = poly_set
+        self.dual = dual.recombine(coefficients)
+
+    def degree(self) -> int:
+        """Return the degree of the polynomial basis."""
+        return self.poly_set.get_embedded_degree()
+
+    def get_nodal_basis(self) -> PolynomialSet:
+        """Return the prescribed polynomial basis.
+
+        The name is retained for compatibility with FIAT clients that use
+        this method to obtain an element's basis, even though this class does
+        not construct a Ciarlet nodal basis.
+        """
+        return self.poly_set
+
+    def get_coeffs(self) -> numpy.ndarray:
+        """Return the coefficients of the prescribed polynomial basis."""
+        return self.poly_set.get_coeffs()
+
+    def tabulate(self, order: int, points: object,
+                 entity: tuple[int, int] | None = None) -> dict:
+        """Tabulate the prescribed polynomial basis."""
+        if entity is None:
+            entity = (self.ref_el.get_spatial_dimension(), 0)
+
+        entity_dim, entity_id = entity
+        transform = self.ref_el.get_entity_transform(entity_dim, entity_id)
+        return self.poly_set.tabulate(transform(points), order)
+
+    def value_shape(self) -> tuple:
+        """Return the value shape of the polynomial basis."""
+        return self.poly_set.get_shape()
+
+    def dmats(self) -> list[numpy.ndarray]:
+        """Return expansion coefficients for basis derivatives."""
+        return self.poly_set.get_dmats()
+
+    def get_num_members(self, arg: int) -> int:
+        """Return the number of expansion-set members of degree ``arg``."""
+        return self.poly_set.get_expansion_set().get_num_members(arg)
+
+
 def entity_support_dofs(elem, entity_dim):
     """Return the map of entity id to the degrees of freedom for which the
     corresponding basis functions take non-zero values

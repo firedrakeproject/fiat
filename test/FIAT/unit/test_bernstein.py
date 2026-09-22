@@ -21,6 +21,7 @@ import numpy
 import pytest
 
 from FIAT.reference_element import ufc_simplex
+from FIAT import NonNodalElement
 from FIAT.bernstein import Bernstein
 from FIAT.quadrature_schemes import create_quadrature
 
@@ -78,6 +79,12 @@ def test_bernstein_2nd_derivatives():
     assert numpy.allclose(D02, actual[(0, 2)])
     assert numpy.allclose(D11, actual[(1, 1)])
     assert numpy.allclose(D20, actual[(2, 0)])
+
+
+def test_bernstein_uses_non_nodal_element():
+    """Construct Bernstein through the prescribed-basis element path."""
+    element = Bernstein(ufc_simplex(2), 3)
+    assert isinstance(element, NonNodalElement)
 
 
 if __name__ == '__main__':

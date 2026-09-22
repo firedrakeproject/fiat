@@ -3,7 +3,7 @@ from itertools import chain, combinations
 import numpy
 
 from FIAT import expansions, polynomial_set, reference_element
-from FIAT.quadrature import CompositeQuadratureRule, FacetQuadratureRule, QuadratureRule
+from FIAT.quadrature import FacetQuadratureRule, QuadratureRule
 from FIAT.reference_element import (TRIANGLE, SimplicialComplex, lattice_iter,
                                     make_lattice)
 
@@ -378,7 +378,7 @@ class PowellSabin12Split(SplitSimplicialComplex):
             raise ValueError("Illegal dimension")
 
 
-class MacroQuadratureRule(CompositeQuadratureRule):
+class MacroQuadratureRule(QuadratureRule):
     """Composite quadrature rule on parent facets that respects the splitting.
 
     :arg ref_el: A simplicial complex.
@@ -400,11 +400,12 @@ class MacroQuadratureRule(CompositeQuadratureRule):
             top = ref_el.get_topology()
             facets = top[parent_dim]
 
-        rules = [FacetQuadratureRule(ref_el, parent_dim, entity, Q_ref) for entity in facets]
-        super().__init__(ref_el, rules)
-
-        pts = list(self.pts)
-        wts = list(self.wts)
+        pts = []
+        wts = []
+        for entity in facets:
+            Q_cur = FacetQuadratureRule(ref_el, parent_dim, entity, Q_ref)
+            pts.extend(Q_cur.pts)
+            wts.extend(Q_cur.wts)
 
         # Collapse repeated points if any of them lie on facets
         atol = 1E-10
@@ -428,9 +429,7 @@ class MacroQuadratureRule(CompositeQuadratureRule):
                 wts = unique_wts
         pts = tuple(pts)
         wts = tuple(wts)
-        self.pts = tuple(pts)
-        self.wts = tuple(wts)
-        self.rules = (QuadratureRule(ref_el, self.pts, self.wts),)
+        super().__init__(ref_el, pts, wts)
 
 
 class CkPolynomialSet(polynomial_set.PolynomialSet):

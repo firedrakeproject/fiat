@@ -267,43 +267,6 @@ def dubiner_recurrence(dim: int,
     return results
 
 
-def interior_bubble_indices(dim, n):
-    """List the multi-indices of the interior bubbles in the C0 ordering.
-
-    :arg dim: The spatial dimension of the simplex.
-    :arg n: The polynomial degree.
-
-    :returns: A list of multi-indices into the hierarchical expansion set.
-    """
-    if dim == 1:
-        return [(i,) for i in range(2, n+1)]
-    elif dim == 2:
-        return [(i, j) for j in range(1, n+1) for i in range(2, n-j+1)]
-    else:
-        return [(i, j, k) for k in range(1, n+1)
-                for j in range(1, n-k+1) for i in range(2, n-j-k+1)]
-
-
-def dual_bubble_indices(dim, n):
-    """Locate the L2-duals of the interior bubbles in the dual expansion set.
-
-    The interior bubble with multi-index (i, j, k) is the cell bubble times the
-    member of the "dual" expansion set with multi-index (i-2, j-1, k-1).  Those
-    members are orthogonal with respect to the bubble weight, so the shifted
-    multi-index gives the L2-dual of each interior bubble, up to a constant that
-    only depends on dim.
-
-    :arg dim: The spatial dimension of the simplex.
-    :arg n: The polynomial degree.
-
-    :returns: A list of indices into the dual expansion set of degree n-dim-1.
-    """
-    idx = (lambda p: p, morton_index2, morton_index3)[dim-1]
-    shift = (2,) + (1,) * (dim - 1)
-    return [idx(*(a - s for a, s in zip(alpha, shift)))
-            for alpha in interior_bubble_indices(dim, n)]
-
-
 def C0_basis(dim, n, tabulations):
     """Modify a tabulation of a hierarchical basis to enforce C0-continuity.
 
@@ -333,11 +296,15 @@ def C0_basis(dim, n, tabulations):
 
     # Reorder by dimension and entity on the reference simplex
     dofs = list(range(dim+1))
-    if dim == 2:
+    if dim == 1:
+        dofs.extend(range(2, n+1))
+    elif dim == 2:
         dofs.extend(idx(1, i-1) for i in range(2, n+1))
         dofs.extend(idx(0, i) for i in range(2, n+1))
         dofs.extend(idx(i, 0) for i in range(2, n+1))
-    elif dim == 3:
+
+        dofs.extend(idx(i, j) for j in range(1, n+1) for i in range(2, n-j+1))
+    else:
         dofs.extend(idx(0, 1, i-1) for i in range(2, n+1))
         dofs.extend(idx(1, 0, i-1) for i in range(2, n+1))
         dofs.extend(idx(1, i-1, 0) for i in range(2, n+1))
@@ -350,7 +317,8 @@ def C0_basis(dim, n, tabulations):
         dofs.extend(idx(i, 0, j) for j in range(1, n+1) for i in range(2, n-j+1))
         dofs.extend(idx(i, j, 0) for j in range(1, n+1) for i in range(2, n-j+1))
 
-    dofs.extend(idx(*alpha) for alpha in interior_bubble_indices(dim, n))
+        dofs.extend(idx(i, j, k) for k in range(1, n+1) for j in range(1, n-k+1) for i in range(2, n-j-k+1))
+
     return tuple(phi[dofs] for phi in tabulations)
 
 
@@ -428,6 +396,11 @@ class ExpansionSet(object):
         elif n == 0 and sd > 1 and len(self.affine_mappings) == 1:
             # return 1 for n=0 to make regression tests pass
             scale = 1
+        if self.variant == "dual":
+            factor = (-1)**sd * 2**sd
+            if n > 0:
+                factor /= math.prod(range(3, 2 * sd + 2, 2))
+            scale *= factor
         return scale
 
     def get_num_members(self, n):
@@ -770,33 +743,6 @@ def polynomial_entity_ids(ref_el, n, continuity=None):
         for entity in sorted(top[dim]):
             entity_ids[dim][entity] = list(range(cur, cur + dofs))
             cur += dofs
-    return entity_ids
-
-
-def C0_entity_ids(ref_el, n):
-    """Maps entities of a cell complex to the C0 basis functions they own.
-
-    ``C0_basis`` orders the basis by the entities of the reference simplex, and
-    ``ExpansionSet.tabulate`` keeps that ordering on a single cell, so entities
-    are matched against the reference numbering through their vertices.  On a
-    macrocell the tabulation is already scattered into the global numbering.
-
-    :arg ref_el: a SimplicialComplex.
-    :arg n: the polynomial degree of the expansion set.
-    :returns: a dict of dicts mapping dimension and entity id to basis functions.
-    """
-    if ref_el.is_macrocell():
-        return polynomial_entity_ids(ref_el, n, continuity="C0")
-    sd = ref_el.get_spatial_dimension()
-    top = ref_el.get_topology()
-    ref_cell = ref_el.construct_subelement(sd)
-    ref_top = ref_cell.get_topology()
-    ref_entity_ids = polynomial_entity_ids(ref_cell, n, continuity="C0")
-    entity_ids = {}
-    for dim in sorted(top):
-        ref_entities = {frozenset(verts): entity for entity, verts in ref_top[dim].items()}
-        entity_ids[dim] = {entity: ref_entity_ids[dim][ref_entities[frozenset(verts)]]
-                           for entity, verts in top[dim].items()}
     return entity_ids
 
 
