@@ -92,6 +92,8 @@ def test_macro_quadrature(split, cell):
 
     degree = 3
     Q = create_quadrature(ref_el, 2*degree)
+    from FIAT.quadrature import CompositeQuadratureRule
+    assert isinstance(Q, CompositeQuadratureRule)
     pts, wts = Q.get_points(), Q.get_weights()
 
     Qcell = create_quadrature(cell, 2*degree)

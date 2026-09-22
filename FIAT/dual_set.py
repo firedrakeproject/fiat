@@ -7,10 +7,10 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 import numpy
-from itertools import chain
 from collections import defaultdict
 
 from FIAT import polynomial_set, functional
+from FIAT.quadrature import CompositeQuadratureRule
 from FIAT.reference_element import compute_unflattening_map
 
 
@@ -119,90 +119,72 @@ class DualSet(object):
         riesz_shape = (num_nodes, *tshape, num_exp)
         mat = numpy.zeros(riesz_shape, "d")
 
-        def map_quadratures_to_points(nodes, deriv=False):
-            Qs_to_ells = defaultdict(list)
-            for i, ell in enumerate(nodes):
-                if deriv and len(ell.deriv_dict) == 0:
-                    continue
-                elif not deriv and len(ell.pt_dict) == 0:
-                    continue
-                if isinstance(ell, (functional.IntegralMoment, functional.IntegralMomentOfDerivative)):
-                    Q = ell.Q
-                else:
-                    Q = None
-                Qs_to_ells[Q].append(i)
-            pts = set()
-            Qs_to_pts = {}
-            for Q in Qs_to_ells:
-                if Q is None:
-                    if deriv:
-                        cur_pts = chain.from_iterable(nodes[i].deriv_dict.keys() for i in Qs_to_ells[None])
-                    else:
-                        cur_pts = chain.from_iterable(nodes[i].pt_dict.keys() for i in Qs_to_ells[None])
-                    cur_pts = tuple(set(cur_pts))
-                else:
-                    cur_pts = tuple(map(tuple, Q.pts))
-                Qs_to_pts[Q] = cur_pts
-                pts.update(cur_pts)
-            pts = list(sorted(pts))
-            return Qs_to_ells, Qs_to_pts, pts
+        def point_blocks(deriv=False):
+            blocks = defaultdict(list)
+            for i, ell in enumerate(self.nodes):
+                if deriv:
+                    if not ell.deriv_dict:
+                        continue
+                    points = tuple(ell.deriv_dict)
+                    blocks[points].append((i, ell, None, None))
+                elif isinstance(ell, functional.IntegralMoment):
+                    offset = 0
+                    for Q in (ell.Q.rules if isinstance(ell.Q, CompositeQuadratureRule)
+                              else (ell.Q,)):
+                        size = len(Q.pts)
+                        points = tuple(map(tuple, Q.pts))
+                        f = ell.f_at_qpts[..., offset:offset + size]
+                        blocks[points].append((i, ell, Q, f))
+                        offset += size
+                elif ell.pt_dict:
+                    points = tuple(ell.pt_dict)
+                    blocks[points].append((i, ell, None, None))
+            return blocks
 
-        # Now tabulate the function values
-        Qs_to_ells, Qs_to_pts, pts = map_quadratures_to_points(self.nodes)
-        expansion_values = numpy.transpose(es.tabulate(ed, pts))
-        for Q in Qs_to_ells:
-            ells = Qs_to_ells[Q]
-            cur_pts = Qs_to_pts[Q]
-            indices = list(map(pts.index, cur_pts))
-            wshape = (len(ells), *tshape, len(cur_pts))
+        values_at_points = {}
+
+        # Tabulate the function values, once for each unique point block.
+        for points, blocks in point_blocks().items():
+            if points not in values_at_points:
+                values_at_points[points] = numpy.transpose(es.tabulate(ed, points))
+            expansion_values = values_at_points[points]
+            ells = [block[0] for block in blocks]
+            wshape = (len(blocks), *tshape, len(points))
             wts = numpy.zeros(wshape, "d")
-            if Q is None:
-                for i, k in enumerate(ells):
-                    ell = self.nodes[k]
-                    for pt, wc_list in ell.pt_dict.items():
-                        j = cur_pts.index(pt)
-                        for (w, c) in wc_list:
-                            wts[i][c][j] = w
-            else:
-                for i, k in enumerate(ells):
-                    ell = self.nodes[k]
-                    wts[i][ell.comp][:] = ell.f_at_qpts
-                qwts = Q.get_weights()
-                wts = numpy.multiply(wts, qwts, out=wts)
-            mat[ells] += numpy.dot(wts, expansion_values[indices])
+            for i, (_, ell, Q, f) in enumerate(blocks):
+                if Q is None:
+                    for j, pt in enumerate(points):
+                        for w, c in ell.pt_dict[pt]:
+                            wts[i][c][j] += w
+                else:
+                    wts[i][ell.comp][:] = f
+                    numpy.multiply(wts[i], Q.get_weights(), out=wts[i])
+            numpy.add.at(mat, ells, numpy.dot(wts, expansion_values))
 
         # Tabulate the derivative values that are needed
         max_deriv_order = max(ell.max_deriv_order for ell in self.nodes)
         if max_deriv_order > 0:
-            Qs_to_ells, Qs_to_pts, pts = map_quadratures_to_points(self.nodes, deriv=True)
             # It's easiest/most efficient to get derivatives of the
             # expansion set through the polynomial set interface.
             # This is creating a short-lived set to do just this.
             coeffs = numpy.eye(num_exp)
             expansion = polynomial_set.PolynomialSet(self.ref_el, ed, ed, es, coeffs)
-            dexpansion_values = expansion.tabulate(pts, max_deriv_order)
-            for Q in Qs_to_ells:
-                ells = Qs_to_ells[Q]
-                cur_pts = Qs_to_pts[Q]
-                indices = list(map(pts.index, cur_pts))
-                wshape = (len(ells), *tshape, len(cur_pts))
-                dwts = {alpha: numpy.zeros(wshape, "d") for alpha in dexpansion_values if sum(alpha) > 0}
-                if Q is None:
-                    for i, k in enumerate(ells):
-                        ell = self.nodes[k]
-                        for pt, wac_list in ell.deriv_dict.items():
-                            j = cur_pts.index(pt)
-                            for (w, alpha, c) in wac_list:
-                                dwts[alpha][i][c][j] = w
-                else:
-                    for i, k in enumerate(ells):
-                        ell = self.nodes[k]
-                        for alpha in ell.weights:
-                            dwts[alpha][i][ell.comp][:] = ell.weights[alpha]
-                for alpha in dwts:
-                    wts = dwts[alpha]
-                    expansion_values = dexpansion_values[alpha].T
-                    mat[ells] += numpy.dot(wts, expansion_values[indices])
+            derivative_values = {}
+            for points, blocks in point_blocks(deriv=True).items():
+                if points not in derivative_values:
+                    derivative_values[points] = expansion.tabulate(points, max_deriv_order)
+                dexpansion_values = derivative_values[points]
+                ells = [block[0] for block in blocks]
+                wshape = (len(blocks), *tshape, len(points))
+                dwts = {alpha: numpy.zeros(wshape, "d")
+                        for alpha in dexpansion_values if sum(alpha) > 0}
+                for i, (_, ell, _, _) in enumerate(blocks):
+                    for j, pt in enumerate(points):
+                        for w, alpha, c in ell.deriv_dict[pt]:
+                            dwts[alpha][i][c][j] += w
+                for alpha, wts in dwts.items():
+                    numpy.add.at(mat, ells,
+                                 numpy.dot(wts, dexpansion_values[alpha].T))
         return mat
 
     def get_indices(self, restriction_domain, take_closure=True):

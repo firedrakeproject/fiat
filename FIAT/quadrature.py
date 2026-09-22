@@ -215,7 +215,8 @@ class CompositeQuadratureRule(QuadratureRule):
                 in the coordinates of ``ref_el``.
     """
     def __init__(self, ref_el, rules):
-        super().__init__(ref_el, *concatenate_quadratures(rules))
+        self.rules = tuple(rules)
+        super().__init__(ref_el, *concatenate_quadratures(self.rules))
 
 
 class FacetQuadratureRule(QuadratureRule):
