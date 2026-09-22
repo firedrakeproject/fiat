@@ -147,22 +147,15 @@ class CiarletElement(FiniteElement):
         V = numpy.dot(A, numpy.transpose(B))
         self.V = V
 
-        # new_coeffs_flat = numpy.linalg.solve(V.T, B)
         with warnings.catch_warnings():
             warnings.filterwarnings("error")
             try:
-                new_coeffs_flat = scipy.linalg.solve(V, B, transposed=True)
+                recombination = scipy.linalg.solve(V, numpy.eye(V.shape[0]),
+                                                   transposed=True)
             except (scipy.linalg.LinAlgWarning, scipy.linalg.LinAlgError):
                 raise numpy.linalg.LinAlgError("Singular Vandermonde matrix")
 
-        new_shp = new_coeffs_flat.shape[:1] + shp[1:]
-        new_coeffs = new_coeffs_flat.reshape(new_shp)
-
-        self.poly_set = PolynomialSet(poly_set.get_reference_element(),
-                                      poly_set.get_degree(),
-                                      poly_set.get_embedded_degree(),
-                                      poly_set.get_expansion_set(),
-                                      new_coeffs)
+        self.poly_set = poly_set.recombine(recombination)
 
     def degree(self):
         "Return the degree of the (embedding) polynomial space."

@@ -24,3 +24,18 @@ def test_non_nodal_element_preserves_polynomial_basis():
     assert not numpy.allclose(numpy.dot(raw_riesz, poly_set.get_coeffs().T), numpy.eye(3))
     assert numpy.allclose(element.dual.get_coeffs(), numpy.linalg.inv(
         numpy.dot(raw_riesz, poly_set.get_coeffs().T)))
+
+
+def test_polynomial_set_recombine():
+    """Recombine polynomial members while retaining their metadata."""
+    ref_el = ufc_simplex(1)
+    poly_set = ONPolynomialSet(ref_el, 2)
+    coefficients = numpy.array([[1.0, 2.0, 0.0], [0.0, 0.0, 1.0]])
+
+    recombined = poly_set.recombine(coefficients)
+
+    assert len(recombined) == 2
+    assert recombined.get_reference_element() is poly_set.get_reference_element()
+    assert recombined.get_expansion_set() is poly_set.get_expansion_set()
+    assert numpy.array_equal(recombined.get_coeffs(),
+                             numpy.dot(coefficients, poly_set.get_coeffs()))
