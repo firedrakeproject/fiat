@@ -88,15 +88,13 @@ class IntegratedLegendreDual(dual_set.DualSet):
         for dim in sorted(top):
             if degree <= dim:
                 continue
-            sub_el = symmetric_simplex(dim)
-            Q_ref, phis = make_dual_bubbles(sub_el, degree,
-                                            interpolant_deg=interpolant_deg,
-                                            quad_scheme=quad_scheme)
+            ref_facet = symmetric_simplex(dim)
+            Q_ref, phis = make_dual_bubbles(ref_facet, degree, interpolant_deg=interpolant_deg, quad_scheme=quad_scheme)
             for entity in sorted(top[dim]):
                 cur = len(nodes)
-                Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref, avg=True)
-                entity_ids[dim][entity].extend(range(cur, cur + len(phis)))
-                nodes.extend(functional.IntegralMoment(ref_el, Q, phi) for phi in phis)
+                Q_facet = FacetQuadratureRule(ref_el, dim, entity, Q_ref, avg=True)
+                nodes.extend(functional.IntegralMoment(ref_el, Q_facet, phi) for phi in phis)
+                entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)
 

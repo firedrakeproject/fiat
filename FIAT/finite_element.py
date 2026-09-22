@@ -213,7 +213,7 @@ class CiarletElement(FiniteElement):
         return True
 
 
-class NonNodalElement(FiniteElement):
+class NonNodalElement(CiarletElement):
     """Finite element with a prescribed, non-nodal polynomial basis.
 
     The supplied polynomial basis is retained.  The degrees of freedom are
@@ -232,7 +232,7 @@ class NonNodalElement(FiniteElement):
                  mapping="affine", ref_complex=None):
         ref_el = dual.get_reference_element()
         ref_complex = ref_complex or poly_set.get_reference_element()
-        super().__init__(ref_el, dual, order, formdegree, mapping, ref_complex)
+        FiniteElement.__init__(self, ref_el, dual, order, formdegree, mapping, ref_complex)
 
         if len(poly_set) != len(dual):
             raise ValueError(f"Dimension of function space is {len(poly_set)}, "
@@ -255,44 +255,6 @@ class NonNodalElement(FiniteElement):
 
         self.poly_set = poly_set
         self.dual = dual.recombine(coefficients)
-
-    def degree(self):
-        """Return the degree of the polynomial basis."""
-        return self.poly_set.get_embedded_degree()
-
-    def get_nodal_basis(self):
-        """Return the prescribed polynomial basis.
-
-        The name is retained for compatibility with FIAT clients that use
-        this method to obtain an element's basis, even though this class does
-        not construct a Ciarlet nodal basis.
-        """
-        return self.poly_set
-
-    def get_coeffs(self):
-        """Return the coefficients of the prescribed polynomial basis."""
-        return self.poly_set.get_coeffs()
-
-    def tabulate(self, order, points, entity=None):
-        """Tabulate the prescribed polynomial basis."""
-        if entity is None:
-            entity = (self.ref_el.get_spatial_dimension(), 0)
-
-        entity_dim, entity_id = entity
-        transform = self.ref_el.get_entity_transform(entity_dim, entity_id)
-        return self.poly_set.tabulate(transform(points), order)
-
-    def value_shape(self):
-        """Return the value shape of the polynomial basis."""
-        return self.poly_set.get_shape()
-
-    def dmats(self):
-        """Return expansion coefficients for basis derivatives."""
-        return self.poly_set.get_dmats()
-
-    def get_num_members(self, arg):
-        """Return the number of expansion-set members of degree ``arg``."""
-        return self.poly_set.get_expansion_set().get_num_members(arg)
 
 
 def entity_support_dofs(elem, entity_dim):
