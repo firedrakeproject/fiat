@@ -31,11 +31,11 @@ def test_polynomial_set_recombine():
     ref_el = ufc_simplex(1)
     poly_set = ONPolynomialSet(ref_el, 2)
     coefficients = numpy.array([[1.0, 2.0, 0.0], [0.0, 0.0, 1.0]])
+    new_coeffs = numpy.dot(coefficients, poly_set.get_coeffs())
 
-    recombined = poly_set.recombine(coefficients)
+    recombined = poly_set.recombine(new_coeffs)
 
     assert len(recombined) == 2
     assert recombined.get_reference_element() is poly_set.get_reference_element()
     assert recombined.get_expansion_set() is poly_set.get_expansion_set()
-    assert numpy.array_equal(recombined.get_coeffs(),
-                             numpy.dot(coefficients, poly_set.get_coeffs()))
+    assert numpy.array_equal(recombined.get_coeffs(), new_coeffs)

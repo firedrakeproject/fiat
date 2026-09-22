@@ -17,8 +17,7 @@ from FIAT.check_format_variant import check_format_variant, parse_quadrature_sch
 from FIAT.P0 import P0
 
 
-def make_dual_bubbles(ref_el: object, degree: int, interpolant_deg: int | None = None,
-                      quad_scheme: object | None = None) -> tuple[object, numpy.ndarray]:
+def make_dual_bubbles(ref_el, degree, interpolant_deg=None, quad_scheme=None):
     """Tabulate the L2-duals of the hierarchical C0 basis."""
     dim = ref_el.get_spatial_dimension()
     if dim == 0:
@@ -94,8 +93,7 @@ class Legendre(finite_element.CiarletElement):
 
 class IntegratedLegendreDual(dual_set.DualSet):
     """Uncombined moments against the dual integrated Legendre bubbles."""
-    def __init__(self, ref_el: object, degree: int, interpolant_deg: int | None = None,
-                 quad_scheme: object | None = None) -> None:
+    def __init__(self, ref_el, degree, interpolant_deg=None, quad_scheme=None):
         top = ref_el.get_topology()
         entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
         if ref_el.is_macrocell():

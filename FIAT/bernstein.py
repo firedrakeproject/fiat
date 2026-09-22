@@ -20,13 +20,12 @@ from FIAT.reference_element import default_simplex, make_lattice
 class BernsteinExpansionSet(expansions.ExpansionSet):
     """Expansion set for Bernstein polynomials on a simplex."""
 
-    def get_num_members(self, n: int) -> int:
+    def get_num_members(self, n):
         """Return the number of Bernstein polynomials of degree ``n``."""
         dim = self.ref_el.get_spatial_dimension()
         return math.comb(n + dim, dim)
 
-    def _tabulate_on_cell(self, n: int, pts: object, order: int = 0,
-                          cell: int = 0, direction: object | None = None) -> dict:
+    def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
         """Tabulate Bernstein polynomials and their derivatives."""
         dim = self.ref_el.get_spatial_dimension()
         pts = numpy.asarray(pts)
@@ -80,7 +79,7 @@ class BernsteinExpansionSet(expansions.ExpansionSet):
 class BernsteinDualSet(DualSet):
     """The dual basis for Bernstein elements."""
 
-    def __init__(self, ref_el: object, degree: int) -> None:
+    def __init__(self, ref_el, degree):
         # Initialise data structures
         topology = ref_el.get_topology()
         entity_ids = {dim: {entity_i: []
@@ -112,7 +111,7 @@ class BernsteinDualSet(DualSet):
 class Bernstein(NonNodalElement):
     """A finite element with Bernstein polynomials as basis functions."""
 
-    def __init__(self, ref_el: object, degree: int) -> None:
+    def __init__(self, ref_el, degree):
         expansion_set = BernsteinExpansionSet(ref_el)
         poly_set = polynomial_set.PolynomialSet(
             ref_el, degree, degree, expansion_set,

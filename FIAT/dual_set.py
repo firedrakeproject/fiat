@@ -15,9 +15,8 @@ from FIAT.reference_element import compute_unflattening_map
 
 
 class DualSet(object):
-    def __init__(self, nodes: list, ref_el: object, entity_ids: dict,
-                 entity_permutations: dict | None = None,
-                 coeffs: numpy.ndarray | None = None) -> None:
+    def __init__(self, nodes, ref_el, entity_ids, entity_permutations=None,
+                 coeffs=None):
         if ref_el.get_dimension() != max(entity_ids):
             entity_ids = unflatten_entity_ids(ref_el, entity_ids)
         nodes, ref_el, entity_ids, entity_permutations = merge_entities(nodes, ref_el, entity_ids, entity_permutations)
@@ -55,22 +54,15 @@ class DualSet(object):
     def get_nodes(self):
         return self.nodes
 
-    def get_coeffs(self) -> numpy.ndarray:
+    def get_coeffs(self):
         """Return the recombination coefficients of the dual set."""
         return self.coeffs
 
-    def recombine(self, coefficients: numpy.ndarray) -> "DualSet":
+    def recombine(self, coefficients):
         """Return a dual set with an additional node recombination.
 
-        Parameters
-        ----------
-        coefficients : numpy.ndarray
-            Matrix multiplying the current dual set.
-
-        Returns
-        -------
-        DualSet
-            A dual set representing the recombined functionals.
+        :arg coefficients: Matrix multiplying the current dual set.
+        :returns: A dual set representing the recombined functionals.
         """
         coefficients = numpy.asarray(coefficients)
         if coefficients.shape != self.coeffs.shape:

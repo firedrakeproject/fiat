@@ -13,7 +13,6 @@ import scipy
 import warnings
 
 from FIAT.dual_set import DualSet
-from FIAT.polynomial_set import PolynomialSet
 from FIAT.quadrature_schemes import create_quadrature
 
 
@@ -147,15 +146,17 @@ class CiarletElement(FiniteElement):
         V = numpy.dot(A, numpy.transpose(B))
         self.V = V
 
+        # new_coeffs_flat = numpy.linalg.solve(V.T, B)
         with warnings.catch_warnings():
             warnings.filterwarnings("error")
             try:
-                recombination = scipy.linalg.solve(V, numpy.eye(V.shape[0]),
-                                                   transposed=True)
+                new_coeffs_flat = scipy.linalg.solve(V, B, transposed=True)
             except (scipy.linalg.LinAlgWarning, scipy.linalg.LinAlgError):
                 raise numpy.linalg.LinAlgError("Singular Vandermonde matrix")
 
-        self.poly_set = poly_set.recombine(recombination)
+        new_shp = new_coeffs_flat.shape[:1] + shp[1:]
+        new_coeffs = new_coeffs_flat.reshape(new_shp)
+        self.poly_set = poly_set.recombine(new_coeffs)
 
     def degree(self):
         "Return the degree of the (embedding) polynomial space."
@@ -219,25 +220,16 @@ class NonNodalElement(FiniteElement):
     recombined by the inverse Vandermonde matrix so that their coefficients
     represent functions in the prescribed basis.
 
-    Parameters
-    ----------
-    poly_set : PolynomialSet
-        The prescribed polynomial basis.
-    dual : DualSet
-        The uncombined degrees of freedom.
-    order : int
-        The polynomial order of the element.
-    formdegree : int, optional
-        The degree of the associated differential form.
-    mapping : str, optional
-        The mapping from the reference element to a physical element.
-    ref_complex : object, optional
-        The reference complex for macroelements.
+    :arg poly_set: The prescribed polynomial basis.
+    :arg dual: The uncombined degrees of freedom.
+    :arg order: The polynomial order of the element.
+    :arg formdegree: The degree of the associated differential form.
+    :arg mapping: The mapping from the reference element to a physical element.
+    :arg ref_complex: The reference complex for macroelements.
     """
 
-    def __init__(self, poly_set: PolynomialSet, dual: DualSet, order: int,
-                 formdegree: int | None = None, mapping: str = "affine",
-                 ref_complex: object | None = None) -> None:
+    def __init__(self, poly_set, dual, order, formdegree=None,
+                 mapping="affine", ref_complex=None):
         ref_el = dual.get_reference_element()
         ref_complex = ref_complex or poly_set.get_reference_element()
         super().__init__(ref_el, dual, order, formdegree, mapping, ref_complex)
@@ -264,11 +256,11 @@ class NonNodalElement(FiniteElement):
         self.poly_set = poly_set
         self.dual = dual.recombine(coefficients)
 
-    def degree(self) -> int:
+    def degree(self):
         """Return the degree of the polynomial basis."""
         return self.poly_set.get_embedded_degree()
 
-    def get_nodal_basis(self) -> PolynomialSet:
+    def get_nodal_basis(self):
         """Return the prescribed polynomial basis.
 
         The name is retained for compatibility with FIAT clients that use
@@ -277,12 +269,11 @@ class NonNodalElement(FiniteElement):
         """
         return self.poly_set
 
-    def get_coeffs(self) -> numpy.ndarray:
+    def get_coeffs(self):
         """Return the coefficients of the prescribed polynomial basis."""
         return self.poly_set.get_coeffs()
 
-    def tabulate(self, order: int, points: object,
-                 entity: tuple[int, int] | None = None) -> dict:
+    def tabulate(self, order, points, entity=None):
         """Tabulate the prescribed polynomial basis."""
         if entity is None:
             entity = (self.ref_el.get_spatial_dimension(), 0)
@@ -291,15 +282,15 @@ class NonNodalElement(FiniteElement):
         transform = self.ref_el.get_entity_transform(entity_dim, entity_id)
         return self.poly_set.tabulate(transform(points), order)
 
-    def value_shape(self) -> tuple:
+    def value_shape(self):
         """Return the value shape of the polynomial basis."""
         return self.poly_set.get_shape()
 
-    def dmats(self) -> list[numpy.ndarray]:
+    def dmats(self):
         """Return expansion coefficients for basis derivatives."""
         return self.poly_set.get_dmats()
 
-    def get_num_members(self, arg: int) -> int:
+    def get_num_members(self, arg):
         """Return the number of expansion-set members of degree ``arg``."""
         return self.poly_set.get_expansion_set().get_num_members(arg)
 
