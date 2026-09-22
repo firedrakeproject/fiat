@@ -17,7 +17,7 @@ from FIAT.functional import (
 from FIAT.reference_element import TETRAHEDRON
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.hierarchical import make_projected_bubble_moment
+from FIAT.hierarchical import make_projected_bubble_moments
 from FIAT.jacobi import eval_jacobi
 import numpy
 
@@ -66,7 +66,8 @@ class WalkingtonDualSet(DualSet):
         x = ref_edge.compute_barycentric_coordinates(Q_edge.get_points())
         leg4_at_qpts = eval_jacobi(0, 0, 4, x[:, 1] - x[:, 0])
         # Face constraint: normal derivative drops to degree-2
-        Q_face, phi = make_projected_bubble_moment(ref_face, degree-2)
+        Q_face, phis = make_projected_bubble_moments(ref_face, degree-2)
+        phi = phis[-1]
 
         extra_entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
         extra_nodes = []

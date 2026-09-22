@@ -11,52 +11,41 @@ import numpy
 from FIAT import finite_element, dual_set, functional
 from FIAT.expansions import polynomial_dimension
 from FIAT.reference_element import symmetric_simplex
-from FIAT.quadrature import FacetQuadratureRule, QuadratureRule
+from FIAT.quadrature import FacetQuadratureRule
 from FIAT.polynomial_set import ONPolynomialSet, make_bubbles
 from FIAT.check_format_variant import check_format_variant, parse_quadrature_scheme
 from FIAT.P0 import P0
-from FIAT.reference_element import SimplicialComplex
 
 
-def make_projected_bubble_moment(
-    ref_el: SimplicialComplex, degree: int, quad_scheme: str = None
-) -> tuple[QuadratureRule, numpy.ndarray]:
-    """Tabulate the leading-degree part of the bubble on the given cell.
-
-    The bubble is projected onto polynomials of the given degree, and the
-    components of lower degree are dropped.  What remains is orthogonal to
-    polynomials of degree ``degree - 1`` and is invariant under the symmetry
-    group of the cell, which is what a constraint functional annihilating that
-    lower-degree space needs of its weight.  The result is normalized to unit
-    L2 norm, which keeps the moments of comparable size across cells.
-
-    Parameters
-    ----------
-    ref_el : SimplicialComplex
-        The cell on which to tabulate the weight.
-    degree : int
-        The degree of the weight.
-    quad_scheme : str, optional
-        The quadrature scheme, see ``parse_quadrature_scheme``.
-
-    Returns
-    -------
-    tuple
-        The quadrature rule and the weight tabulated on its points.
-    """
+def make_projected_bubble_moments(ref_el, degree, interpolant_deg=None, quad_scheme=None):
+    """Tabulate moments against projected bubbles of the given degree."""
+    if interpolant_deg is None:
+        interpolant_deg = degree
     sd = ref_el.get_spatial_dimension()
-    Q = parse_quadrature_scheme(ref_el, degree + sd + 1, quad_scheme)
-    Pk = ONPolynomialSet(ref_el, degree, scale="orthonormal")
+    Q = parse_quadrature_scheme(ref_el, degree + interpolant_deg, quad_scheme)
+    Pk = ONPolynomialSet(ref_el, interpolant_deg, scale="orthonormal")
     phis = Pk.tabulate(Q.get_points())[(0,) * sd]
     duals = numpy.multiply(phis, Q.get_weights())
-    coeffs = numpy.dot(duals, ref_el.compute_bubble(Q.get_points()))
-    bubble_norm = numpy.linalg.norm(coeffs)
-    coeffs[:polynomial_dimension(ref_el, degree-1)] = 0
-    norm = numpy.linalg.norm(coeffs)
-    if norm <= 1E-12 * bubble_norm:
-        raise ValueError(f"The bubble on {type(ref_el).__name__} "
-                         f"has no component of degree {degree}")
-    return Q, numpy.dot(coeffs / norm, phis)
+    B = make_bubbles(ref_el, degree)
+    bubbles = B.tabulate(Q.get_points())[(0,) * sd]
+    num_cells = len(ref_el.get_topology()[sd])
+    num_bubbles = B.get_num_members() // num_cells
+    num_killed = polynomial_dimension(ref_el, interpolant_deg - sd - 2)
+    num_killed //= num_cells
+    keep = max(num_bubbles - num_killed, 0)
+    bubbles = bubbles[-num_cells * num_bubbles:] if num_bubbles else bubbles[:0]
+    bubbles = bubbles.reshape(num_cells, num_bubbles, bubbles.shape[-1])
+    bubbles = bubbles[:, -keep:] if keep else bubbles[:, :0]
+    bubbles = bubbles.reshape(-1, bubbles.shape[-1])
+    num_kept = bubbles.shape[0]
+    coeffs = numpy.dot(duals, bubbles.T)
+    num_members = polynomial_dimension(ref_el, interpolant_deg) // num_cells
+    num_lower = polynomial_dimension(ref_el, interpolant_deg - 1) // num_cells
+    coeffs = coeffs.reshape(num_cells, num_members, num_kept)
+    coeffs[:, :num_lower] = 0
+    coeffs = coeffs.reshape(num_cells * num_members, num_kept)
+    coeffs /= numpy.linalg.norm(coeffs, axis=0)
+    return Q, numpy.dot(coeffs.T, phis)
 
 
 def make_dual_bubbles(ref_el, degree, codim=0, interpolant_deg=None, quad_scheme=None, scale="orthonormal"):
