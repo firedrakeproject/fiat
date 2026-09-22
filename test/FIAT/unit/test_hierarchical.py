@@ -42,8 +42,9 @@ def test_hierarchical_basis_values(dim, family, degree):
     for test_degree in range(degree + 1):
         v = lambda x: sum(x)**test_degree
         raw_coefs = [n(v) for n in fe.dual.nodes]
-        coefs = np.dot(fe.dual.get_coeffs(), raw_coefs)
-        integral = np.dot(coefs, np.dot(tab, q.wts))
+        dual_coeffs = fe.dual.get_coeffs()
+        coeffs = raw_coefs if dual_coeffs is None else np.dot(dual_coeffs, raw_coefs)
+        integral = np.dot(coeffs, np.dot(tab, q.wts))
         reference = q.integrate(v)
         assert np.allclose(integral, reference, rtol=1e-14)
 

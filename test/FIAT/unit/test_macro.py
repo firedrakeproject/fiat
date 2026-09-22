@@ -570,7 +570,7 @@ def compare_macro_variant(element, K, degree, variant):
     # Compute Vandermonde matrix on the subcell
     P = fe_macro.get_nodal_basis()
     B = P.get_coeffs()
-    A = numpy.tensordot(fe_ref.dual.get_coeffs(), fe_ref.dual.to_riesz(P), axes=(1, 0))
+    A = fe_ref.dual.to_riesz(P)
     V = numpy.tensordot(A, B, axes=(range(1, A.ndim), range(1, B.ndim)))
 
     # Assert that V = permutation matrix

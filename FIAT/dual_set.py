@@ -20,11 +20,10 @@ class DualSet(object):
         if ref_el.get_dimension() != max(entity_ids):
             entity_ids = unflatten_entity_ids(ref_el, entity_ids)
         nodes, ref_el, entity_ids, entity_permutations = merge_entities(nodes, ref_el, entity_ids, entity_permutations)
-        if coeffs is None:
-            coeffs = numpy.eye(len(nodes))
-        coeffs = numpy.asarray(coeffs)
-        if coeffs.shape != (len(nodes), len(nodes)):
-            raise ValueError("Dual coefficients must form a square matrix")
+        if coeffs is not None:
+            coeffs = numpy.asarray(coeffs)
+            if coeffs.shape != (len(nodes), len(nodes)):
+                raise ValueError("Dual coefficients must form a square matrix")
 
         self.nodes = nodes
         self.coeffs = coeffs
@@ -65,9 +64,11 @@ class DualSet(object):
         :returns: A dual set representing the recombined functionals.
         """
         coefficients = numpy.asarray(coefficients)
-        if coefficients.shape != self.coeffs.shape:
+        shape = (len(self.nodes), len(self.nodes))
+        if coefficients.shape != shape:
             raise ValueError("Dual coefficients must form a square matrix")
-        coefficients = numpy.dot(coefficients, self.coeffs)
+        if self.coeffs is not None:
+            coefficients = numpy.dot(coefficients, self.coeffs)
         return DualSet(self.nodes, self.ref_el, self.entity_ids,
                        self.entity_permutations, coeffs=coefficients)
 
@@ -228,6 +229,9 @@ class DualSet(object):
                     wts = dwts[alpha]
                     expansion_values = dexpansion_values[alpha].T
                     mat[ells] += numpy.dot(wts, expansion_values[indices])
+        coeffs = self.get_coeffs()
+        if coeffs is not None:
+            mat = numpy.tensordot(coeffs, mat, axes=(1, 0))
         return mat
 
     def get_indices(self, restriction_domain, take_closure=True):

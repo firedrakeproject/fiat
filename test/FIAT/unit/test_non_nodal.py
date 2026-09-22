@@ -24,6 +24,9 @@ def test_non_nodal_element_preserves_polynomial_basis():
     assert not numpy.allclose(numpy.dot(raw_riesz, poly_set.get_coeffs().T), numpy.eye(3))
     assert numpy.allclose(element.dual.get_coeffs(), numpy.linalg.inv(
         numpy.dot(raw_riesz, poly_set.get_coeffs().T)))
+    result = numpy.dot(element.dual.to_riesz(poly_set), poly_set.get_coeffs().T)
+    expected = numpy.eye(len(poly_set))
+    assert numpy.allclose(result, expected)
 
 
 def test_polynomial_set_recombine():
