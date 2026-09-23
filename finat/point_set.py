@@ -5,6 +5,8 @@ from itertools import chain, product
 
 import numpy
 
+from FIAT.precision import calibrate_tolerance
+
 import gem
 from gem.utils import safe_repr
 
@@ -46,6 +48,13 @@ class AbstractPointSet(abc.ABC):
     def expression(self):
         """GEM expression describing the points, with free indices
         ``self.indices`` and shape (point dimension,)."""
+
+    def almost_equal(self, other, tolerance=1e-12):
+        """Approximate numerical equality of point sets."""
+        tolerance = calibrate_tolerance(tolerance, self.points.dtype)
+        return type(self) is type(other) and \
+            self.points.shape == other.points.shape and \
+            numpy.allclose(self.points, other.points, rtol=0, atol=tolerance)
 
     @cached_property
     def point_sets(self):
@@ -171,12 +180,6 @@ class PointSet(AbstractPointSet):
     @cached_property
     def expression(self):
         return gem.partial_indexed(gem.Literal(self.points), self.indices)
-
-    def almost_equal(self, other, tolerance=1e-12):
-        """Approximate numerical equality of point sets"""
-        return type(self) is type(other) and \
-            self.points.shape == other.points.shape and \
-            numpy.allclose(self.points, other.points, rtol=0, atol=tolerance)
 
 
 class GaussLegendrePointSet(PointSet):
