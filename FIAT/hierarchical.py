@@ -9,14 +9,48 @@
 import numpy
 
 from FIAT import finite_element, dual_set, functional
-from FIAT.reference_element import symmetric_simplex
+from FIAT.expansions import polynomial_dimension
+from FIAT.reference_element import symmetric_simplex, lattice_iter
 from FIAT.quadrature import FacetQuadratureRule
-from FIAT.polynomial_set import ONPolynomialSet
+from FIAT.polynomial_set import ONPolynomialSet, make_bubbles
 from FIAT.check_format_variant import check_format_variant, parse_quadrature_scheme
 from FIAT.P0 import P0
 
 
-def make_dual_bubbles(ref_el, degree, interpolant_deg=None, quad_scheme=None):
+def make_projected_bubble_moments(ref_el, degree, interpolant_deg=None, quad_scheme=None):
+    """Tabulate moments against projected bubbles of the given degree."""
+    if interpolant_deg is None:
+        interpolant_deg = degree
+    sd = ref_el.get_spatial_dimension()
+    num_cells = len(ref_el.get_topology()[sd])
+    deg = numpy.array([sum(alpha) for alpha in lattice_iter(0, degree - sd, sd)])
+    lex2hier = numpy.argsort(deg, kind="stable")
+
+    Q = parse_quadrature_scheme(ref_el, degree + interpolant_deg, quad_scheme)
+    P = ONPolynomialSet(ref_el, degree, scale="orthonormal")
+    phis = P.tabulate(Q.get_points())[(0,) * sd]
+    duals = numpy.multiply(phis, Q.get_weights())
+
+    B = make_bubbles(ref_el, degree)
+    bubbles = B.tabulate(Q.get_points())[(0,) * sd]
+    bubbles = bubbles.reshape(num_cells, len(B)//num_cells, -1)
+    bubbles = bubbles[:, lex2hier, :]
+    bubbles = bubbles.reshape(len(B), -1)
+    coeffs = numpy.dot(duals, bubbles.T)
+    coeffs = coeffs.reshape(num_cells, len(duals)//num_cells, num_cells, -1)
+
+    for k in range(degree-sd):
+        dimPk0 = polynomial_dimension(ref_el, k) // num_cells
+        dimPk1 = polynomial_dimension(ref_el, k-1) // num_cells
+        dimPkd = polynomial_dimension(ref_el, k+sd) // num_cells
+        coeffs[:, :dimPkd, :, dimPk1:dimPk0] = 0
+
+    coeffs = coeffs.reshape(len(duals), -1)
+    coeffs /= numpy.linalg.norm(coeffs, axis=0)
+    return Q, numpy.dot(coeffs.T, phis)
+
+
+def make_dual_bubbles(ref_el, degree, codim=0, interpolant_deg=None, quad_scheme=None, scale="orthonormal"):
     """Tabulate the L2-duals of the hierarchical C0 basis."""
     dim = ref_el.get_spatial_dimension()
     if dim == 0:
@@ -24,15 +58,13 @@ def make_dual_bubbles(ref_el, degree, interpolant_deg=None, quad_scheme=None):
         degree = 0
     if interpolant_deg is None:
         interpolant_deg = degree
-
     Q = parse_quadrature_scheme(ref_el, degree + interpolant_deg, quad_scheme)
-    if dim == 0:
-        return Q, numpy.ones((1, len(Q.get_weights())))
-
-    dual_degree = degree - dim - 1
-    poly_set = ONPolynomialSet(ref_el, dual_degree, scale="orthonormal", variant="dual")
-    dual_values = poly_set.tabulate(Q.get_points())[(0,) * dim]
-    return Q, dual_values
+    B = make_bubbles(ref_el, degree, codim=codim, scale=scale)
+    P_at_qpts = B.expansion_set.tabulate(degree, Q.get_points())
+    M = numpy.dot(numpy.multiply(P_at_qpts, Q.get_weights()), P_at_qpts.T)
+    phis = numpy.linalg.solve(M, P_at_qpts)
+    phis = numpy.dot(B.get_coeffs(), phis)
+    return Q, phis
 
 
 class LegendreDual(dual_set.DualSet):
@@ -80,11 +112,14 @@ class Legendre(finite_element.CiarletElement):
 
 
 class IntegratedLegendreDual(dual_set.DualSet):
-    """Uncombined moments against the dual integrated Legendre bubbles."""
+    """The dual basis for integrated Legendre elements."""
     def __init__(self, ref_el, degree, interpolant_deg=None, quad_scheme=None):
+        if interpolant_deg is None:
+            interpolant_deg = degree
         top = ref_el.get_topology()
         entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
         nodes = []
+
         for dim in sorted(top):
             if degree <= dim:
                 continue
@@ -99,7 +134,7 @@ class IntegratedLegendreDual(dual_set.DualSet):
         super().__init__(nodes, ref_el, entity_ids)
 
 
-class IntegratedLegendre(finite_element.NonNodalElement):
+class IntegratedLegendre(finite_element.CiarletElement):
     """Simplicial continuous element with integrated Legendre polynomials."""
     def __init__(self, ref_el, degree, variant=None, quad_scheme=None):
         splitting, variant, interpolant_deg = check_format_variant(variant, degree)
@@ -107,7 +142,7 @@ class IntegratedLegendre(finite_element.NonNodalElement):
             ref_el = splitting(ref_el)
         if degree < 1:
             raise ValueError(f"{type(self).__name__} elements only valid for k >= 1")
-        poly_set = ONPolynomialSet(ref_el, degree, scale="orthonormal", variant="bubble")
+        poly_set = ONPolynomialSet(ref_el, degree, variant="bubble")
         dual = IntegratedLegendreDual(ref_el, degree, interpolant_deg=interpolant_deg, quad_scheme=quad_scheme)
         formdegree = 0  # 0-form
         super().__init__(poly_set, dual, degree, formdegree)

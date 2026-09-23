@@ -9,7 +9,6 @@
 # bfs, but the extra 20 are used in the transformation theory.
 
 from FIAT import finite_element, polynomial_set, macro
-from FIAT.bubble import make_projected_bubble_moment
 from FIAT.dual_set import DualSet
 from FIAT.functional import (
     PointEvaluation, PointDerivative,
@@ -18,6 +17,7 @@ from FIAT.functional import (
 from FIAT.reference_element import TETRAHEDRON
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
+from FIAT.hierarchical import make_projected_bubble_moments
 from FIAT.jacobi import eval_jacobi
 import numpy
 
@@ -66,7 +66,8 @@ class WalkingtonDualSet(DualSet):
         x = ref_edge.compute_barycentric_coordinates(Q_edge.get_points())
         leg4_at_qpts = eval_jacobi(0, 0, 4, x[:, 1] - x[:, 0])
         # Face constraint: normal derivative drops to degree-2
-        Q_constraint, phi = make_projected_bubble_moment(ref_face, degree-2)
+        Q_face, phis = make_projected_bubble_moments(ref_face, degree-2)
+        phi = phis[-1]
 
         extra_entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
         extra_nodes = []
@@ -84,7 +85,7 @@ class WalkingtonDualSet(DualSet):
                 nfe /= numpy.linalg.norm(nfe)
                 nodes.append(IntegralMomentOfDerivative(ref_el, Q, leg4_at_qpts, nfe))
 
-            Q = FacetQuadratureRule(ref_el, 2, face, Q_constraint, avg=True)
+            Q = FacetQuadratureRule(ref_el, 2, face, Q_face, avg=True)
             nodes.extend(IntegralMomentOfDerivative(ref_el, Q, phi, nface, t) for t in thats)
             entity_ids[2][face].extend(range(cur, len(nodes)))
 
