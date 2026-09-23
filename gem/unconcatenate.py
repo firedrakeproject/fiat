@@ -245,7 +245,7 @@ def _unconcatenate(cache, pairs):
 
 
 def _split_contraction(cache, expression, indices):
-    # Tail-call recursive core of split_contraction.
+    # Recursive core of split_contraction.
     # Assumes that input has already been sanitised.
     concat_group = find_group([expression], set(indices))
     if concat_group is None:

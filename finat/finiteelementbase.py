@@ -305,10 +305,10 @@ class FiniteElementBase(metaclass=ABCMeta):
             The direct-sum leaves on this element's cell.
         """
         from finat.enriched import as_enriched  # Avoid circular import
-        summands = as_enriched(self)
-        if summands is None:
+        enriched = as_enriched(self)
+        if enriched is None:
             return (self,)
-        return summands.summands
+        return enriched.summands
 
     def dual_evaluation(self, fn, coordinate_mapping=None):
         '''Get a GEM expression for performing the dual basis evaluation at
