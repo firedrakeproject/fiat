@@ -48,14 +48,14 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">finite_element</span><span class="p">,</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">macro</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.dual_set</span><span class="w"> </span><span class="kn">import</span> <span class="n">DualSet</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.expansions</span><span class="w"> </span><span class="kn">import</span> <span class="n">polynomial_dimension</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.functional</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">PointEvaluation</span><span class="p">,</span> <span class="n">PointDerivative</span><span class="p">,</span>
     <span class="n">IntegralMomentOfDerivative</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.reference_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">TETRAHEDRON</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature</span><span class="w"> </span><span class="kn">import</span> <span class="n">FacetQuadratureRule</span><span class="p">,</span> <span class="n">QuadratureRule</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature</span><span class="w"> </span><span class="kn">import</span> <span class="n">FacetQuadratureRule</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature_schemes</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_quadrature</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.hierarchical</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_projected_bubble_moments</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.jacobi</span><span class="w"> </span><span class="kn">import</span> <span class="n">eval_jacobi</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 
@@ -105,8 +105,9 @@
         <span class="n">Q_edge</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">ref_edge</span><span class="p">,</span> <span class="mi">2</span><span class="o">*</span><span class="p">(</span><span class="n">degree</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span>
         <span class="n">x</span> <span class="o">=</span> <span class="n">ref_edge</span><span class="o">.</span><span class="n">compute_barycentric_coordinates</span><span class="p">(</span><span class="n">Q_edge</span><span class="o">.</span><span class="n">get_points</span><span class="p">())</span>
         <span class="n">leg4_at_qpts</span> <span class="o">=</span> <span class="n">eval_jacobi</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="n">x</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">x</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])</span>
-        <span class="c1"># Face constraint: normal derivative is cubic</span>
-        <span class="n">Q_face</span><span class="p">,</span> <span class="n">phi</span> <span class="o">=</span> <span class="n">face_constraint</span><span class="p">(</span><span class="n">ref_face</span><span class="p">)</span>
+        <span class="c1"># Face constraint: normal derivative drops to degree-2</span>
+        <span class="n">Q_face</span><span class="p">,</span> <span class="n">phis</span> <span class="o">=</span> <span class="n">make_projected_bubble_moments</span><span class="p">(</span><span class="n">ref_face</span><span class="p">,</span> <span class="n">degree</span><span class="o">-</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">phi</span> <span class="o">=</span> <span class="n">phis</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
 
         <span class="n">extra_entity_ids</span> <span class="o">=</span> <span class="p">{</span><span class="n">dim</span><span class="p">:</span> <span class="p">{</span><span class="n">entity</span><span class="p">:</span> <span class="p">[]</span> <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="n">top</span><span class="p">[</span><span class="n">dim</span><span class="p">]}</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">top</span><span class="p">}</span>
         <span class="n">extra_nodes</span> <span class="o">=</span> <span class="p">[]</span>
@@ -153,31 +154,6 @@
         <span class="n">ref_complex</span> <span class="o">=</span> <span class="n">macro</span><span class="o">.</span><span class="n">AlfeldSplit</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
         <span class="n">poly_set</span> <span class="o">=</span> <span class="n">macro</span><span class="o">.</span><span class="n">CkPolynomialSet</span><span class="p">(</span><span class="n">ref_complex</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">vorder</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">"bubble"</span><span class="p">)</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span></div>
-
-
-
-<div class="viewcode-block" id="face_constraint">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.walkington.face_constraint">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">face_constraint</span><span class="p">(</span><span class="n">ref_face</span><span class="p">):</span>
-    <span class="n">k</span> <span class="o">=</span> <span class="mi">3</span>
-    <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_face</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
-    <span class="n">Q</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">ref_face</span><span class="p">,</span> <span class="mi">2</span><span class="o">*</span><span class="n">k</span><span class="p">)</span>
-    <span class="n">dimPkm1</span> <span class="o">=</span> <span class="n">polynomial_dimension</span><span class="p">(</span><span class="n">ref_face</span><span class="p">,</span> <span class="n">k</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
-
-    <span class="n">pts</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">()[:</span><span class="mi">3</span><span class="p">])</span>
-    <span class="n">pts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">()[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
-    <span class="n">P</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_face</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span>
-    <span class="n">Pk</span> <span class="o">=</span> <span class="n">P</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">pts</span><span class="p">)[(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="n">sd</span><span class="p">][</span><span class="n">dimPkm1</span><span class="p">:]</span>
-    <span class="n">c</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">Pk</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
-    <span class="n">Pk</span> <span class="o">=</span> <span class="n">P</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">())[(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="n">sd</span><span class="p">][</span><span class="n">dimPkm1</span><span class="p">:]</span>
-    <span class="n">phi</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">Pk</span><span class="p">)</span>
-
-    <span class="n">supp</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">phi</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">1E-12</span>
-    <span class="n">pts</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">()[</span><span class="n">supp</span><span class="p">]</span>
-    <span class="n">wts</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">()[</span><span class="n">supp</span><span class="p">]</span>
-    <span class="n">Q</span> <span class="o">=</span> <span class="n">QuadratureRule</span><span class="p">(</span><span class="n">ref_face</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">wts</span><span class="p">)</span>
-    <span class="n">phi</span> <span class="o">=</span> <span class="n">phi</span><span class="p">[</span><span class="n">supp</span><span class="p">]</span>
-    <span class="k">return</span> <span class="n">Q</span><span class="p">,</span> <span class="n">phi</span></div>
 
 </pre></div>
 
