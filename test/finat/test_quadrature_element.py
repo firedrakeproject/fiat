@@ -25,7 +25,7 @@ def test_create_from_quadrature(cell):
 
 
 @pytest.mark.parametrize("cellname", ["quadrilateral", "hexahedron"])
-@pytest.mark.parametrize("degree", [1, 2, 3, 5])
+@pytest.mark.parametrize("degree", range(1, 6))
 def test_facet_factorisation_ordering(cellname, degree):
     """The products dual evaluation splits into number the same points."""
     element = make_quadrature_element(ufc_cell(cellname), degree, codim=1)
