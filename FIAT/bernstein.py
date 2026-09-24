@@ -371,27 +371,52 @@ def _ck_coefficients(ref_el, degree, order, vorder, entity_ids=None):
         row = c0_ids[dim][entity][entity_multiindices(dim).index(beta)]
         row_of_point.update(dict.fromkeys(local_points, row))
 
+    # On the ball of radius vorder around the interior vertex, the spline is a
+    # polynomial of degree vorder. Its Bernstein coefficients on each cell are
+    # convex combinations of its Bernstein coefficients on the parent simplex,
+    # which enter the conditions as auxiliary unknowns.
+    parent_vertices = [vertex for vertex in topology[0] if vertex not in interior_vertices]
+    parent_alphas = {alpha: i for i, alpha in enumerate(multiindex_equal(sd + 1, vorder))}
+    B2R = numpy.vstack([numpy.transpose(ref_el.get_vertices_of_subcomplex(parent_vertices)),
+                        numpy.ones(sd + 1)])
+    num_columns = len(c0_coeffs) + len(interior_vertices) * len(parent_alphas)
+
+    conditions = []
+    for interior_vertex in ref_el.get_vertices_of_subcomplex(interior_vertices):
+        bary = numpy.linalg.solve(B2R, [*interior_vertex, 1])[None, :]
+        for m in range(vorder + 1):
+            gammas = list(multiindex_equal(sd + 1, vorder - m))
+            weights = [bernstein_db(bary, gamma)[0] for gamma in gammas]
+            for local_points in domain_points.values():
+                cell, alpha = local_points[0]
+                if distance_to_interior_vertex(cell, alpha) != m:
+                    continue
+                exponents = dict(zip(topology[sd][cell], alpha))
+                condition = numpy.zeros(num_columns)
+                condition[row_of_point[cell, alpha]] += 1
+                for gamma, weight in zip(gammas, weights):
+                    parent_alpha = tuple(exponents.get(vertex, 0) + g
+                                         for vertex, g in zip(parent_vertices, gamma))
+                    condition[len(c0_coeffs) + parent_alphas[parent_alpha]] -= weight
+                conditions.append(condition)
+
     # The C^m condition across the facet shared by cells a and b equates the
     # coefficients in cell b at distance m from the facet to the m-th
     # de Casteljau step in cell a towards the vertex of cell b opposite to the facet.
-    conditions = []
     for facet in ref_el.get_interior_facets(sd - 1):
         facet_vertices = topology[sd - 1][facet]
         cell_a, cell_b = ref_el.connectivity[(sd - 1, sd)][facet]
         vertex_b, = set(topology[sd][cell_b]) - set(facet_vertices)
         bary = ref_el.compute_barycentric_coordinates(
             ref_el.get_vertices_of_subcomplex((vertex_b,)), entity=(sd, cell_a))
-        for m in range(1, vorder + 1):
+        for m in range(1, order + 1):
             gammas = list(multiindex_equal(sd + 1, m))
             weights = [bernstein_db(bary, gamma)[0] for gamma in gammas]
             for beta in multiindex_equal(sd, degree - m):
                 exponents = dict(zip(facet_vertices, beta))
                 alpha_b = tuple(m if vertex == vertex_b else exponents.get(vertex, 0)
                                 for vertex in topology[sd][cell_b])
-                # Beyond C^order, smoothness is only imposed on the ball of radius vorder
-                if m > order and distance_to_interior_vertex(cell_b, alpha_b) > vorder:
-                    continue
-                condition = numpy.zeros(len(c0_coeffs))
+                condition = numpy.zeros(num_columns)
                 condition[row_of_point[cell_b, alpha_b]] += 1
                 for gamma, weight in zip(gammas, weights):
                     alpha_a = tuple(exponents.get(vertex, 0) + g
@@ -399,6 +424,7 @@ def _ck_coefficients(ref_el, degree, order, vorder, entity_ids=None):
                     condition[row_of_point[cell_a, alpha_a]] -= weight
                 conditions.append(condition)
 
-    A = numpy.reshape(conditions, (-1, len(c0_coeffs)))
+    A = numpy.reshape(conditions, (-1, num_columns))
     dependent, *_ = numpy.linalg.lstsq(A[:, num_free:], -A[:, :num_free], rcond=None)
+    dependent = dependent[:len(c0_coeffs) - num_free]
     return c0_coeffs[:num_free] + dependent.T @ c0_coeffs[num_free:]
