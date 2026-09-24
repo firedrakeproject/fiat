@@ -155,6 +155,7 @@ class CiarletElement(FiniteElement):
 
         new_shp = new_coeffs_flat.shape[:1] + shp[1:]
         new_coeffs = new_coeffs_flat.reshape(new_shp)
+
         if recombine_dual:
             dual = dual.recombine(new_coeffs.T)
         else:

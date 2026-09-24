@@ -11,10 +11,9 @@ import numpy
 
 from FIAT import expansions, polynomial_set
 from FIAT.finite_element import CiarletElement
-from FIAT.dual_set import DualSet
-from FIAT.functional import PointEvaluation
+from FIAT.lagrange import LagrangeDualSet
 from FIAT.polynomial_set import mis
-from FIAT.reference_element import default_simplex, make_lattice
+from FIAT.reference_element import default_simplex
 
 
 class BernsteinExpansionSet(expansions.ExpansionSet):
@@ -76,47 +75,17 @@ class BernsteinExpansionSet(expansions.ExpansionSet):
         return result
 
 
-class BernsteinDualSet(DualSet):
-    """The dual basis for Bernstein elements."""
-
-    def __init__(self, ref_el, degree):
-        # Initialise data structures
-        topology = ref_el.get_topology()
-        entity_ids = {dim: {entity_i: []
-                            for entity_i in entities}
-                      for dim, entities in topology.items()}
-
-        # Calculate inverse topology
-        inverse_topology = {vertices: (dim, entity_i)
-                            for dim, entities in topology.items()
-                            for entity_i, vertices in entities.items()}
-
-        # Generate triangular barycentric indices
-        dim = ref_el.get_spatial_dimension()
-        kss = mis(dim + 1, degree)
-
-        # Fill data structures
-        nodes = []
-        for i, ks in enumerate(kss):
-            vertices, = numpy.nonzero(ks)
-            entity_dim, entity_i = inverse_topology[tuple(vertices)]
-            entity_ids[entity_dim][entity_i].append(i)
-
-            nodes.append(PointEvaluation(ref_el, make_lattice(
-                ref_el.vertices, degree, variant="gll")[i]))
-
-        super().__init__(nodes, ref_el, entity_ids)
-
-
 class Bernstein(CiarletElement):
-    """A finite element with Bernstein polynomials as basis functions."""
+    """A finite element with Bernstein polynomials as basis functions.
+
+    The nodes are linear combinations of point evaluations at GLL points.
+    """
 
     def __init__(self, ref_el, degree):
         expansion_set = BernsteinExpansionSet(ref_el)
-        poly_set = polynomial_set.PolynomialSet(
-            ref_el, degree, degree, expansion_set,
-            numpy.eye(expansion_set.get_num_members(degree)))
-        dual = BernsteinDualSet(ref_el, degree)
+        coeffs = numpy.eye(expansion_set.get_num_members(degree))
+        poly_set = polynomial_set.PolynomialSet(ref_el, degree, degree, expansion_set, coeffs)
+        dual = LagrangeDualSet(ref_el, degree, variant="gll")
         super().__init__(poly_set, dual, degree, formdegree=0, recombine_dual=True)
 
 
