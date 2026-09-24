@@ -145,21 +145,23 @@ class CiarletElement(FiniteElement):
         V = numpy.dot(A, numpy.transpose(B))
         self.V = V
 
-        # new_coeffs_flat = numpy.linalg.solve(V.T, B)
+        # Either recombine the nodes by V^{-1} to make them dual to the
+        # prescribed basis, or recombine the basis by V^{-T} to make it nodal.
         with warnings.catch_warnings():
             warnings.filterwarnings("error")
             try:
-                new_coeffs_flat = scipy.linalg.solve(V, B, transposed=True)
+                if recombine_dual:
+                    dual_coeffs = scipy.linalg.solve(V, numpy.eye(len(V)))
+                else:
+                    new_coeffs_flat = scipy.linalg.solve(V, B, transposed=True)
             except (scipy.linalg.LinAlgWarning, scipy.linalg.LinAlgError):
                 raise numpy.linalg.LinAlgError("Singular Vandermonde matrix")
 
-        new_shp = new_coeffs_flat.shape[:1] + shp[1:]
-        new_coeffs = new_coeffs_flat.reshape(new_shp)
-
         if recombine_dual:
-            dual = dual.recombine(new_coeffs.T)
+            dual = dual.recombine(dual_coeffs)
         else:
-            poly_set = poly_set.recombine(new_coeffs)
+            new_shp = new_coeffs_flat.shape[:1] + shp[1:]
+            poly_set = poly_set.recombine(new_coeffs_flat.reshape(new_shp))
 
         super().__init__(ref_el, dual, order, formdegree, mapping, ref_complex)
         self.poly_set = poly_set

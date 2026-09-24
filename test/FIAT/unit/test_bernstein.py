@@ -24,7 +24,7 @@ import pytest
 
 from FIAT.reference_element import ufc_simplex
 from FIAT.bernstein import Bernstein, BernsteinPolynomialSet
-from FIAT.macro import AlfeldSplit
+from FIAT.macro import AlfeldSplit, CkPolynomialSet
 from FIAT.quadrature_schemes import create_quadrature
 
 
@@ -83,20 +83,34 @@ def test_bernstein_2nd_derivatives():
     assert numpy.allclose(D20, actual[(2, 0)])
 
 
-@pytest.mark.parametrize("degree", (1, 2, 3))
-def test_bernstein_c0_alfeld(degree):
-    ref_el = AlfeldSplit(ufc_simplex(2))
+@pytest.mark.parametrize("dim, degree",
+                         [(dim, degree) for dim in (1, 2, 3) for degree in range(1, 2*dim + 1)])
+def test_bernstein_dual_basis(dim, degree):
+    elem = Bernstein(ufc_simplex(dim), degree)
+    poly_set = elem.get_nodal_basis()
+    dualmat = elem.get_dual_set().to_riesz(poly_set)
+
+    assert numpy.allclose(dualmat @ poly_set.get_coeffs().T, numpy.eye(elem.space_dimension()))
+
+
+@pytest.mark.parametrize("dim, degree",
+                         [(dim, degree) for dim in (2, 3) for degree in range(1, 2*dim + 1)])
+def test_bernstein_c0_alfeld(dim, degree):
+    ref_el = AlfeldSplit(ufc_simplex(dim))
     poly_set = BernsteinPolynomialSet(ref_el, degree, order=0)
-    points = create_quadrature(ref_el, degree).get_points()
+    points = create_quadrature(ref_el, 2*degree).get_points()
 
     expected_dimension = sum(
         math.comb(degree - 1, dim) * len(ref_el.get_topology()[dim])
         for dim in ref_el.get_topology()
     )
-    values = poly_set.tabulate(points)[(0, 0)]
+    values = poly_set.tabulate(points)[(0,) * dim]
+    c0_values = CkPolynomialSet(ref_el, degree, order=0).tabulate(points)[(0,) * dim]
+    rank = numpy.linalg.matrix_rank
 
     assert poly_set.get_num_members() == expected_dimension
     assert numpy.allclose(values.sum(axis=0), 1)
+    assert rank(values) == rank(c0_values) == rank(numpy.vstack([values, c0_values]))
 
 
 @pytest.mark.parametrize("degree, expected_dimension", ((1, 3), (2, 6), (3, 12)))
