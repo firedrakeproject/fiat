@@ -9,6 +9,7 @@
 import math
 import numpy
 
+from FIAT.check_format_variant import parse_lagrange_variant
 from FIAT.expansions import ExpansionSet
 from FIAT.finite_element import CiarletElement
 from FIAT.lagrange import LagrangeDualSet
@@ -83,12 +84,23 @@ class BernsteinPolynomialSet(PolynomialSet):
 class Bernstein(CiarletElement):
     """A finite element with Bernstein polynomials as basis functions.
 
-    The nodes are linear combinations of point evaluations at GLL points.
+    The nodes are linear combinations of Lagrange point evaluations.
+
+    :arg ref_el: The reference simplex.
+    :arg degree: The polynomial degree.
+    :kwarg variant: A comma-separated string that may specify the type of
+        point distribution and the splitting strategy if a macro element is
+        desired, as in :class:`FIAT.lagrange.Lagrange`.
+        Example: variant='alfeld' gives C0 piecewise Bernstein polynomials
+        on the barycentric refinement.
     """
 
-    def __init__(self, ref_el, degree):
-        dual = LagrangeDualSet(ref_el, degree, point_variant="gll", sort_entities=True)
-        poly_set = BernsteinPolynomialSet(ref_el, degree, entity_ids=dual.get_entity_ids())
+    def __init__(self, ref_el, degree, variant="gll"):
+        splitting, point_variant = parse_lagrange_variant(variant)
+        if splitting is not None:
+            ref_el = splitting(ref_el)
+        dual = LagrangeDualSet(ref_el, degree, point_variant=point_variant, sort_entities=True)
+        poly_set = BernsteinPolynomialSet(ref_el, degree, entity_ids=dual._macro_entity_ids)
         super().__init__(poly_set, dual, degree, formdegree=0, recombine_dual=True)
 
 

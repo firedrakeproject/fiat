@@ -19,7 +19,8 @@ class DualSet:
                  coeffs=None):
         if ref_el.get_dimension() != max(entity_ids):
             entity_ids = unflatten_entity_ids(ref_el, entity_ids)
-        nodes, ref_el, entity_ids, entity_permutations = merge_entities(nodes, ref_el, entity_ids, entity_permutations)
+        nodes, ref_el, entity_ids, entity_permutations, macro_entity_ids = merge_entities(
+            nodes, ref_el, entity_ids, entity_permutations)
         if coeffs is not None:
             coeffs = numpy.asarray(coeffs)
             if coeffs.shape != (len(nodes), len(nodes)):
@@ -29,6 +30,8 @@ class DualSet:
         self.coeffs = coeffs
         self.ref_el = ref_el
         self.entity_ids = entity_ids
+        # The entity ids on the simplicial complex, numbered by the merged node ordering
+        self._macro_entity_ids = macro_entity_ids
         self.entity_permutations = entity_permutations
 
         # Compute the nodes on the closure of each sub_entity.
@@ -332,10 +335,14 @@ def lexsort_nodes(ref_el, nodes, entity=None, offset=0):
 
 
 def merge_entities(nodes, ref_el, entity_ids, entity_permutations):
-    """Collect DOFs from simplicial complex onto facets of parent cell."""
+    """Collect DOFs from simplicial complex onto facets of parent cell.
+
+    Also returns the entity ids on the simplicial complex, numbered by the
+    merged node ordering.
+    """
     parent_cell = ref_el.get_parent()
     if parent_cell is None:
-        return nodes, ref_el, entity_ids, entity_permutations
+        return nodes, ref_el, entity_ids, entity_permutations, entity_ids
     parent_ids = {}
     parent_permutations = None
     parent_to_children = ref_el.get_parent_to_children()
@@ -343,17 +350,21 @@ def merge_entities(nodes, ref_el, entity_ids, entity_permutations):
     if all(isinstance(node, functional.PointEvaluation) for node in nodes):
         # Merge Lagrange dual with lexicographical reordering
         parent_nodes = []
+        child_ids = {dim: {} for dim in entity_ids}
         for dim in sorted(parent_to_children):
             parent_ids[dim] = {}
             for entity in sorted(parent_to_children[dim]):
                 cur = len(parent_nodes)
                 for child_dim, child_entity in parent_to_children[dim][entity]:
+                    start = len(parent_nodes)
                     parent_nodes.extend(nodes[i] for i in entity_ids[child_dim][child_entity])
+                    child_ids[child_dim][child_entity] = list(range(start, len(parent_nodes)))
                 ids = lexsort_nodes(parent_cell, parent_nodes[cur:], entity=(dim, entity), offset=cur)
                 parent_ids[dim][entity] = ids
     else:
         # Merge everything else with the same node ordering
         parent_nodes = nodes
+        child_ids = entity_ids
         for dim in sorted(parent_to_children):
             parent_ids[dim] = {}
             for entity in sorted(parent_to_children[dim]):
@@ -361,4 +372,4 @@ def merge_entities(nodes, ref_el, entity_ids, entity_permutations):
                 for child_dim, child_entity in parent_to_children[dim][entity]:
                     parent_ids[dim][entity].extend(entity_ids[child_dim][child_entity])
 
-    return parent_nodes, parent_cell, parent_ids, parent_permutations
+    return parent_nodes, parent_cell, parent_ids, parent_permutations, child_ids

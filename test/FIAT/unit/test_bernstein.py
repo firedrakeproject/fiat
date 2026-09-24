@@ -113,6 +113,32 @@ def test_bernstein_c0_alfeld(dim, degree):
     assert rank(values) == rank(c0_values) == rank(numpy.vstack([values, c0_values]))
 
 
+@pytest.mark.parametrize("dim, variant, degree",
+                         [(dim, variant, degree)
+                          for dim in (1, 2, 3)
+                          for variant in ("alfeld", "iso", "powell-sabin", "worsey-farin")
+                          for degree in range(1, 2*dim + 1)
+                          if (dim, variant) != (1, "worsey-farin")])
+def test_bernstein_macro_variant(dim, variant, degree):
+    ref_el = ufc_simplex(dim)
+    elem = Bernstein(ref_el, degree, variant=variant)
+    ref_complex = elem.get_reference_complex()
+    poly_set = elem.get_nodal_basis()
+    dualmat = elem.get_dual_set().to_riesz(poly_set)
+    assert elem.is_macroelement()
+    assert numpy.allclose(dualmat @ poly_set.get_coeffs().T, numpy.eye(elem.space_dimension()))
+
+    points = create_quadrature(ref_complex, 2*degree).get_points()
+    values = elem.tabulate(0, points)[(0,) * dim]
+    c0_values = CkPolynomialSet(ref_complex, degree, order=0).tabulate(points)[(0,) * dim]
+    rank = numpy.linalg.matrix_rank
+    assert rank(values) == rank(c0_values) == rank(numpy.vstack([values, c0_values]))
+
+    for facet, dofs in elem.entity_closure_dofs()[dim - 1].items():
+        facet_values = elem.tabulate(0, ref_el.make_points(dim - 1, facet, degree + 3))[(0,) * dim]
+        assert numpy.allclose(numpy.delete(facet_values, dofs, axis=0), 0)
+
+
 @pytest.mark.parametrize("degree, expected_dimension", ((1, 3), (2, 6), (3, 12)))
 def test_bernstein_c1_alfeld(degree, expected_dimension):
     ref_el = AlfeldSplit(ufc_simplex(2))
