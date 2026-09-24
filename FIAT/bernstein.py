@@ -20,8 +20,8 @@ class BernsteinExpansionSet(ExpansionSet):
     """Bernstein polynomial expansion set on a simplex."""
 
     def __init__(self, ref_el):
-        if not ref_el.is_simplex():
-            raise ValueError("Bernstein expansion sets require a simplex")
+        if not (ref_el.is_simplex() or ref_el.is_macrocell()):
+            raise ValueError("Bernstein expansion sets require a simplex or macrocell")
         super().__init__(ref_el, scale=1.0)
 
     def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
@@ -60,28 +60,71 @@ class BernsteinExpansionSet(ExpansionSet):
         return result
 
 
-class BernsteinPolynomialSet(PolynomialSet):
-    """The Bernstein polynomials of a given degree on a simplex.
+def _c0_coefficients(ref_el, degree, entity_ids=None, sort_entities=False):
+    """Construct C0 Bernstein coefficients from entity multiindices."""
+    sd = ref_el.get_spatial_dimension()
+    topology = ref_el.get_topology()
+    if degree == 0 and ref_el.is_simplex():
+        return numpy.ones((1, 1))
+    local_alphas = list(multiindex_equal(sd + 1, degree))
+    local_alpha_ids = {alpha: i for i, alpha in enumerate(local_alphas)}
+    num_cells = len(topology[sd])
+    num_local = len(local_alphas)
+    if entity_ids is None:
+        entities = [(dim, entity) for dim in sorted(topology) for entity in sorted(topology[dim])]
+        if sort_entities:
+            entities.sort(key=lambda entity: topology[entity[0]][entity[1]])
+        entity_ids = {dim: {entity: [] for entity in topology[dim]} for dim in topology}
+        cur = 0
+        for dim, entity in entities:
+            num_entity_alphas = sum(1 for _ in multiindex_equal(dim + 1, degree, imin=1))
+            entity_ids[dim][entity] = list(range(cur, cur + num_entity_alphas))
+            cur += num_entity_alphas
+    num_members = sum(len(ids) for entities in entity_ids.values() for ids in entities.values())
+    coeffs = numpy.zeros((num_members, num_cells * num_local))
 
-    :arg ref_el: The simplex.
+    for dim, entities in topology.items():
+        entity_alphas = list(multiindex_equal(dim + 1, degree, imin=1))
+        for entity, entity_vertices in entities.items():
+            ids = entity_ids[dim][entity]
+            for row, alpha in zip(ids, entity_alphas):
+                for cell, cell_vertices in topology[sd].items():
+                    if not set(entity_vertices).issubset(cell_vertices):
+                        continue
+                    local_alpha = tuple(
+                        alpha[entity_vertices.index(vertex)] if vertex in entity_vertices else 0
+                        for vertex in cell_vertices
+                    )
+                    coeffs[row, cell * num_local + local_alpha_ids[local_alpha]] = 1
+    return coeffs
+
+
+class BernsteinPolynomialSet(PolynomialSet):
+    """The Bernstein polynomials of a given degree on a simplex or macrocell.
+
+    :arg ref_el: The simplex or macrocell.
     :arg degree: The polynomial degree.
-    :kwarg ordering: The ordering of the Bernstein polynomials, either
-        None for the ordering of the expansion set, or "topological"
-        for decreasing support entity dimension,
-        which orders the polynomials by their barycentric
-        exponents sorted in decreasing order.
+    :kwarg ordering: The entity ordering, either None for dimension-first
+        ordering or "topological" for ordering by support vertex ids.
+    :kwarg order: The continuity order for a macrocell. Only C0 is currently
+        supported.
+    :kwarg entity_ids: An optional entity-to-basis-index map defining the
+        ordering of the macrocell basis.
     """
-    def __init__(self, ref_el, degree, ordering=None):
-        sd = ref_el.get_spatial_dimension()
-        alphas = list(multiindex_equal(sd + 1, degree))
+    def __init__(self, ref_el, degree, ordering=None, order=0, entity_ids=None):
+        expansion_set = BernsteinExpansionSet(ref_el)
         if ordering is None:
-            order = Ellipsis
+            sort_entities = False
         elif ordering == "topological":
-            order = sorted(range(len(alphas)), key=lambda i: sorted(alphas[i], reverse=True))
+            sort_entities = True
         else:
             raise ValueError(f"Invalid ordering {ordering}")
-        coeffs = numpy.eye(len(alphas))[order]
-        super().__init__(ref_el, degree, degree, BernsteinExpansionSet(ref_el), coeffs)
+        if order != 0:
+            raise NotImplementedError("Only C0 Bernstein polynomial sets are implemented")
+        if degree < 1 and not ref_el.is_simplex():
+            raise ValueError("C0 Bernstein polynomial sets require a positive degree")
+        coeffs = _c0_coefficients(ref_el, degree, entity_ids, sort_entities=sort_entities)
+        super().__init__(ref_el, degree, degree, expansion_set, coeffs)
 
 
 class Bernstein(CiarletElement):
@@ -91,8 +134,8 @@ class Bernstein(CiarletElement):
     """
 
     def __init__(self, ref_el, degree):
-        poly_set = BernsteinPolynomialSet(ref_el, degree)
         dual = LagrangeDualSet(ref_el, degree, point_variant="gll", sort_entities=True)
+        poly_set = BernsteinPolynomialSet(ref_el, degree, entity_ids=dual.get_entity_ids())
         super().__init__(poly_set, dual, degree, formdegree=0, recombine_dual=True)
 
 
