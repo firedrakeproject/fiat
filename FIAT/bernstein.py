@@ -60,70 +60,23 @@ class BernsteinExpansionSet(ExpansionSet):
         return result
 
 
-def _c0_coefficients(ref_el, degree, entity_ids=None, sort_entities=False):
-    """Construct C0 Bernstein coefficients from entity multiindices."""
-    sd = ref_el.get_spatial_dimension()
-    topology = ref_el.get_topology()
-    if degree == 0 and ref_el.is_simplex():
-        return numpy.ones((1, 1))
-    local_alphas = list(multiindex_equal(sd + 1, degree))
-    local_alpha_ids = {alpha: i for i, alpha in enumerate(local_alphas)}
-    num_cells = len(topology[sd])
-    num_local = len(local_alphas)
-    if entity_ids is None:
-        entities = [(dim, entity) for dim in sorted(topology) for entity in sorted(topology[dim])]
-        if sort_entities:
-            entities.sort(key=lambda entity: topology[entity[0]][entity[1]])
-        entity_ids = {dim: {entity: [] for entity in topology[dim]} for dim in topology}
-        cur = 0
-        for dim, entity in entities:
-            num_entity_alphas = sum(1 for _ in multiindex_equal(dim + 1, degree, imin=1))
-            entity_ids[dim][entity] = list(range(cur, cur + num_entity_alphas))
-            cur += num_entity_alphas
-    num_members = sum(len(ids) for entities in entity_ids.values() for ids in entities.values())
-    coeffs = numpy.zeros((num_members, num_cells * num_local))
-
-    for dim, entities in topology.items():
-        entity_alphas = list(multiindex_equal(dim + 1, degree, imin=1))
-        for entity, entity_vertices in entities.items():
-            ids = entity_ids[dim][entity]
-            for row, alpha in zip(ids, entity_alphas):
-                for cell, cell_vertices in topology[sd].items():
-                    if not set(entity_vertices).issubset(cell_vertices):
-                        continue
-                    local_alpha = tuple(
-                        alpha[entity_vertices.index(vertex)] if vertex in entity_vertices else 0
-                        for vertex in cell_vertices
-                    )
-                    coeffs[row, cell * num_local + local_alpha_ids[local_alpha]] = 1
-    return coeffs
-
-
 class BernsteinPolynomialSet(PolynomialSet):
     """The Bernstein polynomials of a given degree on a simplex or macrocell.
 
     :arg ref_el: The simplex or macrocell.
     :arg degree: The polynomial degree.
-    :kwarg ordering: The entity ordering, either None for dimension-first
-        ordering or "topological" for ordering by support vertex ids.
     :kwarg order: The continuity order for a macrocell. Only C0 is currently
         supported.
     :kwarg entity_ids: An optional entity-to-basis-index map defining the
         ordering of the macrocell basis.
     """
-    def __init__(self, ref_el, degree, ordering=None, order=0, entity_ids=None):
+    def __init__(self, ref_el, degree, order=0, entity_ids=None):
         expansion_set = BernsteinExpansionSet(ref_el)
-        if ordering is None:
-            sort_entities = False
-        elif ordering == "topological":
-            sort_entities = True
-        else:
-            raise ValueError(f"Invalid ordering {ordering}")
         if order != 0:
             raise NotImplementedError("Only C0 Bernstein polynomial sets are implemented")
-        if degree < 1 and not ref_el.is_simplex():
-            raise ValueError("C0 Bernstein polynomial sets require a positive degree")
-        coeffs = _c0_coefficients(ref_el, degree, entity_ids, sort_entities=sort_entities)
+        if degree < 0:
+            raise ValueError("Bernstein polynomial sets require a nonnegative degree")
+        coeffs = _c0_coefficients(ref_el, degree, entity_ids)
         super().__init__(ref_el, degree, degree, expansion_set, coeffs)
 
 
@@ -214,3 +167,73 @@ def bernstein_Dx(points, ks, order, R2B):
                 values = R2B[:, d].dot(values)
         result[alpha] = values
     return result
+
+
+def _default_entity_ids(ref_el, degree):
+    """Construct the default Bernstein basis entity ordering."""
+    topology = ref_el.get_topology()
+    sd = ref_el.get_spatial_dimension()
+    local_alphas = list(multiindex_equal(sd + 1, degree))
+    inverse = {
+        vertices: (entity_dim, entity)
+        for entity_dim, entities in topology.items()
+        for entity, vertices in entities.items()
+    }
+    candidates = {}
+    for cell_vertices in topology[sd].values():
+        for alpha in local_alphas:
+            support = tuple(vertex for vertex, exponent in zip(cell_vertices, alpha) if exponent)
+            entity_dim, entity = inverse[support]
+            entity_vertices = topology[entity_dim][entity]
+            beta = tuple(alpha[cell_vertices.index(vertex)] for vertex in entity_vertices)
+            candidates.setdefault((entity_dim, entity, beta), alpha)
+
+    candidates = list(candidates.items())
+    order = sorted(
+        range(len(candidates)),
+        key=lambda i: tuple(sorted(candidates[i][1], reverse=True)),
+    )
+    row_of_candidate = {
+        candidates[candidate][0]: row for row, candidate in enumerate(order)
+    }
+    entity_ids = {dim: {entity: [] for entity in topology[dim]} for dim in topology}
+    for entity_dim, entities in topology.items():
+        for entity in entities:
+            for beta in multiindex_equal(entity_dim + 1, degree, imin=1):
+                candidate = (entity_dim, entity, beta)
+                entity_ids[entity_dim][entity].append(row_of_candidate[candidate])
+    return entity_ids
+
+
+def _c0_coefficients(ref_el, degree, entity_ids=None):
+    """Construct C0 Bernstein coefficients from entity multiindices."""
+    sd = ref_el.get_spatial_dimension()
+    topology = ref_el.get_topology()
+    if degree == 0:
+        coeffs = numpy.zeros((1, len(topology[sd])))
+        coeffs[0] = 1
+        return coeffs
+    local_alphas = list(multiindex_equal(sd + 1, degree))
+    local_alpha_ids = {alpha: i for i, alpha in enumerate(local_alphas)}
+    num_cells = len(topology[sd])
+    num_local = len(local_alphas)
+    if entity_ids is None:
+        entity_ids = _default_entity_ids(ref_el, degree)
+
+    num_members = sum(len(ids) for entities in entity_ids.values() for ids in entities.values())
+    coeffs = numpy.zeros((num_members, num_cells * num_local))
+
+    for dim, entities in topology.items():
+        entity_alphas = list(multiindex_equal(dim + 1, degree, imin=1))
+        for entity, entity_vertices in entities.items():
+            ids = entity_ids[dim][entity]
+            for row, alpha in zip(ids, entity_alphas):
+                for cell, cell_vertices in topology[sd].items():
+                    if not set(entity_vertices).issubset(cell_vertices):
+                        continue
+                    local_alpha = tuple(
+                        alpha[entity_vertices.index(vertex)] if vertex in entity_vertices else 0
+                        for vertex in cell_vertices
+                    )
+                    coeffs[row, cell * num_local + local_alpha_ids[local_alpha]] = 1
+    return coeffs
