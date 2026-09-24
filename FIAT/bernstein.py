@@ -9,70 +9,79 @@
 import math
 import numpy
 
-from FIAT import expansions, polynomial_set
+from FIAT.expansions import ExpansionSet
 from FIAT.finite_element import CiarletElement
 from FIAT.lagrange import LagrangeDualSet
-from FIAT.polynomial_set import mis
-from FIAT.reference_element import default_simplex
+from FIAT.polynomial_set import PolynomialSet, mis
+from FIAT.reference_element import multiindex_equal
 
 
-class BernsteinExpansionSet(expansions.ExpansionSet):
-    """Expansion set for Bernstein polynomials on a simplex."""
+class BernsteinExpansionSet(ExpansionSet):
+    """Bernstein polynomial expansion set on a simplex."""
 
-    def get_num_members(self, n):
-        """Return the number of Bernstein polynomials of degree ``n``."""
-        dim = self.ref_el.get_spatial_dimension()
-        return math.comb(n + dim, dim)
+    def __init__(self, ref_el):
+        if not ref_el.is_simplex():
+            raise ValueError("Bernstein expansion sets require a simplex")
+        super().__init__(ref_el, scale=1.0)
 
     def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
-        """Tabulate Bernstein polynomials and their derivatives."""
-        dim = self.ref_el.get_spatial_dimension()
-        pts = numpy.asarray(pts)
-        single_point = pts.ndim == 1
-        if single_point:
-            pts = pts[None, :]
-        A, b = self.affine_mappings[cell]
-        ref_pts = numpy.add(numpy.dot(pts, A.T), b).T
+        """Tabulate the expansion set and its derivatives on one cell."""
+        if direction is not None:
+            raise NotImplementedError("directional Bernstein tabulation is not implemented")
 
-        vertices = numpy.asarray(default_simplex(dim).get_vertices())
-        barycentric_to_reference = numpy.vstack([vertices.T, numpy.ones(dim + 1)])
-        reference_to_barycentric = numpy.linalg.inv(barycentric_to_reference)
-        barycentric = numpy.concatenate(
-            [ref_pts.T, numpy.ones((ref_pts.shape[1], 1))], axis=-1)
-        barycentric = numpy.dot(barycentric, reference_to_barycentric.T)
+        ref_el = self.ref_el
+        dim = ref_el.get_spatial_dimension()
+        topology = ref_el.get_topology()
+        vertices = ref_el.get_vertices_of_subcomplex(topology[dim][cell])
 
-        multiindices = mis(dim + 1, n)
-        values = {
-            derivative_order: [bernstein_Dx(
-                barycentric, ks, derivative_order, reference_to_barycentric)
-                for ks in multiindices]
-            for derivative_order in range(order + 1)
+        B2R = numpy.vstack([numpy.asarray(vertices).T, numpy.ones(len(vertices))])
+        R2B = numpy.linalg.inv(B2R)
+        points = numpy.asarray(pts)
+        B = numpy.concatenate([points, numpy.ones((*points.shape[:-1], 1))],
+                              axis=-1).dot(R2B.T)
+
+        raw_result = {
+            (derivative, i): vec
+            for i, alpha in enumerate(multiindex_equal(dim+1, n))
+            for o in range(order + 1)
+            for derivative, vec in bernstein_Dx(
+                B, alpha, o, R2B
+            ).items()
         }
-        result = {}
-        for derivative_order in range(order + 1):
-            for alpha in mis(dim, derivative_order):
-                derivative = numpy.stack([
-                    value[alpha] for value in values[derivative_order]])
-                if derivative_order == 0:
-                    result[alpha] = derivative
-                    continue
-
-                components = []
-                directions = tuple(
-                    direction for direction, count in enumerate(alpha)
-                    for _ in range(count))
-                for index in numpy.ndindex((dim,) * derivative_order):
-                    beta = tuple(index.count(i) for i in range(dim))
-                    coefficient = numpy.prod([
-                        A[coordinate, direction]
-                        for coordinate, direction in zip(index, directions)
-                    ])
-                    components.append(coefficient * numpy.stack(
-                        [value[beta] for value in values[derivative_order]]))
-                result[alpha] = sum(components)
-        if single_point:
-            result = {alpha: values[:, 0] for alpha, values in result.items()}
+        num_members = math.comb(n + dim, dim)
+        dtype = numpy.array(list(raw_result.values())).dtype
+        result = {
+            alpha: numpy.zeros((num_members, *points.shape[:-1]), dtype=dtype)
+            for o in range(order + 1)
+            for alpha in mis(dim, o)
+        }
+        for (alpha, i), vec in raw_result.items():
+            result[alpha][i] = vec
         return result
+
+
+class BernsteinPolynomialSet(PolynomialSet):
+    """The Bernstein polynomials of a given degree on a simplex.
+
+    :arg ref_el: The simplex.
+    :arg degree: The polynomial degree.
+    :kwarg ordering: The ordering of the Bernstein polynomials, either
+        None for the ordering of the expansion set, or "topological"
+        for decreasing support entity dimension,
+        which orders the polynomials by their barycentric
+        exponents sorted in decreasing order.
+    """
+    def __init__(self, ref_el, degree, ordering=None):
+        sd = ref_el.get_spatial_dimension()
+        alphas = list(multiindex_equal(sd + 1, degree))
+        if ordering is None:
+            order = Ellipsis
+        elif ordering == "topological":
+            order = sorted(range(len(alphas)), key=lambda i: sorted(alphas[i], reverse=True))
+        else:
+            raise ValueError(f"Invalid ordering {ordering}")
+        coeffs = numpy.eye(len(alphas))[order]
+        super().__init__(ref_el, degree, degree, BernsteinExpansionSet(ref_el), coeffs)
 
 
 class Bernstein(CiarletElement):
@@ -82,10 +91,8 @@ class Bernstein(CiarletElement):
     """
 
     def __init__(self, ref_el, degree):
-        expansion_set = BernsteinExpansionSet(ref_el)
-        coeffs = numpy.eye(expansion_set.get_num_members(degree))
-        poly_set = polynomial_set.PolynomialSet(ref_el, degree, degree, expansion_set, coeffs)
-        dual = LagrangeDualSet(ref_el, degree, variant="gll")
+        poly_set = BernsteinPolynomialSet(ref_el, degree)
+        dual = LagrangeDualSet(ref_el, degree, point_variant="gll", sort_entities=True)
         super().__init__(poly_set, dual, degree, formdegree=0, recombine_dual=True)
 
 
