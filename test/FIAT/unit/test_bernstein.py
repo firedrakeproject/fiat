@@ -25,6 +25,7 @@ import pytest
 from FIAT.reference_element import ufc_simplex
 from FIAT.bernstein import Bernstein, BernsteinPolynomialSet
 from FIAT.finite_element import CiarletElement
+from FIAT.hct import HCTDualSet, HsiehCloughTocher
 from FIAT.macro import AlfeldSplit, CkPolynomialSet
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.walkington import Walkington, WalkingtonDualSet
@@ -210,6 +211,19 @@ def test_bernstein_supersmooth_small_coefficients(dim, degree):
     ref_el = AlfeldSplit(ufc_simplex(dim))
     poly_set = BernsteinPolynomialSet(ref_el, degree, order=1, vorder=degree-1)
     assert abs(poly_set.get_coeffs()).max() < 30
+
+
+@pytest.mark.parametrize("degree", (3, 5, 8))
+def test_bernstein_hct(degree):
+    ref_el = ufc_simplex(2)
+    ref_complex = AlfeldSplit(ref_el)
+    ck_poly_set = CkPolynomialSet(ref_complex, degree, order=1, vorder=degree-1, variant="bubble")
+    ck_elem = CiarletElement(ck_poly_set, HCTDualSet(ref_complex, degree), degree)
+    elem = HsiehCloughTocher(ref_el, degree)
+    points = create_quadrature(ref_complex, 2*degree).get_points()
+    expected = ck_elem.tabulate(1, points)
+    actual = elem.tabulate(1, points)
+    assert all(numpy.allclose(expected[alpha], actual[alpha]) for alpha in expected)
 
 
 def test_bernstein_walkington():
