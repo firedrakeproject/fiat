@@ -211,11 +211,12 @@ def test_bernstein_walkington():
     poly_set = BernsteinPolynomialSet(AlfeldSplit(ref_el), degree, order=1, vorder=4)
     assert poly_set.get_num_members() == 65
 
+    ck_poly_set = CkPolynomialSet(AlfeldSplit(ref_el), degree, order=1, vorder=4, variant="bubble")
+    ck_elem = CiarletElement(ck_poly_set, WalkingtonDualSet(ref_el, degree), degree)
     elem = Walkington(ref_el, degree)
-    bernstein_elem = CiarletElement(poly_set, WalkingtonDualSet(ref_el, degree), degree)
     points = create_quadrature(elem.get_reference_complex(), 2*degree).get_points()
-    expected = elem.tabulate(1, points)
-    actual = bernstein_elem.tabulate(1, points)
+    expected = ck_elem.tabulate(1, points)
+    actual = elem.tabulate(1, points)
     assert all(numpy.allclose(expected[alpha], actual[alpha]) for alpha in expected)
 
 
