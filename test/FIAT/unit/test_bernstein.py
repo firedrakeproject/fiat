@@ -140,11 +140,65 @@ def test_bernstein_macro_variant(dim, variant, degree):
 
 
 @pytest.mark.parametrize("degree, expected_dimension", ((1, 3), (2, 6), (3, 12)))
-def test_bernstein_c1_alfeld(degree, expected_dimension):
+def test_bernstein_c1_alfeld_dimension(degree, expected_dimension):
     ref_el = AlfeldSplit(ufc_simplex(2))
     poly_set = BernsteinPolynomialSet(ref_el, degree, order=1)
 
     assert poly_set.get_num_members() == expected_dimension
+
+
+@pytest.mark.parametrize("dim, degree",
+                         [(dim, degree) for dim in (1, 2, 3) for degree in range(1, 2*dim + 1)])
+def test_bernstein_c1_alfeld(dim, degree):
+    ref_el = AlfeldSplit(ufc_simplex(dim))
+    poly_set = BernsteinPolynomialSet(ref_el, degree, order=1)
+    coeffs = poly_set.get_coeffs()
+
+    facet_points = numpy.array([point for facet in ref_el.get_interior_facets(dim - 1)
+                                for point in ref_el.make_points(dim - 1, facet, degree + 2)])
+    jumps = poly_set.get_expansion_set().tabulate_jumps(degree, facet_points, order=1)
+    assert numpy.allclose(coeffs @ jumps[0], 0)
+    assert numpy.allclose(coeffs @ jumps[1], 0)
+
+    points = create_quadrature(ref_el, 2*degree).get_points()
+    values = poly_set.tabulate(points)[(0,) * dim]
+    c1_values = CkPolynomialSet(ref_el, degree, order=1).tabulate(points)[(0,) * dim]
+    rank = numpy.linalg.matrix_rank
+    assert numpy.allclose(values.sum(axis=0), 1)
+    assert rank(values) == len(values) == rank(c1_values) == rank(numpy.vstack([values, c1_values]))
+
+
+@pytest.mark.parametrize("dim", (1, 2, 3))
+def test_bernstein_c1_simplex(dim):
+    ref_el = ufc_simplex(dim)
+    degree = 3
+
+    c0_coeffs = BernsteinPolynomialSet(ref_el, degree, order=0).get_coeffs()
+    c1_coeffs = BernsteinPolynomialSet(ref_el, degree, order=1).get_coeffs()
+    assert numpy.array_equal(c0_coeffs, c1_coeffs)
+
+
+def test_bernstein_c1_entity_ids():
+    ref_el = AlfeldSplit(ufc_simplex(2))
+    degree = 3
+    top = ref_el.get_topology()
+
+    entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
+    num_members = 0
+    for dim in top:
+        for entity in top[dim]:
+            if dim == 2 or entity not in ref_el.get_interior_facets(dim):
+                num_dofs = math.comb(degree - 1, dim)
+                entity_ids[dim][entity] = list(range(num_members, num_members + num_dofs))
+                num_members += num_dofs
+
+    perm = numpy.random.default_rng(0).permutation(num_members)
+    permuted_ids = {dim: {entity: [perm[i] for i in ids] for entity, ids in entities.items()}
+                    for dim, entities in entity_ids.items()}
+
+    coeffs = BernsteinPolynomialSet(ref_el, degree, order=1, entity_ids=entity_ids).get_coeffs()
+    permuted_coeffs = BernsteinPolynomialSet(ref_el, degree, order=1, entity_ids=permuted_ids).get_coeffs()
+    assert numpy.allclose(permuted_coeffs[perm], coeffs)
 
 
 if __name__ == '__main__':

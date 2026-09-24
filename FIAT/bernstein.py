@@ -66,18 +66,22 @@ class BernsteinPolynomialSet(PolynomialSet):
 
     :arg ref_el: The simplex or macrocell.
     :arg degree: The polynomial degree.
-    :kwarg order: The continuity order for a macrocell. Only C0 is currently
-        supported.
+    :kwarg order: The continuity order across the interior facets of a
+        macrocell, either 0 or 1.
     :kwarg entity_ids: An optional entity-to-basis-index map defining the
-        ordering of the macrocell basis.
+        ordering of the macrocell basis. For C1 continuity, the entities
+        interior to the parent cell carry no basis functions.
     """
     def __init__(self, ref_el, degree, order=0, entity_ids=None):
         expansion_set = BernsteinExpansionSet(ref_el)
-        if order != 0:
-            raise NotImplementedError("Only C0 Bernstein polynomial sets are implemented")
         if degree < 0:
             raise ValueError("Bernstein polynomial sets require a nonnegative degree")
-        coeffs = _c0_coefficients(ref_el, degree, entity_ids)
+        if order == 0:
+            coeffs = _c0_coefficients(ref_el, degree, entity_ids)
+        elif order == 1:
+            coeffs = _c1_coefficients(ref_el, degree, entity_ids)
+        else:
+            raise NotImplementedError("Only C0 and C1 Bernstein polynomial sets are implemented")
         super().__init__(ref_el, degree, degree, expansion_set, coeffs)
 
 
@@ -239,6 +243,9 @@ def _c0_coefficients(ref_el, degree, entity_ids=None):
         entity_alphas = list(multiindex_equal(dim + 1, degree, imin=1))
         for entity, entity_vertices in entities.items():
             ids = entity_ids[dim][entity]
+            if len(ids) != len(entity_alphas):
+                raise ValueError(f"Expected {len(entity_alphas)} basis functions on entity {(dim, entity)}, "
+                                 f"but got {len(ids)}")
             for row, alpha in zip(ids, entity_alphas):
                 for cell, cell_vertices in topology[sd].items():
                     if not set(entity_vertices).issubset(cell_vertices):
@@ -249,3 +256,93 @@ def _c0_coefficients(ref_el, degree, entity_ids=None):
                     )
                     coeffs[row, cell * num_local + local_alpha_ids[local_alpha]] = 1
     return coeffs
+
+
+def _c1_coefficients(ref_el, degree, entity_ids=None):
+    """Construct C1 Bernstein coefficients from a minimal determining set.
+
+    The determining set consists of the C0 Bernstein coefficients on the
+    entities that are not interior to the parent cell. The coefficients on the
+    interior entities are recovered from the C1 smoothness conditions across
+    the interior facets, solving each condition for its only undetermined
+    coefficient.
+    """
+    sd = ref_el.get_spatial_dimension()
+    topology = ref_el.get_topology()
+    interior = {(dim, entity) for dim in range(sd) for entity in ref_el.get_interior_facets(dim)}
+
+    if entity_ids is None:
+        c0_ids = _default_entity_ids(ref_el, degree)
+        free_rows = sorted(row for dim, entities in c0_ids.items()
+                           for entity, ids in entities.items()
+                           if (dim, entity) not in interior for row in ids)
+        renumbering = {row: i for i, row in enumerate(free_rows)}
+        entity_ids = {dim: {entity: [] if (dim, entity) in interior else [renumbering[row] for row in ids]
+                            for entity, ids in entities.items()}
+                      for dim, entities in c0_ids.items()}
+
+    # Number the C0 functions on the interior entities after the determining set
+    num_free = sum(len(ids) for entities in entity_ids.values() for ids in entities.values())
+    c0_ids = {dim: dict(entities) for dim, entities in entity_ids.items()}
+    row = num_free
+    for dim, entity in sorted(interior):
+        if entity_ids[dim][entity]:
+            raise ValueError("C1 Bernstein basis functions cannot be attached to "
+                             f"the interior entity {(dim, entity)}")
+        num_dofs = math.comb(degree - 1, dim)
+        c0_ids[dim][entity] = list(range(row, row + num_dofs))
+        row += num_dofs
+    c0_coeffs = _c0_coefficients(ref_el, degree, c0_ids)
+
+    num_local = math.comb(degree + sd, sd)
+    local_alpha_ids = {alpha: i for i, alpha in enumerate(multiindex_equal(sd + 1, degree))}
+    rows, columns = numpy.nonzero(c0_coeffs)
+    row_of_column = dict(zip(columns, rows))
+
+    def c0_row(cell, exponents):
+        alpha = tuple(exponents.get(vertex, 0) for vertex in topology[sd][cell])
+        return row_of_column[cell * num_local + local_alpha_ids[alpha]]
+
+    def increment(exponents, vertex):
+        return {**exponents, vertex: exponents.get(vertex, 0) + 1}
+
+    # The C1 condition across the facet shared by cells a and b equates the
+    # coefficient in cell b next to the facet to the de Casteljau step in cell a
+    # towards the vertex of cell b opposite to the facet.
+    conditions = []
+    for facet in ref_el.get_interior_facets(sd - 1):
+        facet_vertices = topology[sd - 1][facet]
+        cell_a, cell_b = ref_el.connectivity[(sd - 1, sd)][facet]
+        vertex_b, = set(topology[sd][cell_b]) - set(facet_vertices)
+        bary = ref_el.compute_barycentric_coordinates(
+            ref_el.get_vertices_of_subcomplex((vertex_b,)), entity=(sd, cell_a))[0]
+        for beta in multiindex_equal(sd, degree - 1):
+            exponents = dict(zip(facet_vertices, beta))
+            condition = {c0_row(cell_b, increment(exponents, vertex_b)): 1.0}
+            for vertex, weight in zip(topology[sd][cell_a], bary):
+                row = c0_row(cell_a, increment(exponents, vertex))
+                condition[row] = condition.get(row, 0.0) - weight
+            conditions.append({row: weight for row, weight in condition.items() if weight != 0})
+
+    # Express every C0 coefficient in terms of the determining set
+    known = dict(enumerate(numpy.eye(num_free)))
+    while conditions:
+        pending = []
+        for condition in conditions:
+            unknown = [row for row in condition if row not in known]
+            if len(unknown) > 1:
+                pending.append(condition)
+                continue
+            value = sum(weight * known[row] for row, weight in condition.items() if row not in unknown)
+            if unknown:
+                row, = unknown
+                known[row] = -value / condition[row]
+            elif not numpy.allclose(value, 0):
+                raise NotImplementedError("The Bernstein coefficients on the parent boundary and "
+                                          "cell interiors do not determine the C1 space of this macrocell")
+        if len(pending) == len(conditions):
+            raise NotImplementedError("Could not determine the C1 Bernstein coefficients on this macrocell")
+        conditions = pending
+
+    dependent = numpy.array([known[row] for row in range(num_free, len(c0_coeffs))]).reshape(-1, num_free)
+    return c0_coeffs[:num_free] + dependent.T @ c0_coeffs[num_free:]
