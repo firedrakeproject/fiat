@@ -50,23 +50,6 @@ def make_projected_bubble_moments(ref_el, degree, interpolant_deg=None, quad_sch
     return Q, numpy.dot(coeffs.T, phis)
 
 
-def make_dual_bubbles(ref_el, degree, codim=0, interpolant_deg=None, quad_scheme=None, scale="orthonormal"):
-    """Tabulate the L2-duals of the hierarchical C0 basis."""
-    dim = ref_el.get_spatial_dimension()
-    if dim == 0:
-        quad_scheme = None
-        degree = 0
-    if interpolant_deg is None:
-        interpolant_deg = degree
-    Q = parse_quadrature_scheme(ref_el, degree + interpolant_deg, quad_scheme)
-    B = make_bubbles(ref_el, degree, codim=codim, scale=scale)
-    P_at_qpts = B.expansion_set.tabulate(degree, Q.get_points())
-    M = numpy.dot(numpy.multiply(P_at_qpts, Q.get_weights()), P_at_qpts.T)
-    phis = numpy.linalg.solve(M, P_at_qpts)
-    phis = numpy.dot(B.get_coeffs(), phis)
-    return Q, phis
-
-
 class LegendreDual(dual_set.DualSet):
     """The dual basis for Legendre elements."""
     def __init__(self, ref_el, degree, codim=0, interpolant_deg=None, quad_scheme=None):
@@ -123,8 +106,11 @@ class IntegratedLegendreDual(dual_set.DualSet):
         for dim in sorted(top):
             if degree <= dim:
                 continue
+            test_deg = degree - dim - 1 if dim > 0 else 0
             ref_facet = symmetric_simplex(dim)
-            Q_ref, phis = make_dual_bubbles(ref_facet, degree, interpolant_deg=interpolant_deg, quad_scheme=quad_scheme)
+            Q_ref = parse_quadrature_scheme(ref_facet, test_deg + interpolant_deg, quad_scheme)
+            poly_set = ONPolynomialSet(ref_facet, test_deg, scale="L2 piola", variant="dual")
+            phis = poly_set.tabulate(Q_ref.get_points())[(0,) * dim]
             for entity in sorted(top[dim]):
                 cur = len(nodes)
                 Q_facet = FacetQuadratureRule(ref_el, dim, entity, Q_ref, avg=True)
@@ -142,7 +128,7 @@ class IntegratedLegendre(finite_element.CiarletElement):
             ref_el = splitting(ref_el)
         if degree < 1:
             raise ValueError(f"{type(self).__name__} elements only valid for k >= 1")
-        poly_set = ONPolynomialSet(ref_el, degree, variant="bubble")
+        poly_set = ONPolynomialSet(ref_el, degree, scale=1, variant="bubble")
         dual = IntegratedLegendreDual(ref_el, degree, interpolant_deg=interpolant_deg, quad_scheme=quad_scheme)
         formdegree = 0  # 0-form
-        super().__init__(poly_set, dual, degree, formdegree)
+        super().__init__(poly_set, dual, degree, formdegree, recombine_dual=True)

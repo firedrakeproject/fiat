@@ -16,7 +16,7 @@ from FIAT.dual_set import DualSet
 from FIAT.quadrature_schemes import create_quadrature
 
 
-class FiniteElement(object):
+class FiniteElement:
     """Class implementing a basic abstraction template for general
     finite element families. Finite elements which inherit from
     this class are non-nodal unless they are CiarletElement subclasses.
@@ -128,11 +128,10 @@ class CiarletElement(FiniteElement):
     basis generated from polynomials encoded in a `PolynomialSet`.
     """
 
-    def __init__(self, poly_set, dual, order, formdegree=None, mapping="affine", ref_complex=None):
+    def __init__(self, poly_set, dual, order, formdegree=None, mapping="affine",
+                 ref_complex=None, recombine_dual=False):
         ref_el = dual.get_reference_element()
         ref_complex = ref_complex or poly_set.get_reference_element()
-        super().__init__(ref_el, dual, order, formdegree, mapping, ref_complex)
-
         if len(poly_set) != len(dual):
             raise ValueError(f"Dimension of function space is {len(poly_set)}, but got {len(dual)} nodes.")
 
@@ -156,7 +155,13 @@ class CiarletElement(FiniteElement):
 
         new_shp = new_coeffs_flat.shape[:1] + shp[1:]
         new_coeffs = new_coeffs_flat.reshape(new_shp)
-        self.poly_set = poly_set.recombine(new_coeffs)
+        if recombine_dual:
+            dual = dual.recombine(new_coeffs.T)
+        else:
+            poly_set = poly_set.recombine(new_coeffs)
+
+        super().__init__(ref_el, dual, order, formdegree, mapping, ref_complex)
+        self.poly_set = poly_set
 
     def degree(self):
         "Return the degree of the (embedding) polynomial space."
@@ -211,50 +216,6 @@ class CiarletElement(FiniteElement):
         All implementations/subclasses are nodal including this one.
         """
         return True
-
-
-class NonNodalElement(CiarletElement):
-    """Finite element with a prescribed, non-nodal polynomial basis.
-
-    The supplied polynomial basis is retained.  The degrees of freedom are
-    recombined by the inverse Vandermonde matrix so that their coefficients
-    represent functions in the prescribed basis.
-
-    :arg poly_set: The prescribed polynomial basis.
-    :arg dual: The uncombined degrees of freedom.
-    :arg order: The polynomial order of the element.
-    :arg formdegree: The degree of the associated differential form.
-    :arg mapping: The mapping from the reference element to a physical element.
-    :arg ref_complex: The reference complex for macroelements.
-    """
-
-    def __init__(self, poly_set, dual, order, formdegree=None,
-                 mapping="affine", ref_complex=None):
-        ref_el = dual.get_reference_element()
-        ref_complex = ref_complex or poly_set.get_reference_element()
-        FiniteElement.__init__(self, ref_el, dual, order, formdegree, mapping, ref_complex)
-
-        if len(poly_set) != len(dual):
-            raise ValueError(f"Dimension of function space is {len(poly_set)}, "
-                             f"but got {len(dual)} nodes.")
-
-        old_coeffs = poly_set.get_coeffs()
-        dualmat = dual.to_riesz(poly_set)
-        shp = dualmat.shape
-        A = dualmat.reshape((shp[0], -1))
-        B = old_coeffs.reshape((shp[0], -1))
-        V = numpy.dot(A, numpy.transpose(B))
-        self.V = V
-
-        with warnings.catch_warnings():
-            warnings.filterwarnings("error")
-            try:
-                coefficients = scipy.linalg.solve(V, numpy.eye(V.shape[0]))
-            except (scipy.linalg.LinAlgWarning, scipy.linalg.LinAlgError):
-                raise numpy.linalg.LinAlgError("Singular Vandermonde matrix")
-
-        self.poly_set = poly_set
-        self.dual = dual.recombine(coefficients)
 
 
 def entity_support_dofs(elem, entity_dim):

@@ -10,7 +10,7 @@ import math
 import numpy
 
 from FIAT import expansions, polynomial_set
-from FIAT.finite_element import NonNodalElement
+from FIAT.finite_element import CiarletElement
 from FIAT.dual_set import DualSet
 from FIAT.functional import PointEvaluation
 from FIAT.polynomial_set import mis
@@ -108,7 +108,7 @@ class BernsteinDualSet(DualSet):
         super().__init__(nodes, ref_el, entity_ids)
 
 
-class Bernstein(NonNodalElement):
+class Bernstein(CiarletElement):
     """A finite element with Bernstein polynomials as basis functions."""
 
     def __init__(self, ref_el, degree):
@@ -117,7 +117,7 @@ class Bernstein(NonNodalElement):
             ref_el, degree, degree, expansion_set,
             numpy.eye(expansion_set.get_num_members(degree)))
         dual = BernsteinDualSet(ref_el, degree)
-        super().__init__(poly_set, dual, degree, formdegree=0)
+        super().__init__(poly_set, dual, degree, formdegree=0, recombine_dual=True)
 
 
 def bernstein_db(points, ks, alpha=None):

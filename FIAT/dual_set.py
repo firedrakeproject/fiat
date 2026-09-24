@@ -14,7 +14,7 @@ from FIAT import polynomial_set, functional
 from FIAT.reference_element import compute_unflattening_map
 
 
-class DualSet(object):
+class DualSet:
     def __init__(self, nodes, ref_el, entity_ids, entity_permutations=None,
                  coeffs=None):
         if ref_el.get_dimension() != max(entity_ids):
