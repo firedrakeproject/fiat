@@ -285,8 +285,17 @@ def _ck_coefficients(ref_el, degree, order, vorder, entity_ids=None):
     - on the boundary of the parent simplex,
     - at distance at least ``order`` from the interior facets and at least
       ``vorder`` from the interior vertex, and
-    - in the ball of radius ``vorder - sd - 1`` around the interior vertex on
-      the first cell.
+    - in the ball of radius ``vorder - 1`` around the interior vertex, those
+      at distance ``vorder - k (c + 1)`` from the interior vertex and greater
+      than ``k`` from the interior facets not containing them, where ``c`` is
+      the codimension of the smallest face of the split containing them.
+
+    On the ball of radius ``vorder`` the spline is a polynomial of degree
+    ``vorder``, which we write as the sum of ``b^k q_k`` over ``k``, where
+    ``b`` is the product of the barycentric coordinates of the parent simplex.
+    The coefficients of the third kind with a given ``k`` are multiples of the
+    Bernstein coefficients of ``q_k`` on the boundary of the parent simplex,
+    plus contributions from ``q_j`` with ``j < k``.
 
     The remaining coefficients are the unique solution of the smoothness
     conditions.
@@ -307,11 +316,18 @@ def _ck_coefficients(ref_el, degree, order, vorder, entity_ids=None):
         return min(exponent for vertex, exponent in zip(topology[sd][cell], alpha)
                    if vertex not in interior_vertices)
 
+    def in_ball_determining_set(cell, alpha):
+        exponents = [exponent for vertex, exponent in zip(topology[sd][cell], alpha)
+                     if vertex not in interior_vertices]
+        codim = exponents.count(0)
+        k, remainder = divmod(vorder - distance_to_interior_vertex(cell, alpha), codim + 1)
+        return k > 0 and remainder == 0 and all(exponent > k for exponent in exponents if exponent)
+
     def in_determining_set(cell, alpha):
         distance = distance_to_interior_vertex(cell, alpha)
         return (distance == degree
                 or (distance >= vorder and distance_to_interior_facets(cell, alpha) >= order)
-                or (cell == 0 and distance < vorder - sd))
+                or in_ball_determining_set(cell, alpha))
 
     domain_points = _domain_points(ref_el, degree)
     free = {key for key, local_points in domain_points.items()

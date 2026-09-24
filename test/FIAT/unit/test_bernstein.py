@@ -205,6 +205,13 @@ def test_bernstein_c0_supersmooth_alfeld(degree, vorder):
     assert poly_set.get_num_members() == expected_dimension
 
 
+@pytest.mark.parametrize("dim, degree", [(2, 14), (3, 8)])
+def test_bernstein_supersmooth_small_coefficients(dim, degree):
+    ref_el = AlfeldSplit(ufc_simplex(dim))
+    poly_set = BernsteinPolynomialSet(ref_el, degree, order=1, vorder=degree-1)
+    assert abs(poly_set.get_coeffs()).max() < 30
+
+
 def test_bernstein_walkington():
     ref_el = ufc_simplex(3)
     degree = 5
