@@ -24,8 +24,10 @@ import pytest
 
 from FIAT.reference_element import ufc_simplex
 from FIAT.bernstein import Bernstein, BernsteinPolynomialSet
+from FIAT.finite_element import CiarletElement
 from FIAT.macro import AlfeldSplit, CkPolynomialSet
 from FIAT.quadrature_schemes import create_quadrature
+from FIAT.walkington import Walkington, WalkingtonDualSet
 
 
 D02 = numpy.array([
@@ -166,6 +168,55 @@ def test_bernstein_c1_alfeld(dim, degree):
     rank = numpy.linalg.matrix_rank
     assert numpy.allclose(values.sum(axis=0), 1)
     assert rank(values) == len(values) == rank(c1_values) == rank(numpy.vstack([values, c1_values]))
+
+
+def assert_vertex_supersmoothness(poly_set, vorder):
+    ref_el = poly_set.get_reference_element()
+    vertex = ref_el.get_vertices_of_subcomplex(ref_el.get_interior_facets(0))
+    jumps = poly_set.get_expansion_set().tabulate_jumps(poly_set.get_degree(), vertex, order=vorder)
+    for r in range(vorder + 1):
+        assert numpy.allclose(poly_set.get_coeffs() @ jumps[r], 0, atol=1E-10 * abs(jumps[r]).max())
+
+
+@pytest.mark.parametrize("dim, degree, vorder",
+                         [(dim, degree, vorder) for dim in (2, 3) for degree in range(dim + 1, 2*dim)
+                          for vorder in range(dim + 1, degree + 1)])
+def test_bernstein_c1_supersmooth_alfeld(dim, degree, vorder):
+    ref_el = AlfeldSplit(ufc_simplex(dim))
+    poly_set = BernsteinPolynomialSet(ref_el, degree, order=1, vorder=vorder)
+    assert_vertex_supersmoothness(poly_set, vorder)
+
+    points = create_quadrature(ref_el, 2*degree).get_points()
+    values = poly_set.tabulate(points)[(0,) * dim]
+    ck_values = CkPolynomialSet(ref_el, degree, order=1, vorder=vorder).tabulate(points)[(0,) * dim]
+    rank = numpy.linalg.matrix_rank
+    assert rank(values) == len(values) == rank(ck_values) == rank(numpy.vstack([values, ck_values]))
+
+
+@pytest.mark.parametrize("degree, vorder",
+                         [(degree, vorder) for degree in range(1, 6) for vorder in range(1, degree + 1)])
+def test_bernstein_c0_supersmooth_alfeld(degree, vorder):
+    ref_el = AlfeldSplit(ufc_simplex(2))
+    poly_set = BernsteinPolynomialSet(ref_el, degree, order=0, vorder=vorder)
+    assert_vertex_supersmoothness(poly_set, vorder)
+
+    # Lai and Schumaker (2007), Theorem 9.7
+    expected_dimension = math.comb(vorder + 2, 2) + 3 * (math.comb(degree + 1, 2) - math.comb(vorder + 1, 2))
+    assert poly_set.get_num_members() == expected_dimension
+
+
+def test_bernstein_walkington():
+    ref_el = ufc_simplex(3)
+    degree = 5
+    poly_set = BernsteinPolynomialSet(AlfeldSplit(ref_el), degree, order=1, vorder=4)
+    assert poly_set.get_num_members() == 65
+
+    elem = Walkington(ref_el, degree)
+    bernstein_elem = CiarletElement(poly_set, WalkingtonDualSet(ref_el, degree), degree)
+    points = create_quadrature(elem.get_reference_complex(), 2*degree).get_points()
+    expected = elem.tabulate(1, points)
+    actual = bernstein_elem.tabulate(1, points)
+    assert all(numpy.allclose(expected[alpha], actual[alpha]) for alpha in expected)
 
 
 @pytest.mark.parametrize("dim", (1, 2, 3))
