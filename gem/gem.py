@@ -14,9 +14,10 @@ the Index objects in GEM, not on all the nodes that have those free
 indices.
 """
 
+import abc
 from abc import ABCMeta
 from itertools import chain, repeat
-from functools import partial, reduce
+from functools import partial, reduce, cached_property
 from operator import attrgetter
 from numbers import Integral, Number
 
@@ -36,7 +37,7 @@ __all__ = ['Node', 'Identity', 'Literal', 'Zero', 'Failure',
            'IndexSum', 'ListTensor', 'Concatenate', 'Delta', 'OrientationVariableIndex',
            'index_sum', 'partial_indexed', 'reshape', 'view',
            'indices', 'as_gem', 'FlexiblyIndexed',
-           'Inverse', 'Solve', 'extract_type', 'uint_type', 'Piecewise']
+           'Inverse', 'Solve', 'extract_type', 'uint_type', 'Piecewise', 'IndexBase', 'Gather']
 
 
 uint_type = numpy.dtype(numpy.uintc)
@@ -306,6 +307,12 @@ class Literal(Constant):
             self.array = array.astype(dtype)
         self._dtype = self.array.dtype
 
+    def __str__(self, /) -> str:
+        if self.shape == ():
+            return str(self.value)
+        else:
+            return str(self.array)
+
     def is_equal(self, other):
         if type(self) is not type(other):
             return False
@@ -332,18 +339,34 @@ class Literal(Constant):
 class Variable(Terminal):
     """Symbolic variable tensor"""
 
-    __slots__ = ('name', 'shape')
+    __slots__ = ('name', 'shape', 'data')
     __front__ = ('name', 'shape')
-    __back__ = ('dtype',)
+    __back__ = ('dtype', 'data')
 
-    def __init__(self, name, shape, dtype=None):
+    def __init__(self, name, shape, dtype=None, data=None):
         self.name = name
         self.shape = shape
         self._dtype = dtype
+        self.data = data
+
+    def __str__(self, /) -> str:
+        return self.name
 
 
-class Sum(Scalar):
+class Operator(Scalar):
+    def __str__(self, /) -> str:
+        return f" {self._symbol} ".join(map(str, self.children))
+
+    @property
+    @abc.abstractmethod
+    def _symbol(self, /) -> str:
+        pass
+
+
+class Sum(Operator):
     __slots__ = ('children',)
+
+    _symbol = "+"
 
     def __new__(cls, *args):
         try:
@@ -368,7 +391,7 @@ class Sum(Scalar):
         return self
 
 
-class Product(Scalar):
+class Product(Operator):
     __slots__ = ('children',)
 
     def __new__(cls, *args):
@@ -396,8 +419,10 @@ class Product(Scalar):
         self.children = a, b
         return self
 
+    _symbol = "*"
 
-class Division(Scalar):
+
+class Division(Operator):
     __slots__ = ('children',)
 
     def __new__(cls, a, b):
@@ -420,8 +445,10 @@ class Division(Scalar):
         self.children = a, b
         return self
 
+    _symbol = "/"
 
-class FloorDiv(Scalar):
+
+class FloorDiv(Operator):
     __slots__ = ('children',)
 
     def __new__(cls, a, b):
@@ -443,8 +470,10 @@ class FloorDiv(Scalar):
         self.children = a, b
         return self
 
+    _symbol = "//"
 
-class Remainder(Scalar):
+
+class Remainder(Operator):
     __slots__ = ('children',)
 
     def __new__(cls, a, b):
@@ -466,8 +495,10 @@ class Remainder(Scalar):
         self.children = a, b
         return self
 
+    _symbol = "%"
 
-class Power(Scalar):
+
+class Power(Operator):
     __slots__ = ('children',)
 
     def __new__(cls, base, exponent):
@@ -488,6 +519,8 @@ class Power(Scalar):
         self = super(Power, cls).__new__(cls)
         self.children = base, exponent
         return self
+
+    _symbol = "^"
 
 
 class MathFunction(Scalar):
@@ -592,12 +625,10 @@ class Conditional(Scalar):
         return self
 
 
-class IndexBase(metaclass=ABCMeta):
+class IndexBase(Scalar, Terminal):
     """Abstract base class for indices."""
-    pass
 
-
-IndexBase.register(int)
+    _dtype = int
 
 
 class Index(IndexBase):
@@ -620,6 +651,16 @@ class Index(IndexBase):
             self.extent = value
         elif self.extent != value:
             raise ValueError("Inconsistent index extents!")
+
+    def __eq__(self, other):
+        return type(other) is type(self) and other._hashkey == self._hashkey
+
+    def __hash__(self):
+        return hash(self._hashkey)
+
+    @cached_property
+    def _hashkey(self):
+        return type(self), self.name, self.extent, self.count
 
     def __str__(self):
         if self.name is None:
@@ -678,7 +719,11 @@ class VariableIndex(IndexBase):
         return type(self), (self.expression,)
 
 
-class Indexed(Scalar):
+class AbstractIndexed(Scalar):
+    pass
+
+
+class Indexed(AbstractIndexed):
     __slots__ = ('children', 'multiindex', 'indirect_children')
     __back__ = ('multiindex',)
 
@@ -690,7 +735,7 @@ class Indexed(Scalar):
         # Set index extents from shape
         assert len(aggregate.shape) == len(multiindex)
         for index, extent in zip(multiindex, aggregate.shape):
-            assert isinstance(index, IndexBase)
+            assert isinstance(index, IndexBase | Integral)
             if isinstance(index, Index):
                 index.set_extent(extent)
             elif isinstance(index, int) and not (0 <= index < extent):
@@ -754,8 +799,16 @@ class Indexed(Scalar):
                 free_indices.extend(i.expression.free_indices)
         return tuple(free_indices)
 
+    @property
+    def aggregate(self):
+        agg, = self.children
+        return agg
 
-class FlexiblyIndexed(Scalar):
+    def __str__(self) -> str:
+        return f"{self.aggregate}{', '.join(map(str, self.multiindex))}"
+
+
+class FlexiblyIndexed(AbstractIndexed):
     """Flexible indexing of :py:class:`Variable`s to implement views and
     reshapes (splitting dimensions only)."""
 
@@ -852,6 +905,36 @@ class FlexiblyIndexed(Scalar):
                 if isinstance(stride, Node):
                     free_indices.extend(stride.free_indices)
         return tuple(free_indices)
+
+
+# NOTE: if we made FlexiblyIndexed less god-awful then these could be the same thing
+class Gather(AbstractIndexed):
+
+    __slots__ = ('children', 'multiindex')
+    __back__ = ('multiindex',)
+
+    def __init__(self, variable, multiindex):
+        import pyop3.collections
+
+        if len(variable.shape) != 1:
+            raise NotImplementedError("Currently assuming a 1D thing, everything in pyop3 is flat")
+        assert len(variable.shape) == len(multiindex)
+
+        self.children = (variable,)
+        self.multiindex = multiindex
+
+        # can't be a property because of __new__
+        free_idxs = pyop3.collections.OrderedSet()
+        for idx in self.multiindex:
+            free_idxs |= as_gem(idx).free_indices
+        self.free_indices = tuple(free_idxs)
+
+    def __str__(self, /) -> str:
+        return f"{self.variable}[{', '.join(map(str, self.multiindex))}]"
+
+    @property
+    def variable(self):
+        return self.children[0]
 
 
 class ComponentTensor(Node):
@@ -1055,8 +1138,8 @@ class Delta(Scalar, Terminal):
         if isinstance(i, tuple) and isinstance(j, tuple):
             # Handle multiindices
             return Product(*map(Delta, i, j, repeat(dtype)))
-        assert isinstance(i, IndexBase)
-        assert isinstance(j, IndexBase)
+        assert isinstance(i, IndexBase | Integral)
+        assert isinstance(j, IndexBase | Integral)
 
         # \delta_{i,i} = 1
         if i == j:
@@ -1346,7 +1429,7 @@ def as_gem(expr):
         If conversion was not possible.
 
     """
-    if isinstance(expr, Node):
+    if isinstance(expr, Node | Index):
         return expr
     elif isinstance(expr, Number):
         return Literal(expr)

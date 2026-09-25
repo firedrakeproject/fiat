@@ -157,3 +157,12 @@ class For(Node):
     def __init__(self, index, statement):
         self.index = index
         self.children = (statement,)
+
+
+class Assignment(Node):
+    __slots__ = ("assignee", "expression", "mode")
+
+    def __init__(self, assignee, expression, mode):
+        self.assignee = assignee
+        self.expression = expression
+        self.mode = mode
