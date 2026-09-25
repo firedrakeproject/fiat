@@ -62,7 +62,10 @@ class BDMDualSet(dual_set.DualSet):
             Ned_at_qpts = Nedel.tabulate(0, Q_ref.get_points())[(0,) * sd]
             for entity in top[sd]:
                 Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref)
-                Jinv = numpy.linalg.inv(Q.jacobian())
+                J = Q.jacobian()
+                # The quadrature carries |det J|, so the orientation of the cell
+                # makes the moments invariant under the contravariant Piola map
+                Jinv = numpy.sign(numpy.linalg.det(J)) * numpy.linalg.inv(J)
                 phis = numpy.tensordot(Jinv.T, Ned_at_qpts, (1, 1)).transpose((1, 0, 2))
                 cur = len(nodes)
                 nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi) for phi in phis)
