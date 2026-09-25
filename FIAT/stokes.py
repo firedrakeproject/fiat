@@ -16,7 +16,8 @@ from FIAT.functional import (PointEvaluation,
                              IntegralMomentOfDerivative,
                              IntegralMoment,
                              FrobeniusIntegralMoment)
-from FIAT.polynomial_set import make_bubbles, ONPolynomialSet, polynomial_set_union_normalized
+from FIAT.polynomial_set import make_bubbles, ONPolynomialSet, PolynomialSet, polynomial_set_union_normalized
+from FIAT.reference_element import make_affine_mapping, symmetric_simplex
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.bernstein import Bernstein
@@ -226,7 +227,7 @@ class StokesDual(dual_set.DualSet):
                 cur = len(nodes)
                 if dim == sd:
                     # Interior dofs
-                    Q, phis, nullspace_dim = self._interior_duals(ref_el, degree)
+                    Q, phis, nullspace_dim = self._interior_duals(ref_el, ref_el.construct_subelement(sd), degree)
                     self._reduced_dofs[dim] = nullspace_dim
                     nodes.extend(FrobeniusIntegralMoment(ref_el, Q, phi) for phi in phis)
                     entity_ids[dim][entity] = list(range(cur, len(nodes)))
@@ -240,14 +241,21 @@ class StokesDual(dual_set.DualSet):
                     entity_ids[dim][entity] = list(range(cur, len(nodes)))
                     continue
 
-                elif dim == 1:
+                entity_comps = comps
+                if dim == sd - 1:
+                    # Components along the normal and the reciprocal tangents
+                    t = ref_el.compute_tangents(dim, entity)
+                    n = numpy.dot([[0, 1], [-1, 0]], *t) if sd == 2 else numpy.cross(*t)
+                    entity_comps = [n, *t] if sd == 2 else [n, *(numpy.cross(n, ti) for ti in t)]
+
+                if dim == 1:
                     # Vertex-edge dofs
                     verts = ref_el.get_vertices_of_subcomplex(top[dim][entity])
                     ells = [PointTangentialDerivative]
                     if sd == 3:
                         ells.append(PointTangentialSecondDerivative)
                     nodes.extend(ell(ref_el, entity, pt, comp=comp, shp=shp)
-                                 for pt in verts for ell in ells for comp in comps)
+                                 for pt in verts for ell in ells for comp in entity_comps)
 
                 elif dim == 2:
                     # Face-vertex dofs
@@ -255,17 +263,17 @@ class StokesDual(dual_set.DualSet):
                     for i in range(len(verts)):
                         tangents = [verts[j] - verts[i] for j in range(len(verts)) if j != i]
                         nodes.extend(PointSecondDerivative(ref_el, *tangents, verts[i], comp=comp, shp=shp)
-                                     for comp in comps)
+                                     for comp in entity_comps)
 
-                    # Face-edge dofs
-                    mid_face, = numpy.asarray(ref_el.make_points(dim, entity, dim+1))
+                    # Face-edge dofs: derivative along the normal to the edge within the face
+                    nface = n / numpy.linalg.norm(n)
                     edges = ref_el.connectivity[(dim, dim-1)][entity]
                     for e in edges:
-                        mid_edge, = numpy.asarray(ref_el.make_points(dim-1, e, dim))
-                        s = mid_face - mid_edge
+                        nfe = numpy.cross(ref_el.compute_edge_tangent(e), nface)
+                        nfe /= numpy.linalg.norm(nfe)
                         Q, phis = map_duals(ref_el, dim-1, e, Q_edge, phis_edge[:degree-5+1])
-                        nodes.extend(IntegralMomentOfDerivative(ref_el, Q, phi, s, comp=comp, shp=shp)
-                                     for phi in phis for comp in comps)
+                        nodes.extend(IntegralMomentOfDerivative(ref_el, Q, phi, nfe, comp=comp, shp=shp)
+                                     for phi in phis for comp in entity_comps)
 
                 # Rest of the facet moments
                 nodes.extend(generate_vector_moments(ref_el, dim, entity, Q_ref, Phis))
@@ -274,20 +282,28 @@ class StokesDual(dual_set.DualSet):
 
         super().__init__(nodes, ref_el, entity_ids)
 
-    def _interior_duals(self, ref_el, degree):
+    def _interior_duals(self, ref_el, ref_cell, degree):
         """Compute div-div and eps-eps moments of the trial space against an
            orthonormal bases for div(V_0) and eps(V_0).
+
+        The moments are computed on the reference cell and mapped
+        covariantly, so that they are invariant under the contravariant
+        Piola map.
+
+        :arg ref_el: The cell.
+        :arg ref_cell: The reference cell, or its split for a macroelement.
+        :arg degree: The polynomial degree.
         """
         sd = ref_el.get_spatial_dimension()
         shp = (sd,)
 
         # Test space
-        V0 = macro_stokes_space(ref_el, degree, bubble=True)
-        Q, eps_test, div_test, S, nullspace_dim = stokes_eigenbasis(V0)
-        Qpts, Qwts = Q.get_points(), Q.get_weights()
+        V0 = macro_stokes_space(ref_cell, degree, bubble=True)
+        Q_ref, eps_test, div_test, S, nullspace_dim = stokes_eigenbasis(V0)
+        Qpts, Qwts = Q_ref.get_points(), Q_ref.get_weights()
 
         # Trial space
-        V = ONPolynomialSet(ref_el, degree, shp, scale="orthonormal")
+        V = ONPolynomialSet(ref_cell, degree, shp, scale="orthonormal")
         V_at_qpts = V.tabulate(Qpts, 1)
         trial = V_at_qpts[(0,) * sd]
         eps_trial = eps(V_at_qpts)
@@ -297,6 +313,13 @@ class StokesDual(dual_set.DualSet):
                                inner(div_test, div_trial, Qwts),
                                ), axis=0)
         phis = numpy.tensordot(K, trial, axes=(1, 0))
+
+        Q = FacetQuadratureRule(ref_el, sd, 0, Q_ref)
+        J = Q.jacobian()
+        # The quadrature carries |det J|, so the orientation of the cell
+        # makes the moments invariant under the contravariant Piola map
+        Jinv = numpy.sign(numpy.linalg.det(J)) * numpy.linalg.inv(J)
+        phis = numpy.tensordot(Jinv.T, phis, (1, 1)).transpose((1, 0, 2))
         return Q, phis, nullspace_dim
 
     def get_indices(self, restriction_domain, take_closure=True):
@@ -364,7 +387,7 @@ class MacroStokesDual(StokesDual):
                                  for pt in pts for comp in comps)
                 elif dim == sd:
                     # Interior dofs
-                    Q, phis, nullspace_dim = self._interior_duals(ref_complex, degree)
+                    Q, phis, nullspace_dim = self._interior_duals(ref_el, macro.AlfeldSplit(ref_el.construct_subelement(sd)), degree)
                     self._reduced_dofs[dim] = nullspace_dim
                     nodes.extend(FrobeniusIntegralMoment(ref_el, Q, phi) for phi in phis)
                 else:
@@ -386,8 +409,15 @@ class MacroStokes(finite_element.CiarletElement):
         if degree < sd:
             raise ValueError(f"{type(self).__name__} elements only valid for k >= {sd}")
 
+        # The space depends on the geometry through the eps-eps inner product,
+        # so it is built on the symmetric simplex and mapped with the Piola map
         ref_complex = macro.AlfeldSplit(ref_el)
-        poly_set = macro_stokes_space(ref_complex, degree)
+        sym_el = symmetric_simplex(sd)
+        P = macro_stokes_space(macro.AlfeldSplit(sym_el), degree)
+        J, _ = make_affine_mapping(sym_el.get_vertices(), ref_el.get_vertices())
+        coeffs = numpy.tensordot(J / numpy.linalg.det(J), P.get_coeffs(), (1, 1)).transpose((1, 0, 2))
+        expansion_set = ONPolynomialSet(ref_complex, P.get_embedded_degree(), variant="bubble").get_expansion_set()
+        poly_set = PolynomialSet(ref_complex, P.degree, P.get_embedded_degree(), expansion_set, coeffs)
         dual = MacroStokesDual(ref_complex, degree)
         formdegree = sd-1  # (n-1)-form
         super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")

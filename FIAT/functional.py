@@ -217,11 +217,19 @@ class PointDerivative(Functional):
 
 
 class PointDirectionalDerivative(Functional):
-    """Represents d/ds at a point."""
+    """Represents d/ds at a point.
+
+    :arg comp: Optional component index, or an array of shape ``shp``
+        with the direction along which the components are taken.
+    """
     def __init__(self, ref_el, s, pt, comp=(), shp=(), nm=None):
         sd = ref_el.get_spatial_dimension()
         alphas = tuple(map(tuple, numpy.eye(sd, dtype=int)))
-        dpt_dict = {pt: [(s[i], tuple(alphas[i]), comp) for i in range(sd)]}
+        if isinstance(comp, numpy.ndarray):
+            comps = [(c, idx) for idx, c in numpy.ndenumerate(comp) if c]
+        else:
+            comps = [(1, comp)]
+        dpt_dict = {pt: [(c*s[i], alphas[i], idx) for i in range(sd) for c, idx in comps]}
 
         super().__init__(ref_el, shp, {}, dpt_dict, nm or "PointDirectionalDeriv")
 
@@ -241,7 +249,11 @@ class PointTangentialDerivative(PointDirectionalDerivative):
 
 
 class PointSecondDerivative(Functional):
-    """Represents d/ds1 d/ds2 at a point."""
+    """Represents d/ds1 d/ds2 at a point.
+
+    :arg comp: Optional component index, or an array of shape ``shp``
+        with the direction along which the components are taken.
+    """
     def __init__(self, ref_el, s1, s2, pt, comp=(), shp=(), nm=None):
         S = numpy.outer(s1, s2)
         sd = ref_el.get_spatial_dimension()
@@ -252,7 +264,11 @@ class PointSecondDerivative(Functional):
                 alpha[i] += 1
             tau[tuple(alpha)] += S[index]
 
-        dpt_dict = {tuple(pt): [(tau[alpha], alpha, comp) for alpha in tau]}
+        if isinstance(comp, numpy.ndarray):
+            comps = [(c, idx) for idx, c in numpy.ndenumerate(comp) if c]
+        else:
+            comps = [(1, comp)]
+        dpt_dict = {tuple(pt): [(c*tau[alpha], alpha, idx) for alpha in tau for c, idx in comps]}
 
         super().__init__(ref_el, shp, {}, dpt_dict, nm or "PointSecondDeriv")
 
@@ -324,7 +340,9 @@ class IntegralMomentOfDerivative(Functional):
          points.
     :arg *directions: a list of vectors of directions of differentiation.
     :arg comp: Optional argument indicating that only a particular
-         component of the input function should be integrated against f
+         component of the input function should be integrated against f,
+         or an array of shape ``shp`` with the direction along which the
+         components are taken.
     :arg shp: Optional argument giving the value shape of input functions.
     """
 
@@ -348,8 +366,14 @@ class IntegralMomentOfDerivative(Functional):
         points = Q.get_points()
         weights = numpy.multiply(f_at_qpts, Q.get_weights())
         self.weights = {alpha: weights*tau[alpha] for alpha in tau}
+        if isinstance(comp, numpy.ndarray):
+            self.comp = slice(None)
+            self.weights = {alpha: numpy.multiply.outer(comp, wts) for alpha, wts in self.weights.items()}
+            comps = [(c, idx) for idx, c in numpy.ndenumerate(comp) if c]
+        else:
+            comps = [(1, comp)]
 
-        dpt_dict = {tuple(pt): [(wt*tau[alpha], alpha, comp) for alpha in tau]
+        dpt_dict = {tuple(pt): [(c*wt*tau[alpha], alpha, idx) for alpha in tau for c, idx in comps]
                     for pt, wt in zip(points, weights)}
 
         super().__init__(ref_el, shp, {}, dpt_dict, nm or "IntegralMomentOfDerivative")
