@@ -17,28 +17,32 @@ from FIAT.check_format_variant import check_format_variant, parse_quadrature_sch
 from FIAT.P0 import P0
 
 
-def make_projected_bubble_moments(ref_el, degree, interpolant_deg=None, quad_scheme=None):
+def make_projected_bubble_moments(ref_el, degree, interpolant_deg=None, quad_scheme=None, codim=0):
     """Tabulate moments against projected bubbles of the given degree."""
     if interpolant_deg is None:
         interpolant_deg = degree
     sd = ref_el.get_spatial_dimension()
+    Q = parse_quadrature_scheme(ref_el, degree + interpolant_deg, quad_scheme)
+    B = make_bubbles(ref_el, degree, codim=codim)
+    bubbles = B.tabulate(Q.get_points())[(0,) * sd]
+
+    if degree == 1:
+        mean = numpy.dot(bubbles, Q.get_weights()) / sum(Q.get_weights())
+        bubbles -= mean[:, None]
+        bubbles /= numpy.sqrt(numpy.dot(bubbles**2, Q.get_weights()))[:, None]
+        return Q, bubbles
+
     num_cells = len(ref_el.get_topology()[sd])
     deg = numpy.array([sum(alpha) for alpha in lattice_iter(0, degree - sd, sd)])
     lex2hier = numpy.argsort(deg, kind="stable")
-
-    Q = parse_quadrature_scheme(ref_el, degree + interpolant_deg, quad_scheme)
     P = ONPolynomialSet(ref_el, degree, scale="orthonormal")
     phis = P.tabulate(Q.get_points())[(0,) * sd]
     duals = numpy.multiply(phis, Q.get_weights())
-
-    B = make_bubbles(ref_el, degree)
-    bubbles = B.tabulate(Q.get_points())[(0,) * sd]
     bubbles = bubbles.reshape(num_cells, len(B)//num_cells, -1)
     bubbles = bubbles[:, lex2hier, :]
     bubbles = bubbles.reshape(len(B), -1)
     coeffs = numpy.dot(duals, bubbles.T)
     coeffs = coeffs.reshape(num_cells, len(duals)//num_cells, num_cells, -1)
-
     for k in range(degree-sd):
         dimPk0 = polynomial_dimension(ref_el, k) // num_cells
         dimPk1 = polynomial_dimension(ref_el, k-1) // num_cells
