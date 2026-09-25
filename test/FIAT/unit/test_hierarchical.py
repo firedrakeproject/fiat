@@ -22,7 +22,21 @@
 import pytest
 import numpy as np
 
-from FIAT import IntegratedLegendre, Legendre, make_quadrature, ufc_simplex
+from FIAT import IntegratedLegendre, Lagrange, Legendre, make_quadrature, ufc_simplex
+
+
+@pytest.mark.parametrize("dim", range(1, 4))
+def test_integrated_legendre_degree_one_matches_lagrange(dim):
+    """Ensure that degree-one hierarchical basis functions are hat functions."""
+    ref_el = ufc_simplex(dim)
+    points = np.array(ref_el.vertices)
+    integrated_legendre = IntegratedLegendre(ref_el, 1)
+    lagrange = Lagrange(ref_el, 1)
+
+    np.testing.assert_allclose(
+        integrated_legendre.tabulate(0, points)[(0,) * dim],
+        lagrange.tabulate(0, points)[(0,) * dim],
+    )
 
 
 @pytest.mark.parametrize("dim, family, degree", [(dim, f, degree - 1 if f == "DG" else degree)

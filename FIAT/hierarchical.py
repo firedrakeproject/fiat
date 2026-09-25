@@ -110,10 +110,10 @@ class IntegratedLegendreDual(dual_set.DualSet):
         for dim in sorted(top):
             if degree <= dim:
                 continue
-            test_deg = degree - dim - 1 if dim > 0 else 0
             ref_facet = symmetric_simplex(dim)
+            test_deg = degree - dim - 1 if dim > 0 else 0
             Q_ref = parse_quadrature_scheme(ref_facet, test_deg + interpolant_deg, quad_scheme)
-            poly_set = ONPolynomialSet(ref_facet, test_deg, scale=1, variant="dual")
+            poly_set = ONPolynomialSet(ref_facet, test_deg, variant="dual")
             phis = poly_set.tabulate(Q_ref.get_points())[(0,) * dim]
             for entity in sorted(top[dim]):
                 cur = len(nodes)
@@ -132,7 +132,7 @@ class IntegratedLegendre(finite_element.CiarletElement):
             ref_el = splitting(ref_el)
         if degree < 1:
             raise ValueError(f"{type(self).__name__} elements only valid for k >= 1")
-        poly_set = ONPolynomialSet(ref_el, degree, scale=1, variant="bubble")
+        poly_set = ONPolynomialSet(ref_el, degree, variant="bubble")
         dual = IntegratedLegendreDual(ref_el, degree, interpolant_deg=interpolant_deg, quad_scheme=quad_scheme)
         formdegree = 0  # 0-form
         super().__init__(poly_set, dual, degree, formdegree, recombine_dual=True)

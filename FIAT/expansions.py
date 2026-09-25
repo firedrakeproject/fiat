@@ -396,6 +396,9 @@ class ExpansionSet(object):
         elif n == 0 and sd > 1 and len(self.affine_mappings) == 1:
             # return 1 for n=0 to make regression tests pass
             scale = 1
+        if self.variant in ("bubble", "dual"):
+            factor = 2**sd / math.sqrt(math.prod(range(3, 2*sd + 2, 2)))
+            scale *= factor if self.variant == "bubble" else 1 / factor
         if self.variant == "dual":
             factor = (-1)**sd * 2**sd
             if n > 0:

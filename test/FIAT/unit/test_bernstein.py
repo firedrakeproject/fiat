@@ -26,6 +26,7 @@ from FIAT.reference_element import ufc_simplex
 from FIAT.bernstein import Bernstein, BernsteinPolynomialSet
 from FIAT.finite_element import CiarletElement
 from FIAT.hct import HCTDualSet, HsiehCloughTocher
+from FIAT.lagrange import Lagrange
 from FIAT.macro import AlfeldSplit, CkPolynomialSet
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.walkington import Walkington, WalkingtonDualSet
@@ -69,6 +70,20 @@ D20 = numpy.array([
     [0., 0., 0., 0., 0., 0.],
     [0., 0., 0., 0., 0., 0.],
 ])
+
+
+@pytest.mark.parametrize("dim", (1, 2, 3))
+def test_bernstein_degree_one_matches_lagrange(dim):
+    """Ensure that degree-one Bernstein basis functions are hat functions."""
+    ref_el = ufc_simplex(dim)
+    points = numpy.array(ref_el.vertices)
+    bernstein = Bernstein(ref_el, 1)
+    lagrange = Lagrange(ref_el, 1)
+
+    numpy.testing.assert_allclose(
+        bernstein.tabulate(0, points)[(0,) * dim],
+        lagrange.tabulate(0, points)[(0,) * dim],
+    )
 
 
 def test_bernstein_2nd_derivatives():

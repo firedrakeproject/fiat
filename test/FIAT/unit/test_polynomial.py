@@ -129,16 +129,20 @@ def test_expansion_orthonormality(cell, degree):
 @pytest.mark.parametrize("degree", [10])
 def test_bubble_duality(cell, degree):
     sd = cell.get_spatial_dimension()
-    B = polynomial_set.make_bubbles(cell, degree)
+    B = polynomial_set.make_bubbles(cell, degree, scale=None)
+    D = polynomial_set.ONPolynomialSet(cell, degree-sd-1, variant="dual")
 
-    Q = create_quadrature(cell, 2*B.degree - sd - 1)
+    Q = create_quadrature(cell, B.degree + D.degree)
     qpts, qwts = Q.get_points(), Q.get_weights()
     phi = B.tabulate(qpts)[(0,) * sd]
-    phi_dual = phi / abs(phi[0])
-    scale = 2 ** sd
-    results = scale * numpy.dot(numpy.multiply(phi_dual, qwts), phi.T)
-    assert numpy.allclose(results, numpy.diag(numpy.diag(results)))
-    assert numpy.allclose(numpy.diag(results), 1.0)
+    phi_dual = D.tabulate(qpts)[(0,) * sd]
+
+    pairing = numpy.dot(numpy.multiply(phi_dual, qwts), phi.T)
+    ordering = numpy.argmax(numpy.abs(pairing), axis=0)
+    assert numpy.array_equal(numpy.sort(ordering), numpy.arange(len(phi)))
+
+    expected = numpy.eye(len(phi))
+    assert numpy.allclose(pairing[ordering], expected)
 
 
 @pytest.mark.parametrize("degree", [10])
