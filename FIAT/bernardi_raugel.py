@@ -12,7 +12,7 @@
 from FIAT import finite_element, dual_set, polynomial_set, expansions
 from FIAT.check_format_variant import parse_quadrature_scheme
 from FIAT.functional import ComponentPointEvaluation, FrobeniusIntegralMoment
-from FIAT.hierarchical import make_dual_bubbles, make_projected_bubble_moments
+from FIAT.hierarchical import make_projected_bubble_moments
 from FIAT.quadrature import FacetQuadratureRule
 
 import numpy
@@ -71,26 +71,19 @@ class BernardiRaugelDualSet(dual_set.DualSet):
 
         if order < sd:
             # Face moments of normal component against constant
-            # Face moments of tangential components against dual bubbles
+            # Face moments of tangential components against projected bubbles
             ref_facet = ref_complex.construct_subcomplex(sd-1)
             ref_area = ref_facet.volume()
             # Quadrature and weight function for tangential constraints
             codim = sd-1 if degree == 1 and ref_facet.is_macrocell() else 0
+            Qt_ref, phis = make_projected_bubble_moments(ref_facet, degree, codim=codim)
+            ft_at_qpts = phis[-1]
             if codim == 0:
-                Qt_ref, phis = make_projected_bubble_moments(ref_facet, degree)
-                ft_at_qpts = phis[-1]
                 bf_at_qpts = ref_facet.compute_bubble(Qt_ref.get_points())
                 bf_wts = numpy.multiply(bf_at_qpts, Qt_ref.get_weights())
                 scale = numpy.sum(bf_wts) / numpy.dot(ft_at_qpts, bf_wts)
                 scale /= ref_area
-            else:
-                Qt_ref, phis = make_dual_bubbles(ref_facet, degree, codim=codim, scale=1)
-                ft_at_qpts = phis[-1]
-                scale = ref_area / numpy.dot(ft_at_qpts, Qt_ref.get_weights())
-
-            ft_at_qpts *= scale
-            if codim != 0:
-                ft_at_qpts -= numpy.dot(ft_at_qpts, Qt_ref.get_weights()) / ref_area
+                ft_at_qpts *= scale
 
             interior_facets = ref_el.get_interior_facets(sd-1) or ()
             facets = list(set(top[sd-1]) - set(interior_facets))

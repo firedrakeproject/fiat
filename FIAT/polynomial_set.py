@@ -97,6 +97,16 @@ class PolynomialSet(object):
         scalar (2,) a vector of length 2, etc"""
         return self.coeffs.shape[1:-1]
 
+    def recombine(self, coefficients):
+        """Return a polynomial set with new expansion coefficients.
+
+        :arg coefficients: The expansion coefficients of the recombined
+                           polynomial basis.
+        :returns: A polynomial set with the same metadata as this set.
+        """
+        return PolynomialSet(self.ref_el, self.degree, self.embedded_degree,
+                             self.expansion_set, coefficients)
+
     def take(self, items):
         """Extracts subset of polynomials given by items."""
         new_coeffs = numpy.take(self.get_coeffs(), items, 0)
