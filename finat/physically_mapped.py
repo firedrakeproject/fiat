@@ -552,7 +552,7 @@ def support_entity(ref_el, points, tol=1e-12):
 def get_transformation_type(node, dim):
     """How FIAT builds the physical counterpart of a node.
 
-    Instantiated on a physical cell, FIAT dual sets follow one of three
+    Instantiated on a physical cell, FIAT dual sets follow one of four
     conventions, which cannot be read off the reference functional
     alone:
 
@@ -566,7 +566,10 @@ def get_transformation_type(node, dim):
       values of Hu-Zhang);
     * ``"invariant"``: interior moments are taken against pulled-back
       test functions, so the physical node is the push-forward of the
-      reference one; point values of scalar fields are invariant too.
+      reference one; point values of scalar fields are invariant too;
+    * ``"edge"``: derivatives along an edge of a three-dimensional cell
+      (the vertex-edge dofs of the Stokes element), whose physical
+      tangent is the difference of the physical vertices.
 
     Vector point values on a facet are Cartesian, not framed: they are
     the C0 data of vector-valued H1 elements (the edge midpoint values
@@ -574,7 +577,7 @@ def get_transformation_type(node, dim):
 
     :arg node: The FIAT :class:`~FIAT.functional.Functional`.
     :arg dim: The dimension of the entity FIAT lists the node under.
-    :returns: One of ``"cartesian"``, ``"frame"`` or ``"invariant"``.
+    :returns: One of ``"cartesian"``, ``"frame"``, ``"invariant"`` or ``"edge"``.
     """
     sd = node.ref_el.get_spatial_dimension()
     order = node.max_deriv_order
@@ -586,6 +589,8 @@ def get_transformation_type(node, dim):
         return "frame"
     if dim == sd and not single and order == 0:
         return "invariant"
+    if 0 < dim < sd - 1 and order > 0:
+        return "edge"
     return "cartesian"
 
 
@@ -621,6 +626,27 @@ class DirectionPullback:
 def identity_pullback(extent):
     """The pullback of an axis whose physical directions pull back to themselves."""
     return DirectionPullback(numpy.eye(extent), [], one)
+
+
+def edge_pullback(ref_el, edge, coefficients, axis, tol=1e-12):
+    """The pullback of a derivative axis along an edge of a three-dimensional cell.
+
+    The physical tangent is the image of the reference tangent, so it
+    pulls back to itself.  An edge has no normal convention.
+
+    :arg ref_el: The reference cell.
+    :arg edge: The edge number.
+    :arg coefficients: The coefficient tensor of the node.
+    :arg axis: The derivative axis of the coefficient tensor.
+    :arg tol: Relative tolerance for the normal part of the node.
+    :returns: The :class:`DirectionPullback`.
+    """
+    t = ref_el.compute_edge_tangent(edge)
+    normal = numpy.eye(len(t)) - numpy.outer(t, t) / (t @ t)
+    residual = numpy.tensordot(coefficients, normal, axes=(axis, 1))
+    if numpy.abs(residual).max() > tol * numpy.abs(coefficients).max():
+        raise NotImplementedError("No physical convention for derivatives normal to an edge.")
+    return identity_pullback(len(t))
 
 
 def cartesian_pullback(mapping, jacobian):
@@ -840,6 +866,10 @@ def physical_node(node, functional, ref_el, entity, jacobian, avg=True):
         pullbacks = [identity_pullback(sd) for mapping in functional.mappings]
     elif transformation == "cartesian":
         pullbacks = [cartesian_pullback(mapping, jacobian) for mapping in functional.mappings]
+    elif transformation == "edge":
+        pullbacks = [edge_pullback(ref_el, entity[1], functional.coefficients, 1 + k)
+                     if mapping == DERIVATIVE else cartesian_pullback(mapping, jacobian)
+                     for k, mapping in enumerate(functional.mappings)]
     else:
         support = support_entity(ref_el, functional.points)
         frame = PhysicalEntityFrame(ref_el, entity[1], support, jacobian)
