@@ -6,6 +6,7 @@
 #
 # Written by Pablo D. Brubeck (brubeck@protonmail.com), 2026
 
+from FIAT.bernstein import BernsteinPolynomialSet
 from FIAT.functional import (PointEvaluation, PointDerivative,
                              IntegralMoment, IntegralMomentOfDerivative)
 from FIAT import finite_element, dual_set, macro, polynomial_set
@@ -86,7 +87,7 @@ class C2DualSet(dual_set.DualSet):
 class BrambleZlamalC2(finite_element.CiarletElement):
     """The Bramble-Zlamal C2 element."""
     def __init__(self, ref_el, degree=9, reduced=False, quad_scheme=None):
-        poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
+        poly_set = BernsteinPolynomialSet(ref_el, degree, ordering="topological")
         dual = C2DualSet(ref_el, degree, reduced=reduced, quad_scheme=quad_scheme)
         super().__init__(poly_set, dual, degree, formdegree=0)
 

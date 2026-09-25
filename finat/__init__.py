@@ -28,6 +28,7 @@ from .alfeld_sorokina import AlfeldSorokina                        # noqa: F401
 from .guzman_neilan import GuzmanNeilanFirstKindH1, GuzmanNeilanSecondKindH1, GuzmanNeilanBubble, GuzmanNeilanH1div  # noqa: F401
 from .powell_sabin import QuadraticPowellSabin6, QuadraticPowellSabin12  # noqa: F401
 from .hermite import Hermite                                       # noqa: F401
+from .stokes import Stokes, MacroStokes, DivStokes                 # noqa: F401
 from .johnson_mercier import JohnsonMercier                        # noqa: F401
 from .mtw import MardalTaiWinther                                  # noqa: F401
 from .morley import Morley                                         # noqa: F401
@@ -44,6 +45,7 @@ from .nodal_enriched import NodalEnrichedElement                   # noqa: F401
 from .quadrature_element import QuadratureElement, make_quadrature_element  # noqa: F401
 from .restricted import RestrictedElement                          # noqa: F401
 from .runtime_tabulated import RuntimeTabulated                    # noqa: F401
+from .functional import Functional                                  # noqa: F401
 from . import quadrature                                           # noqa: F401
 from . import cell_tools                                           # noqa: F401
 from . import element_factory                                      # noqa: F401

@@ -8,7 +8,7 @@ import pprint
 from gem.interpreter import evaluate
 from gem.node import traversal
 from gem.optimise import contraction
-from finat.physically_mapped import MappedTabulation, PhysicallyMappedElement
+from finat.physically_mapped import Jacobian, MappedTabulation, PhysicallyMappedElement
 
 
 def test_sparse_mapped_tabulation():
@@ -44,6 +44,36 @@ def test_sparse_mapped_tabulation():
     expected = np.asarray([[1.0, 0.0, 2.0], [0.0, 1.0, 0.0]]) \
         @ table_values
     assert np.array_equal(actual.arr, expected)
+
+
+def test_jacobian_accepts_rectangular_matrix():
+    jacobian = Jacobian(gem.Literal(np.array([[3., 0.], [0., 4.], [0., 0.]])))
+    assert jacobian.J.shape == (3, 2)
+    assert evaluate([jacobian.detJ])[0].arr == pytest.approx(12.)
+    assert jacobian.adjJ is None
+    K = evaluate([gem.ListTensor(jacobian.K)])[0].arr
+    assert np.allclose(K, [[4, 0], [0, 3], [0, 0]])
+
+
+@pytest.fixture(params=["positive", "negative"])
+def phys_el(request):
+    K = {dim: FIAT.ufc_simplex(dim) for dim in (1, 2, 3)}
+    K[1].vertices = ((0.1,), (1.27,))
+    K[2].vertices = ((0.0, 0.1), (1.17, -0.09), (0.15, 1.84))
+    K[3].vertices = ((0, 0, 0),
+                     (1., 0.1, -0.37),
+                     (0.01, 0.987, -.23),
+                     (-0.1, -0.2, 1.38))
+    if request.param == "negative":
+        # swap two vertices to reverse the orientation
+        for dim in K:
+            v = list(K[dim].vertices)
+            if dim == 1:
+                v[0], v[1] = v[1], v[0]
+            else:
+                v[1], v[2] = v[2], v[1]
+            K[dim].vertices = tuple(v)
+    return K
 
 
 def make_unisolvent_points(element, interior=False):
@@ -120,6 +150,7 @@ def check_zany_mapping(element, ref_to_phys, *args, **kwargs):
     Vh, residual, *_ = np.linalg.lstsq(Phi.T, phi.T)
     Mh = Vh.T
     Mh = Mh[:num_dofs]
+
     tol = 1E-10
     Mh[abs(Mh) < tol] = 0
     M[abs(M) < tol] = 0
@@ -225,6 +256,16 @@ def test_piola(ref_to_phys, element, dimension):
 
 
 @pytest.mark.parametrize("dimension, element, degree", [
+                         *((2, finat.MacroStokes, k) for k in range(2, 4)),
+                         *((3, finat.MacroStokes, k) for k in range(3, 5)),
+                         *((2, finat.Stokes, k) for k in range(4, 6)),
+                         *((3, finat.Stokes, k) for k in range(6, 8)),
+                         ])
+def test_stokes(ref_to_phys, element, degree, dimension):
+    check_zany_mapping(element, ref_to_phys[dimension], degree)
+
+
+@pytest.mark.parametrize("dimension, element, degree", [
     (3, finat.MardalTaiWinther, 2),
     (3, finat.GuzmanNeilanFirstKindH1, 2),
 ])
@@ -257,3 +298,33 @@ def test_affine(ref_to_phys, element, degree, variant, dimension):
 @pytest.mark.parametrize("variant", [None, "iso"])
 def test_macro_piola(ref_to_phys, element, degree, variant, dimension):
     check_zany_mapping(element, ref_to_phys[dimension], degree, variant=variant)
+
+
+def check_dual_evaluation(element, ref_to_phys, *args, **kwargs):
+    """The physical nodes are dual to the physical basis functions."""
+    finat_element = element(ref_to_phys.ref_cell, *args, **kwargs)
+    sd = ref_to_phys.ref_cell.get_spatial_dimension()
+    Q, x = finat_element.dual_basis
+    Q = finat_element.dual_transformation(Q, coordinate_mapping=ref_to_phys)
+    phi = finat_element.basis_evaluation(0, x, coordinate_mapping=ref_to_phys)[(0,)*sd]
+
+    i, j = gem.indices(2)
+    shape_indices = gem.indices(len(phi.shape) - 1)
+    expr = gem.IndexSum(Q[(i, *shape_indices)] * phi[(j, *shape_indices)],
+                        (*x.indices, *shape_indices))
+    result = evaluate([gem.ComponentTensor(expr, (i, j))])[0].arr
+    assert np.allclose(result, np.eye(finat_element.space_dimension()))
+
+
+# FInAT has no dual basis for elements with derivative nodes
+dual_basis_elements = [e for e in zany_piola_elements[3]
+                       if e not in (finat.AlfeldSorokina, finat.GuzmanNeilanH1div)]
+
+
+@pytest.mark.parametrize("dimension, element", [
+    *((2, e) for e in zany_piola_elements[2]),
+    *((2, e) for e in dual_basis_elements),
+    *((3, e) for e in dual_basis_elements),
+])
+def test_dual_evaluation(ref_to_phys, element, dimension):
+    check_dual_evaluation(element, ref_to_phys[dimension])

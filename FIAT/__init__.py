@@ -26,6 +26,7 @@ from FIAT.c2_elements import AlfeldC2, BrambleZlamalC2
 from FIAT.alfeld_sorokina import AlfeldSorokina
 from FIAT.arnold_qin import ArnoldQin
 from FIAT.guzman_neilan import GuzmanNeilanFirstKindH1, GuzmanNeilanSecondKindH1, GuzmanNeilanH1div
+from FIAT.stokes import Stokes, MacroStokes, DivStokes
 from FIAT.christiansen_hu import ChristiansenHu
 from FIAT.johnson_mercier import JohnsonMercier
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini
@@ -117,6 +118,9 @@ supported_elements = {"Argyris": Argyris,
                       "Nedelec 2nd kind H(curl)": NedelecSecondKind,
                       "Raviart-Thomas": RaviartThomas,
                       "Regge": Regge,
+                      "Stokes": Stokes,
+                      "Macro Stokes": MacroStokes,
+                      "Div Stokes": DivStokes,
                       "HDiv Trace": HDivTrace,
                       "Hellan-Herrmann-Johnson": HellanHerrmannJohnson,
                       "Gopalakrishnan-Lederer-Schoberl 1st kind": GopalakrishnanLedererSchoberlFirstKind,
