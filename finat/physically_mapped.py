@@ -559,7 +559,9 @@ def get_transformation_type(node, dim):
     * ``"cartesian"``: point evaluations keep their Cartesian
       components, values and derivatives alike (vertex jets, the vertex
       divergences of Alfeld-Sorokina, the vertex and interior point
-      values of Guzman-Neilan);
+      values of Guzman-Neilan), except that derivatives along an edge
+      of a three-dimensional cell are taken along the difference of the
+      physical vertices (the vertex-edge dofs of the Stokes element);
     * ``"frame"``: nodes on a facet refer to the physical facet normal
       and tangents (normal derivatives and their moments, normal and
       tangential moments of Piola-mapped fields, the facet point
@@ -839,7 +841,10 @@ def physical_node(node, functional, ref_el, entity, jacobian, avg=True):
     if transformation == "invariant":
         pullbacks = [identity_pullback(sd) for mapping in functional.mappings]
     elif transformation == "cartesian":
-        pullbacks = [cartesian_pullback(mapping, jacobian) for mapping in functional.mappings]
+        on_edge = 0 < entity[0] < sd - 1
+        pullbacks = [identity_pullback(sd) if on_edge and mapping == DERIVATIVE
+                     else cartesian_pullback(mapping, jacobian)
+                     for mapping in functional.mappings]
     else:
         support = support_entity(ref_el, functional.points)
         frame = PhysicalEntityFrame(ref_el, entity[1], support, jacobian)
