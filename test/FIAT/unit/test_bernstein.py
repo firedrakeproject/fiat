@@ -272,8 +272,3 @@ def test_bernstein_c1_entity_ids():
     coeffs = BernsteinPolynomialSet(ref_el, degree, order=1, entity_ids=entity_ids).get_coeffs()
     permuted_coeffs = BernsteinPolynomialSet(ref_el, degree, order=1, entity_ids=permuted_ids).get_coeffs()
     assert numpy.allclose(permuted_coeffs[perm], coeffs)
-
-
-if __name__ == '__main__':
-    import os
-    pytest.main(os.path.abspath(__file__))

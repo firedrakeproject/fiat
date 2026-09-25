@@ -9,6 +9,7 @@
 import itertools
 import math
 import numpy
+import scipy.linalg
 
 from FIAT.check_format_variant import parse_lagrange_variant
 from FIAT.expansions import ExpansionSet
@@ -425,6 +426,7 @@ def _ck_coefficients(ref_el, degree, order, vorder, entity_ids=None):
                 conditions.append(condition)
 
     A = numpy.reshape(conditions, (-1, num_columns))
-    dependent, *_ = numpy.linalg.lstsq(A[:, num_free:], -A[:, :num_free], rcond=None)
+    dependent, *_ = scipy.linalg.lstsq(A[:, num_free:], -A[:, :num_free], cond=None,
+                                       lapack_driver="gelsd")
     dependent = dependent[:len(c0_coeffs) - num_free]
     return c0_coeffs[:num_free] + dependent.T @ c0_coeffs[num_free:]
