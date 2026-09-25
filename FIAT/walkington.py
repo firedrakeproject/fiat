@@ -10,14 +10,14 @@
 
 from FIAT import finite_element, polynomial_set, macro
 from FIAT.dual_set import DualSet
-from FIAT.expansions import polynomial_dimension
 from FIAT.functional import (
     PointEvaluation, PointDerivative,
     IntegralMomentOfDerivative,
 )
 from FIAT.reference_element import TETRAHEDRON
-from FIAT.quadrature import FacetQuadratureRule, QuadratureRule
+from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
+from FIAT.hierarchical import make_projected_bubble_moments
 from FIAT.jacobi import eval_jacobi
 import numpy
 
@@ -65,8 +65,9 @@ class WalkingtonDualSet(DualSet):
         Q_edge = create_quadrature(ref_edge, 2*(degree-1))
         x = ref_edge.compute_barycentric_coordinates(Q_edge.get_points())
         leg4_at_qpts = eval_jacobi(0, 0, 4, x[:, 1] - x[:, 0])
-        # Face constraint: normal derivative is cubic
-        Q_face, phi = face_constraint(ref_face)
+        # Face constraint: normal derivative drops to degree-2
+        Q_face, phis = make_projected_bubble_moments(ref_face, degree-2)
+        phi = phis[-1]
 
         extra_entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
         extra_nodes = []
@@ -110,25 +111,3 @@ class Walkington(finite_element.CiarletElement):
         ref_complex = macro.AlfeldSplit(ref_el)
         poly_set = macro.CkPolynomialSet(ref_complex, degree, order=1, vorder=4, variant="bubble")
         super().__init__(poly_set, dual, degree)
-
-
-def face_constraint(ref_face):
-    k = 3
-    sd = ref_face.get_spatial_dimension()
-    Q = create_quadrature(ref_face, 2*k)
-    dimPkm1 = polynomial_dimension(ref_face, k-1)
-
-    pts = list(Q.get_points()[:3])
-    pts.append(Q.get_points()[-1])
-    P = polynomial_set.ONPolynomialSet(ref_face, k)
-    Pk = P.tabulate(pts)[(0,)*sd][dimPkm1:]
-    c = numpy.linalg.solve(Pk.T, [0, 0, 0, 1])
-    Pk = P.tabulate(Q.get_points())[(0,)*sd][dimPkm1:]
-    phi = numpy.dot(c, Pk)
-
-    supp = abs(phi) > 1E-12
-    pts = Q.get_points()[supp]
-    wts = Q.get_weights()[supp]
-    Q = QuadratureRule(ref_face, pts, wts)
-    phi = phi[supp]
-    return Q, phi

@@ -6,7 +6,7 @@ import gem
 import numpy
 from FIAT.quadrature import GaussLegendreQuadratureLineRule
 from FIAT.quadrature_schemes import create_quadrature as fiat_scheme
-from FIAT.reference_element import LINE, QUADRILATERAL, TENSORPRODUCT
+from FIAT.reference_element import HEXAHEDRON, LINE, QUADRILATERAL, TENSORPRODUCT
 from gem.utils import safe_repr
 
 from finat.point_set import (GaussLegendrePointSet, GaussLobattoLegendrePointSet,
@@ -42,7 +42,7 @@ def make_quadrature(ref_el, degree, scheme="default"):
                       for c, d in zip(ref_el.cells, degree)]
         return TensorProductQuadratureRule(quad_rules, ref_el=ref_el)
 
-    if ref_el.get_shape() == QUADRILATERAL:
+    if ref_el.get_shape() in {QUADRILATERAL, HEXAHEDRON}:
         return make_quadrature(ref_el.product, degree, scheme)
 
     if degree < 0:
