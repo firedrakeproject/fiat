@@ -200,6 +200,15 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         key = None
         return MappedTabulation(B, {key: Q})[key]
 
+    def map_tabulation(self, ref_tabulation, coordinate_mapping):
+        assert coordinate_mapping is not None
+        M = self.basis_transformation(coordinate_mapping)
+        return MappedTabulation(M, ref_tabulation, indices=self.restriction_indices)
+
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
+        result = super().basis_evaluation(order, ps, entity=entity)
+        return self.map_tabulation(result, coordinate_mapping)
+
     def physical_vandermonde(self, coordinate_mapping):
         """The physical Vandermonde matrix of the element.
 
@@ -292,15 +301,6 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         """
         order = node.max_deriv_order
         return havg**(-order) if order > 0 else None
-
-    def map_tabulation(self, ref_tabulation, coordinate_mapping):
-        assert coordinate_mapping is not None
-        M = self.basis_transformation(coordinate_mapping)
-        return MappedTabulation(M, ref_tabulation, indices=self.restriction_indices)
-
-    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
-        result = super().basis_evaluation(order, ps, entity=entity)
-        return self.map_tabulation(result, coordinate_mapping)
 
 
 class DirectlyDefinedElement(NeedsCoordinateMappingElement):
@@ -509,12 +509,10 @@ class Jacobian:
     r"""The cell Jacobian and its derived matrices, as object arrays of GEM scalars.
 
     Following FInAT, :math:`J = \partial x/\partial\hat{x}` maps
-    reference to physical coordinates; the papers' Jacobian is its
-    inverse.
+    reference to physical coordinates.
 
     For a rectangular Jacobian, :attr:`detJ` is the positive metric volume
-    factor :math:`\sqrt{\det(J^T J)}`.  The adjugate and cofactor matrix are
-    only defined here for square Jacobians; :func:`pseudoinverse` handles
+    factor :math:`\sqrt{\det(J^T J)}`.  The :func:`pseudoinverse` handles
     full-rank rectangular Jacobians.
 
     :arg J: A GEM expression for the Jacobian, shape ``(gdim, tdim)``.
@@ -527,13 +525,12 @@ class Jacobian:
         if gdim == tdim:
             self.detJ = determinant(self.J)
             self.adjJ = adjugate(self.J)
-            #: the cofactor matrix, which maps normals to normals
-            self.K = self.adjJ.T
         else:
             JTJ = self.J.T @ self.J
             self.detJ = determinant(JTJ)**0.5
-            self.adjJ = None
-            self.K = self.detJ * pseudoinverse(self.J).T
+            self.adjJ = self.detJ * pseudoinverse(self.J)
+        #: the cofactor matrix, which maps normals to normals
+        self.K = self.adjJ.T
 
 
 class PhysicalVandermondeMatrix:
