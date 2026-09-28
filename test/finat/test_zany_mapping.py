@@ -219,8 +219,8 @@ def test_piola(ref_to_phys, element, dimension):
 
 
 @pytest.mark.parametrize("dimension, element, degree", [
-                         *((2, finat.MacroStokes, k) for k in range(2, 4)),
-                         *((3, finat.MacroStokes, k) for k in range(3, 5)),
+                         *((2, finat.MacroStokes, k) for k in range(1, 4)),
+                         *((3, finat.MacroStokes, k) for k in range(1, 5)),
                          *((2, finat.Stokes, k) for k in range(4, 6)),
                          *((3, finat.Stokes, k) for k in range(6, 8)),
                          ])

@@ -22,6 +22,7 @@ from FIAT.guzman_neilan import (
     GuzmanNeilanH1div,
     GuzmanNeilanSpace)
 from FIAT.restricted import RestrictedElement
+from FIAT.stokes import MacroStokes, reduced_macro_stokes_indices
 from FIAT.quadrature import FacetQuadratureRule
 
 T = ufc_simplex(2)
@@ -303,3 +304,65 @@ def test_minimal_stokes_space(cell, family):
     # Test that the full space includes the reduced space
     assert Wdim > Vdim
     assert span_greater_equal(Wtab[z], Vtab[z])
+
+
+def reduced_macro_stokes(cell, degree):
+    sd = cell.get_spatial_dimension()
+    fe = MacroStokes(cell, sd, hierarchical=True)
+    return RestrictedElement(fe, indices=reduced_macro_stokes_indices(fe, degree))
+
+
+@pytest.mark.parametrize("cell, degree", [(T, 1), (S, 1), (S, 2)])
+def test_macro_stokes_pairs(cell, degree):
+    spaces = [reduced_macro_stokes(cell, degree), DG(cell, degree-1)]
+    check_stokes_complex(spaces, degree)
+
+
+@pytest.mark.parametrize("sd, degree", [(2, 1), (3, 1), (3, 2)])
+def test_macro_stokes_dofs(sd, degree):
+    cell = symmetric_simplex(sd)
+    fe = reduced_macro_stokes(cell, degree)
+    ref_complex = fe.get_reference_complex()
+    Q = create_quadrature(ref_complex, fe.degree()-1)
+    tab = fe.tabulate(1, Q.get_points())
+    div_moments = numpy.dot(div(tab), Q.get_weights())
+
+    # Only the normal dof of each facet carries flux through that facet
+    ref_facet = cell.construct_subelement(sd-1)
+    Q_facet = create_quadrature(ref_facet, fe.degree())
+    entity_ids = fe.entity_dofs()
+    flux = numpy.zeros((fe.space_dimension(), len(entity_ids[sd-1])))
+    for f in entity_ids[sd-1]:
+        Q = FacetQuadratureRule(cell, sd-1, f, Q_facet)
+        vals = fe.tabulate(0, Q.get_points())[(0,)*sd]
+        normal_trace = numpy.tensordot(vals, cell.compute_normal(f), axes=(1, 0))
+        flux[:, f] = numpy.dot(normal_trace, Q.get_weights())
+
+    expected = numpy.zeros(flux.shape)
+    for f in entity_ids[sd-1]:
+        fdof = entity_ids[sd-1][f][0]
+        expected[fdof, f] = flux[fdof, f]
+        assert not numpy.isclose(flux[fdof, f], 0)
+    assert numpy.allclose(flux, expected)
+    assert numpy.allclose(div_moments, flux.sum(axis=1))
+
+
+@pytest.mark.parametrize("sd", (2, 3))
+def test_macro_stokes_trace(sd):
+    degree = 1
+    cell = symmetric_simplex(sd)
+
+    ms = reduced_macro_stokes(cell, degree)
+    br = BernardiRaugel(cell, degree)
+    ndofs = ms.space_dimension()
+
+    ref_facet = cell.construct_subelement(sd-1)
+    Q_facet = create_quadrature(ref_facet, 2*sd)
+    pts = []
+    for f in cell.topology[sd-1]:
+        pts.extend(FacetQuadratureRule(cell, sd-1, f, Q_facet).get_points())
+
+    # Assert that the traces span the same space as the reduced Bernardi-Raugel traces
+    ms_trace = ms.tabulate(0, pts)[(0,)*sd]
+    br_trace = br.tabulate(0, pts)[(0,)*sd][:ndofs]
+    assert span_equal(ms_trace, br_trace)
