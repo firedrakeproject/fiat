@@ -95,6 +95,71 @@ def compile_gem(assignments, prefix_ordering, remove_zeros=False,
     return ImperoC(tree, temporaries, declare, indices)
 
 
+def compile_gem_new(assignments, prefix_ordering, remove_zeros=False,
+                emit_return_accumulate=True):
+    """Compiles GEM to Impero.
+
+    :arg assignments: list of (return variable, expression DAG root) pairs
+    :arg prefix_ordering: outermost loop indices
+    :arg remove_zeros: remove zero assignment to return variables
+    :arg emit_return_accumulate: emit ReturnAccumulate nodes (see
+         :func:`~.scheduling.emit_operations`)? If False,
+         split into Accumulate/Return pairs. Set to False if the
+         output tensor of kernels is not guaranteed to be zero on entry.
+    """
+    # Remove zeros
+    if remove_zeros:
+        def nonzero(assignment):
+            variable, expression = assignment
+            return not isinstance(expression, gem.Zero)
+        assignments = list(filter(nonzero, assignments))
+
+    # Just the expressions
+    # expressions = [expression for variable, expression in assignments]
+
+    # Everything together
+    expressions = []
+    for a in assignments:
+        expressions.append(a.assignee)
+        expressions.append(a.expression)
+
+    # Collect indices in a deterministic order
+    indices = list(collections.OrderedDict.fromkeys(chain.from_iterable(
+        node.index_ordering()
+        for node in traversal(expressions)
+        if isinstance(node, (gem.Indexed, gem.FlexiblyIndexed))
+    )))
+
+    # Build ordered index map
+    index_ordering = make_prefix_ordering(indices, prefix_ordering)
+    apply_ordering = make_index_orderer(index_ordering)
+
+    get_indices = lambda expr: apply_ordering(expr.free_indices)
+
+    # Build operation ordering
+    ops = scheduling.emit_operations(assignments, get_indices, emit_return_accumulate)
+
+    # Empty kernel
+    if len(ops) == 0:
+        raise NoopError()
+
+    # Drop unnecessary temporaries
+    # FIXME
+    # ops = inline_temporaries(expressions, ops)
+
+    # Build Impero AST
+    tree = make_loop_tree(ops, get_indices)
+
+    # Collect temporaries
+    temporaries = collect_temporaries(tree)
+
+    # Determine declarations
+    declare, indices = place_declarations(tree, temporaries, get_indices)
+
+    # Prepare ImperoC (Impero AST + other data for code generation)
+    return ImperoC(tree, temporaries, declare, indices)
+
+
 def make_prefix_ordering(indices, prefix_ordering):
     """Creates an ordering of ``indices`` which starts with those
     indices in ``prefix_ordering``."""

@@ -11,7 +11,7 @@ import numpy
 from gem.utils import groupby
 from gem.node import (Memoizer, MemoizerArg, reuse_if_untouched,
                       reuse_if_untouched_arg, traversal)
-from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
+from gem.gem import (Node, Failure, Gather, Identity, Constant, Literal, Zero,
                      Product, Sum, Comparison, Conditional, Division,
                      Index, VariableIndex, Indexed, FlexiblyIndexed,
                      IndexSum, ComponentTensor, ListTensor, Delta,
@@ -100,9 +100,11 @@ def _replace_indices_atomic(i, self, subst):
     if isinstance(i, VariableIndex):
         new_expr = self(i.expression, subst)
         return i if new_expr == i.expression else VariableIndex(new_expr)
-    else:
+    elif isinstance(i, Index):
         substitute = dict(subst)
         return substitute.get(i, i)
+    else:
+        return replace_indices(i, self, subst)
 
 
 @replace_indices.register(Delta)
@@ -118,6 +120,17 @@ def replace_indices_delta(node, self, subst):
 @replace_indices.register(Indexed)
 def replace_indices_indexed(node, self, subst):
     multiindex = tuple(_replace_indices_atomic(i, self, subst) for i in node.multiindex)
+    # multiindex = []
+    # for i in node.multiindex:
+    #     if isinstance(i, ComponentTensor):
+    #         substitute = dict(subst)
+    #         substitute.update(zip(i.multiindex, multiindex))
+    #         i = self(i.children[0], tuple(sorted(substitute.items())))
+    #     else:
+    #         i = _replace_indices_atomic(i, self, subst)
+    #     multiindex.append(i)
+    # multiindex = tuple(multiindex)
+
     child, = node.children
 
     if isinstance(child, ComponentTensor):
@@ -153,6 +166,7 @@ def replace_indices_indexed(node, self, subst):
 
 @replace_indices.register(FlexiblyIndexed)
 def replace_indices_flexiblyindexed(node, self, subst):
+    raise AssertionError("old code")
     dim2idxs = tuple(
         (
             offset if isinstance(offset, Integral) else _replace_indices_atomic(offset, self, subst),
@@ -162,8 +176,16 @@ def replace_indices_flexiblyindexed(node, self, subst):
     )
 
     child, = node.children
-    assert not child.free_indices
-    if dim2idxs == node.dim2idxs:
+    if isinstance(child, ComponentTensor):
+        # Indexing into ComponentTensor
+        # Inline ComponentTensor and augment the substitution rules
+        substitute = dict(subst)
+        substitute.update(zip(child.multiindex, multiindex))
+        return self(child.children[0], tuple(sorted(substitute.items())))
+    # child = self(child, subst)
+    child = replace_indices(child, self, subst)
+    breakpoint()
+    if child == node.children[0] and dim2idxs == node.dim2idxs:
         return node
     else:
         return FlexiblyIndexed(child, dim2idxs)

@@ -158,11 +158,14 @@ def emit_operations(assignments, get_indices, emit_return_accumulate=True):
               the assignments
     """
     # Prepare reference counts
-    refcount = collect_refcount([e for v, e in assignments])
+    # refcount = collect_refcount([e for v, e in assignments])
+    refcount = collect_refcount([a.expression for a in assignments])
 
     # Stage return operations
     staging = []
-    for variable, expression in assignments:
+    for a in assignments:
+        variable = a.assignee
+        expression = a.expression
         if emit_return_accumulate and \
                 refcount[expression] == 1 and isinstance(expression, gem.IndexSum) \
                 and set(variable.free_indices) == set(expression.free_indices):

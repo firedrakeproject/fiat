@@ -30,4 +30,6 @@ _replace_variables.register(gem.gem.Node)(gem.node.reuse_if_untouched)
 
 @_replace_variables.register
 def _(var: gem.gem.Variable, self):
-    return self.replace_map.get(var.name, var)
+    new_var = self.replace_map.get(var.name, var)
+    assert var.shape == new_var.shape
+    return new_var

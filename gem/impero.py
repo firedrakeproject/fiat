@@ -12,6 +12,7 @@ Trivia:
 
 from abc import ABCMeta, abstractmethod
 
+from gem.gem import as_gem
 from gem.node import Node as NodeBase
 
 
@@ -162,7 +163,16 @@ class For(Node):
 class Assignment(Node):
     __slots__ = ("assignee", "expression", "mode")
 
+    children = ()
+
     def __init__(self, assignee, expression, mode):
-        self.assignee = assignee
-        self.expression = expression
+        self.assignee = as_gem(assignee)
+        self.expression = as_gem(expression)
         self.mode = mode
+
+    def __repr__(self):
+        return f"{type(self).__name__}({self.assignee!r}, {self.expression!r}, {self.mode!r})"
+
+    def __strr__(self):
+        # TODO: handle mode
+        return f"{self.assignee} <- {self.expression}"

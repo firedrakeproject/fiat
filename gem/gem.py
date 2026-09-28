@@ -626,9 +626,11 @@ class Conditional(Scalar):
 
 
 class IndexBase(Scalar, Terminal):
+# class IndexBase(Terminal):
+# class IndexBase(Scalar):
     """Abstract base class for indices."""
 
-    _dtype = int
+    _dtype = uint_type
 
 
 class Index(IndexBase):
@@ -638,12 +640,16 @@ class Index(IndexBase):
     _count = 0
 
     __slots__ = ('name', 'extent', 'count')
+    __front__ = ('name', 'extent')
 
     def __init__(self, name=None, extent=None):
         self.name = name
         Index._count += 1
         self.count = Index._count
         self.extent = extent
+
+        # might need to look in extent
+        self.free_indices = (self,)
 
     def set_extent(self, value):
         # Set extent, check for consistency
@@ -676,12 +682,6 @@ class Index(IndexBase):
         # Allow sorting of free indices in Python 3
         return self.count < other.count
 
-    def __getstate__(self):
-        return self.name, self.extent, self.count
-
-    def __setstate__(self, state):
-        self.name, self.extent, self.count = state
-
 
 class VariableIndex(IndexBase):
     """An index that is constant during a single execution of the
@@ -692,9 +692,22 @@ class VariableIndex(IndexBase):
     def __init__(self, expression):
         assert isinstance(expression, Node)
         assert not expression.shape
-        if expression.dtype != uint_type:
-            raise ValueError(f"expression.dtype ({expression.dtype}) != uint_type ({uint_type})")
+        # FIXME: sometimes violate this with IntType etc
+        # if expression.dtype != uint_type:
+        #     raise ValueError(f"expression.dtype ({expression.dtype}) != uint_type ({uint_type})")
         self.expression = expression
+
+    @property
+    def extent(self):
+        if self.expression.shape:
+            breakpoint()
+        else:
+            return 1
+
+    # @property
+    # def free_index(self):
+    #     i, = self.expression.free_indices
+    #     return i
 
     def __eq__(self, other):
         if self is other:
@@ -815,6 +828,20 @@ class FlexiblyIndexed(AbstractIndexed):
     __slots__ = ('children', 'dim2idxs', 'indirect_children')
     __back__ = ('dim2idxs',)
 
+    def __new__(cls, variable, dim2idxs):
+        assert variable.shape
+        assert len(variable.shape) == len(dim2idxs)
+
+        multiindex = []
+        for dim, (offset, idxs) in zip(variable.shape, dim2idxs):
+            expr = as_gem_uint(offset)
+            for i, stride in idxs:
+                expr += i*as_gem_uint(stride)
+            idx = VariableIndex(expr)
+            multiindex.append(idx)
+        multiindex = tuple(multiindex)
+        return Indexed(variable, multiindex)
+
     def __init__(self, variable, dim2idxs):
         """Construct a flexibly indexed node.
 
@@ -836,6 +863,7 @@ class FlexiblyIndexed(AbstractIndexed):
             variable[1 + i*12 + j*4 + k][0]
 
         """
+        assert False, "old code"
         assert variable.shape
         assert len(variable.shape) == len(dim2idxs)
         dim2idxs_ = []
@@ -916,8 +944,6 @@ class Gather(AbstractIndexed):
     def __init__(self, variable, multiindex):
         import pyop3.collections
 
-        if len(variable.shape) != 1:
-            raise NotImplementedError("Currently assuming a 1D thing, everything in pyop3 is flat")
         assert len(variable.shape) == len(multiindex)
 
         self.children = (variable,)
