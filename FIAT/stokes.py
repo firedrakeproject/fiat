@@ -22,7 +22,7 @@ from FIAT.reference_element import make_affine_mapping, symmetric_simplex
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.bernstein import Bernstein
-from FIAT.hierarchical import make_projected_bubble_moments, make_dual_bubbles
+from FIAT.hierarchical import make_projected_bubble_moments
 from FIAT.restricted import RestrictedElement
 
 
@@ -67,11 +67,10 @@ def dubiner_duals(ref_el, dim, trial_degree, test_degree):
     return Q, phis
 
 
-def bubble_duals(ref_el, dim, degree):
-    sd = ref_el.get_spatial_dimension()
+def bubble_duals(ref_el, dim, degree, quad_scheme=None):
     facet = ref_el.construct_subelement(dim)
-    #Q, phis = make_dual_bubbles(facet, degree)
-    Q, phis = make_projected_bubble_moments(facet, degree)
+    Q, phis = make_projected_bubble_moments(facet, degree,
+                                            quad_scheme=quad_scheme)
     return Q, phis
 
 
@@ -378,7 +377,8 @@ class Stokes(finite_element.CiarletElement):
 
 
 class MacroStokesDual(StokesDual):
-    def __init__(self, ref_complex, degree, hierarchical=False):
+    def __init__(self, ref_complex, degree, hierarchical=False,
+                 quad_scheme=None):
         nodes = []
         entity_ids = {}
         ref_el = ref_complex.get_parent()
@@ -392,7 +392,8 @@ class MacroStokesDual(StokesDual):
             entity_ids[dim] = {}
 
             if dim > 0 and dim < sd:
-                Q_ref, Phis = bubble_duals(ref_complex, dim, degree)
+                Q_ref, Phis = bubble_duals(ref_complex, dim, degree,
+                                           quad_scheme=quad_scheme)
 
             self._reduced_dofs[dim] = None
             for entity in sorted(top[dim]):
@@ -424,7 +425,8 @@ class MacroStokes(finite_element.CiarletElement):
     With hierarchical=True, the interior div dofs are instead ordered by
     the degree of the divergence, so that the lower degree elements are
     obtained by constraining the trailing dofs."""
-    def __init__(self, ref_el, degree=None, hierarchical=False):
+    def __init__(self, ref_el, degree=None, hierarchical=False,
+                 quad_scheme=None):
         sd = ref_el.get_spatial_dimension()
         if degree is None:
             degree = sd
@@ -440,7 +442,8 @@ class MacroStokes(finite_element.CiarletElement):
         coeffs = numpy.tensordot(J / numpy.linalg.det(J), P.get_coeffs(), (1, 1)).transpose((1, 0, 2))
         expansion_set = ONPolynomialSet(ref_complex, P.get_embedded_degree(), variant="bubble").get_expansion_set()
         poly_set = PolynomialSet(ref_complex, P.degree, P.get_embedded_degree(), expansion_set, coeffs)
-        dual = MacroStokesDual(ref_complex, degree, hierarchical=hierarchical)
+        dual = MacroStokesDual(ref_complex, degree, hierarchical=hierarchical,
+                               quad_scheme=quad_scheme)
         formdegree = sd-1  # (n-1)-form
         super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")
 
