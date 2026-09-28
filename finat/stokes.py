@@ -12,11 +12,13 @@ class Stokes(PhysicallyMappedElement, FiatElement):
 
 class MacroStokes(PhysicallyMappedElement, FiatElement):
     """C0 Pk^d(Alfeld)"""
-    def __init__(self, cell, degree=None):
+    def __init__(self, cell, degree=None, quad_scheme=None):
         sd = cell.get_spatial_dimension()
         if degree is None:
             degree = sd
-        fiat_element = FIAT.MacroStokes(cell, degree=max(degree, sd), hierarchical=degree < sd)
+        fiat_element = FIAT.MacroStokes(
+            cell, degree=max(degree, sd), hierarchical=degree < sd,
+            quad_scheme=quad_scheme)
 
         reduced_dim = None
         if degree < sd:
@@ -30,6 +32,7 @@ class MacroStokes(PhysicallyMappedElement, FiatElement):
             reduced_dim = len(indices)
 
         super().__init__(fiat_element)
+        self._quad_scheme = quad_scheme
 
         self._space_dimension = fiat_element.space_dimension()
         self._entity_dofs = fiat_element.entity_dofs()
