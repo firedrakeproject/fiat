@@ -9,10 +9,16 @@ from FIAT.finite_element import CiarletElement
 
 
 class RestrictedDualSet(DualSet):
-    """Restrict the given DualSet to the specified list of dofs."""
+    """Restrict the given DualSet to the specified list of dofs.
 
-    def __init__(self, dual, indices):
-        indices = list(sorted(indices))
+    :arg dual: the DualSet to restrict.
+    :arg indices: the dofs to keep.
+    :kwarg sort: whether to number the kept dofs in increasing order,
+        or in the order given by ``indices``.
+    """
+
+    def __init__(self, dual, indices, sort=True):
+        indices = list(sorted(indices)) if sort else list(indices)
         ref_el = dual.get_reference_element()
         nodes_old = dual.get_nodes()
         entity_ids = {}
@@ -72,8 +78,9 @@ class RestrictedDualSet(DualSet):
 class RestrictedElement(CiarletElement):
     """Restrict the given element to the specified list of dofs."""
 
-    def __init__(self, element, indices=None, restriction_domain=None, take_closure=True):
-        '''For sake of argument, indices overrides restriction_domain'''
+    def __init__(self, element, indices=None, restriction_domain=None, take_closure=True, sort=True):
+        '''For sake of argument, indices overrides restriction_domain.
+        With sort=False, the dofs are numbered in the order given by indices.'''
 
         if not (indices or restriction_domain):
             raise RuntimeError("Either indices or restriction_domain must be passed in")
@@ -94,7 +101,7 @@ class RestrictedElement(CiarletElement):
         poly_set = element.get_nodal_basis().take(indices)
 
         # Restrict dual set
-        dual = RestrictedDualSet(element.get_dual_set(), indices)
+        dual = RestrictedDualSet(element.get_dual_set(), indices, sort=sort)
 
         # Restrict mapping
         mapping_old = element.mapping()

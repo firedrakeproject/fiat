@@ -4,6 +4,7 @@
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
+import math
 import numpy
 import scipy
 
@@ -21,7 +22,7 @@ from FIAT.reference_element import make_affine_mapping, symmetric_simplex
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.bernstein import Bernstein
-from FIAT.hierarchical import make_dual_bubbles
+from FIAT.hierarchical import make_projected_bubble_moments, make_dual_bubbles
 from FIAT.restricted import RestrictedElement
 
 
@@ -69,10 +70,8 @@ def dubiner_duals(ref_el, dim, trial_degree, test_degree):
 def bubble_duals(ref_el, dim, degree):
     sd = ref_el.get_spatial_dimension()
     facet = ref_el.construct_subelement(dim)
-    Q, phis = make_dual_bubbles(facet, degree)
-    if dim == sd-1:
-        phis[0] = 1.0
-
+    #Q, phis = make_dual_bubbles(facet, degree)
+    Q, phis = make_projected_bubble_moments(facet, degree)
     return Q, phis
 
 
@@ -81,8 +80,8 @@ def map_duals(ref_el, dim, entity, Q_ref, Phis):
     return Q, Phis
 
 
-def generate_vector_moments(ref_el, dim, entity, Q_ref, Phis):
-    Q, phis = map_duals(ref_el, dim, entity, Q_ref, Phis)
+def generate_vector_moments(ref_el, dim, entity, Q_ref, phis):
+    Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref, avg=True)
     sd = ref_el.get_spatial_dimension()
     start = 0
     if dim == sd - 1:
@@ -94,10 +93,16 @@ def generate_vector_moments(ref_el, dim, entity, Q_ref, Phis):
         else:
             comps = numpy.array((n, *t))
         # comps /= numpy.linalg.norm(comps, axis=1)[:, None]
-        for phi in phis:
+        # Rescale so that the tangential and normal moments of the facet bubble agree
+        bf_at_qpts = Q_ref.ref_el.compute_bubble(Q_ref.get_points())
+        bf_wts = numpy.multiply(bf_at_qpts, Q_ref.get_weights())
+        phis = phis * (numpy.sum(bf_wts) / numpy.dot(phis[0], bf_wts))
+        for j, phi in enumerate(phis):
             start += 1
-            for comp in comps:
-                yield FrobeniusIntegralMoment(ref_el, Q, numpy.outer(comp, phi))
+            for i, comp in enumerate(comps):
+                # The first normal moment is the facet flux
+                _phi = numpy.ones_like(phi) if i == 0 and j == 0 else phi
+                yield FrobeniusIntegralMoment(ref_el, Q, numpy.outer(comp, _phi))
 
     shp = (sd,)
     comps = list(numpy.ndindex(shp))
@@ -169,7 +174,6 @@ def macro_stokes_space(ref_el, degree, bubble=False, full_macro=False):
     else:
         K = ref_el.get_parent() or ref_el
 
-    # non-macro space
     if bubble:
         V = C0_bubbles(K, degree, shape)
     else:
@@ -181,7 +185,8 @@ def macro_stokes_space(ref_el, degree, bubble=False, full_macro=False):
     V0 = C0_bubbles(ref_el, degree, shape)
     Q, eps_test, div_test, S, nullspace_dim = stokes_eigenbasis(V0)
 
-    # DG space for divergence of bubbles
+    # Construct MB as subset of V0 whose div is an ON basis for dP
+    # dP is the orthogonal complement of the div(bubbles)
     if degree > sd:
         dP = RestrictedElement(DivStokes(K, degree-1), restriction_domain="reduced")
         dP = dP.get_nodal_basis()
@@ -197,6 +202,8 @@ def macro_stokes_space(ref_el, degree, bubble=False, full_macro=False):
     # Modified bubbles with div in dP
     MB = V0.recombine(S[:, nullspace_dim:].T).recombine(C)
 
+    # V = non-macro P_k space
+    # MV = V but in terms of the macro expansion set
     Pmacro = ONPolynomialSet(ref_el, degree, shape=shape, variant="bubble")
     MV = project(V, Pmacro, Q)
     return polynomial_set_union_normalized(MV, MB)
@@ -282,7 +289,7 @@ class StokesDual(dual_set.DualSet):
 
         super().__init__(nodes, ref_el, entity_ids)
 
-    def _interior_duals(self, ref_el, ref_cell, degree):
+    def _interior_duals(self, ref_el, ref_cell, degree, hierarchical=False):
         """Compute div-div and eps-eps moments of the trial space against an
            orthonormal bases for div(V_0) and eps(V_0).
 
@@ -293,6 +300,9 @@ class StokesDual(dual_set.DualSet):
         :arg ref_el: The cell.
         :arg ref_cell: The reference cell, or its split for a macroelement.
         :arg degree: The polynomial degree.
+        :kwarg hierarchical: Whether to test the divergence against an
+            orthonormal basis of P_{k-1} / R ordered by degree, instead of
+            the basis that diagonalizes the eps-eps inner product.
         """
         sd = ref_el.get_spatial_dimension()
         shp = (sd,)
@@ -301,6 +311,13 @@ class StokesDual(dual_set.DualSet):
         V0 = macro_stokes_space(ref_cell, degree, bubble=True)
         Q_ref, eps_test, div_test, S, nullspace_dim = stokes_eigenbasis(V0)
         Qpts, Qwts = Q_ref.get_points(), Q_ref.get_weights()
+        if hierarchical:
+            # div(V_0) is contained in P_{k-1} / R, and they are equal if the dimensions match
+            K = ref_cell.get_parent() or ref_cell
+            dP = ONPolynomialSet(K, degree-1).tabulate(Qpts)[(0,) * sd][1:]
+            if len(dP) != len(div_test):
+                raise ValueError("Hierarchical interior dofs require div(V_0) = P_{k-1} / R")
+            div_test = dP
 
         # Trial space
         V = ONPolynomialSet(ref_cell, degree, shp, scale="orthonormal")
@@ -361,7 +378,7 @@ class Stokes(finite_element.CiarletElement):
 
 
 class MacroStokesDual(StokesDual):
-    def __init__(self, ref_complex, degree):
+    def __init__(self, ref_complex, degree, hierarchical=False):
         nodes = []
         entity_ids = {}
         ref_el = ref_complex.get_parent()
@@ -387,7 +404,8 @@ class MacroStokesDual(StokesDual):
                                  for pt in pts for comp in comps)
                 elif dim == sd:
                     # Interior dofs
-                    Q, phis, nullspace_dim = self._interior_duals(ref_el, macro.AlfeldSplit(ref_el.construct_subelement(sd)), degree)
+                    Q, phis, nullspace_dim = self._interior_duals(ref_el, macro.AlfeldSplit(ref_el.construct_subelement(sd)), degree,
+                                                                  hierarchical=hierarchical)
                     self._reduced_dofs[dim] = nullspace_dim
                     nodes.extend(FrobeniusIntegralMoment(ref_el, Q, phi) for phi in phis)
                 else:
@@ -401,8 +419,12 @@ class MacroStokesDual(StokesDual):
 class MacroStokes(finite_element.CiarletElement):
     """Simplicial continuous element that decouples div-free modes and
     simultaneously diagonalizes the div-div and eps-eps inner-products on
-    the reference element."""
-    def __init__(self, ref_el, degree=None):
+    the reference element.
+
+    With hierarchical=True, the interior div dofs are instead ordered by
+    the degree of the divergence, so that the lower degree elements are
+    obtained by constraining the trailing dofs."""
+    def __init__(self, ref_el, degree=None, hierarchical=False):
         sd = ref_el.get_spatial_dimension()
         if degree is None:
             degree = sd
@@ -418,9 +440,43 @@ class MacroStokes(finite_element.CiarletElement):
         coeffs = numpy.tensordot(J / numpy.linalg.det(J), P.get_coeffs(), (1, 1)).transpose((1, 0, 2))
         expansion_set = ONPolynomialSet(ref_complex, P.get_embedded_degree(), variant="bubble").get_expansion_set()
         poly_set = PolynomialSet(ref_complex, P.degree, P.get_embedded_degree(), expansion_set, coeffs)
-        dual = MacroStokesDual(ref_complex, degree)
+        dual = MacroStokesDual(ref_complex, degree, hierarchical=hierarchical)
         formdegree = sd-1  # (n-1)-form
         super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")
+
+
+def reduced_macro_stokes_indices(fiat_element, degree):
+    """Return the dofs of a degree-dim MacroStokes element that are kept in
+    the degree-k MacroStokes element, with k < dim.
+
+    The degree-k element is the subspace where the remaining dofs vanish:
+    the edge moments against bubbles of degree > k, the facet moments
+    other than the normal flux, the interior eps moments, and the
+    interior div moments against P_{dim-1} / P_{k-1}. The interior div
+    dofs must be hierarchical.
+    """
+    sd = fiat_element.get_reference_element().get_spatial_dimension()
+    entity_ids = fiat_element.entity_dofs()
+    indices = []
+    for dim in sorted(entity_ids):
+        if dim == 0:
+            num_kept = None
+        elif dim < sd - 1:
+            # hierarchical moments against the bubbles of degree <= k, per component
+            num_kept = sd * math.comb(degree - 1, dim)
+        elif dim == sd - 1:
+            # normal flux
+            num_kept = 1
+        else:
+            # div moments against P_{k-1} / R, after the div-free eps moments
+            num_div = math.comb(sd - 1 + sd, sd) - 1
+            start = len(entity_ids[dim][0]) - num_div
+            num_kept = start + math.comb(degree - 1 + sd, sd) - 1
+            indices.extend(entity_ids[dim][0][start:num_kept])
+            continue
+        for entity in sorted(entity_ids[dim]):
+            indices.extend(entity_ids[dim][entity][:num_kept])
+    return indices
 
 
 class DivStokesDual(dual_set.DualSet):

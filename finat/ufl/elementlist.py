@@ -485,5 +485,8 @@ def canonical_element_description(family, cell, order, form_degree):
         embedded_degree = tdim + 1
     elif any(bubble in family for bubble in ("Guzman-Neilan", "Bernardi-Raugel")):
         embedded_degree = tdim
+    elif family == "Macro Stokes":
+        # The low degree elements are constrained C0 P_dim(Alfeld)
+        embedded_degree = max(order, tdim)
 
     return family, short_name, order, reference_value_shape, sobolev_space, mapping, embedded_degree
