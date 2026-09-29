@@ -153,6 +153,10 @@ def test_C1_triangle(ref_to_phys, element):
     check_zany_mapping(element, ref_to_phys[2])
 
 
+def test_rotated_bernardi_raugel(ref_to_phys):
+    check_zany_mapping(finat.BernardiRaugel, ref_to_phys[2], rotated=True)
+
+
 @pytest.mark.parametrize("element", [
                          finat.Morley,
                          finat.Hermite,
