@@ -115,7 +115,7 @@ class EnrichedElement(FiniteElementBase):
             tables = tuple(tables)
             zeta = self.get_value_indices()
             tensors = []
-            for elem, table in zip(self.elements, tables):
+            for elem, table in zip(self.summands, tables):
                 beta_i = elem.get_indices()
                 tensors.append(gem.ComponentTensor(
                     gem.Indexed(table, beta_i + zeta),
@@ -138,7 +138,7 @@ class EnrichedElement(FiniteElementBase):
         :param entity: the cell entity on which to tabulate.
         '''
         results = [element.basis_evaluation(order, ps, entity, coordinate_mapping=coordinate_mapping)
-                   for element in self.elements]
+                   for element in self.summands]
         return self._compose_evaluations(results)
 
     def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
@@ -153,7 +153,7 @@ class EnrichedElement(FiniteElementBase):
         :param entity: the cell entity on which to tabulate.
         '''
         results = [element.point_evaluation(order, refcoords, entity, coordinate_mapping)
-                   for element in self.elements]
+                   for element in self.summands]
         return self._compose_evaluations(results)
 
     @property
@@ -166,20 +166,20 @@ class EnrichedElement(FiniteElementBase):
             return result
 
     @cached_property
-    def _summands(self):
-        """The summands that are not themselves direct sums, in basis order.
+    def summands(self):
+        """Return the leaves of the direct-sum decomposition.
 
-        An element is brought out as a direct sum one level at a time, so a
-        summand may be a direct sum in turn.  These are the elements that
-        evaluate their dual basis on their own points, and whose points make
-        up the union that :attr:`dual_basis` works against.
+        For ``E = E_1 ⊕ ... ⊕ E_n``, return ``(E_1, ..., E_n)``.  For an
+        element that is not a direct sum, return ``(E,)``.  The summands are
+        in basis order.
+
+        Returns
+        -------
+        tuple
+            The direct-sum leaves on this element's cell.
         """
-        summands = []
-        for element in self.elements:
-            expanded = as_enriched(element)
-            summands.extend(expanded._summands if expanded is not None
-                            else [element])
-        return tuple(summands)
+        return tuple(chain.from_iterable(element.summands
+                                         for element in self.elements))
 
     @property
     def dual_basis(self):
@@ -205,12 +205,12 @@ class EnrichedElement(FiniteElementBase):
                 f"Dual basis not defined for non-nodal {type(self).__name__}"
             )
         if any(type(e).dual_transformation is not FiniteElementBase.dual_transformation
-               for e in self._summands):
+               for e in self.summands):
             raise NotImplementedError(
                 f"dual_basis not defined for {type(self).__name__} with a summand"
                 " that has its own dual_transformation; use dual_evaluation instead"
             )
-        duals = [element.dual_basis for element in self._summands]
+        duals = [element.dual_basis for element in self.summands]
         x = UnionPointSet([xk for _, xk in duals])
         p, = x.indices
         zeta = self.get_value_indices()
@@ -219,7 +219,7 @@ class EnrichedElement(FiniteElementBase):
         shapes = [tuple(i.extent for i in xk.indices) for _, xk in duals]
 
         blocks = []
-        for k, (element, (Q, xk)) in enumerate(zip(self._summands, duals)):
+        for k, (element, (Q, xk)) in enumerate(zip(self.summands, duals)):
             alpha = element.get_indices()
             # Turn this summand's point indices into a shape, so that its
             # weights can be embedded at its own offset in the union.
@@ -245,29 +245,43 @@ class EnrichedElement(FiniteElementBase):
            provides physical geometry callbacks (may be None).
         :returns: an ``(evaluation, point_indices, basis_indices)`` triple, as
            :meth:`~finat.finiteelementbase.FiniteElementBase.dual_evaluation`
-           returns.  The points are contracted here, so ``point_indices`` is
-           empty.
+           returns.  The summand point indices remain free, so the caller can
+           choose how to contract each direct-sum component.
 
-        The summands do not share their points, so each one contracts on its
-        own, and the results stack along the basis index.  Concatenating over
-        a free index is what :func:`~gem.unconcatenate.unconcatenate` splits
-        downstream; a concatenation over the contracted points could not be.
+        The summands do not share their points, so their evaluations stack
+        along the basis index while retaining their own point indices.
+        The free basis index carries the direct-sum blocks.  Downstream,
+        :func:`~gem.unconcatenate.unconcatenate` splits those blocks.
         """
         if not self.is_nodal_enriched:
             raise NotImplementedError(
                 f"Dual evaluation not defined for non-nodal {type(self).__name__}"
             )
-        # Each summand contracts through its own dual_basis, so a non-nodal
-        # sum has to be refused here as well as in dual_basis: this path
-        # never asks self for one.
         evals = []
-        for element in self.elements:
-            expr, point_indices, indices = element.dual_evaluation(
+        point_indices = []
+        for element in self.summands:
+            # Enrichments of non-nodal elements raise NotImplementedError
+            expr, element_points, indices = element.dual_evaluation(
                 fn, coordinate_mapping=coordinate_mapping)
-            evals.append(broadcast_tensor(gem.IndexSum(expr, point_indices), indices))
+            evals.append(broadcast_tensor(expr, indices))
+            point_indices.extend(element_points)
 
         beta = self.get_indices()
-        return gem.Indexed(gem.Concatenate(*evals), beta), (), beta
+        evaluation = gem.Indexed(gem.Concatenate(*evals), beta)
+        unique_point_indices = tuple(dict.fromkeys(point_indices))
+        return evaluation, unique_point_indices, beta
+
+
+def distribute_over_sum(reconstruct, summands):
+    """Rebuild each summand of a direct sum, keeping its nodality.
+
+    :arg reconstruct: called on each of ``summands.elements`` to rebuild it
+        inside whatever wraps the sum.
+    :arg summands: an :class:`EnrichedElement`.
+    :returns: an :class:`EnrichedElement` of the rebuilt summands.
+    """
+    return EnrichedElement(list(map(reconstruct, summands.elements)),
+                           is_nodal_enriched=summands.is_nodal_enriched)
 
 
 @singledispatch
@@ -290,7 +304,10 @@ def as_enriched_enriched(element):
 
 @as_enriched.register(FlattenedDimensions)
 def as_enriched_flattened(element):
-    return as_enriched(element.product)
+    summands = as_enriched(element.product)
+    if summands is None:
+        return None
+    return distribute_over_sum(FlattenedDimensions, summands)
 
 
 @as_enriched.register(DiscontinuousElement)
@@ -298,21 +315,8 @@ def as_enriched_discontinuous(element):
     return as_enriched(element.element)
 
 
-def distribute_over_sum(reconstruct, summands):
-    """Rebuild each summand of a direct sum, keeping its nodality.
-
-    :arg reconstruct: called on each of ``summands.elements`` to rebuild it
-        inside whatever wraps the sum.
-    :arg summands: an :class:`EnrichedElement`.
-    :returns: an :class:`EnrichedElement` of the rebuilt summands.
-    """
-    return EnrichedElement(list(map(reconstruct, summands.elements)),
-                           is_nodal_enriched=summands.is_nodal_enriched)
-
-
 @as_enriched.register(WrapperElementBase)
 def as_enriched_wrapper(element):
-    """Distribute the pullback over the sum the wrapped element is."""
     summands = as_enriched(element.wrappee)
     if summands is None:
         return None
@@ -321,7 +325,6 @@ def as_enriched_wrapper(element):
 
 @as_enriched.register(QuadratureElement)
 def as_enriched_quadrature_element(element):
-    """Rewrite a rule on a union of point sets as a sum of one rule each."""
     rules = element._summand_rules
     if not rules:
         return None
@@ -332,7 +335,7 @@ def as_enriched_quadrature_element(element):
 
 @as_enriched.register(TensorProductElement)
 def as_enriched_tensor_product(element):
-    """Distribute the product over the sum its first factor is.
+    """Expand a product of sums into a sum of products.
 
     The summands of a sum in the first factor own a contiguous range of the
     flat basis index, so they stack in the order the product already numbers
