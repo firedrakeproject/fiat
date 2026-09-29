@@ -358,6 +358,7 @@ elements = [
     "Hermite(I, 4)",
     "Hermite(T)",
     "Hermite(S)",
+    "Hermite(T, reduced=True)",
     "Morley(T)",
     "Morley(S)",
     "BernardiRaugel(T)",
