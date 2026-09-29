@@ -144,6 +144,7 @@ def test_C1_interval(ref_to_phys, element, degree):
 @pytest.mark.parametrize("element", [
                          finat.Morley,
                          finat.Hermite,
+                         finat.ReducedHermite,
                          finat.Bell,
                          finat.WuXuH3NC,
                          finat.WuXuRobustH3NC,
