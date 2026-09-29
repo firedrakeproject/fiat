@@ -137,7 +137,7 @@ def compile_gem_new(assignments, prefix_ordering, remove_zeros=False,
     get_indices = lambda expr: apply_ordering(expr.free_indices)
 
     # Build operation ordering
-    ops = scheduling.emit_operations(assignments, get_indices, emit_return_accumulate)
+    ops = scheduling.emit_operations_new(assignments, get_indices, emit_return_accumulate)
 
     # Empty kernel
     if len(ops) == 0:

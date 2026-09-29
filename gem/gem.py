@@ -56,6 +56,7 @@ class NodeMeta(type):
 
         # Set free_indices if not set already
         if not hasattr(obj, 'free_indices'):
+            raise NotImplementedError
             obj.free_indices = unique(chain.from_iterable(c.free_indices
                                                           for c in obj.children))
         # Set dtype if not set already.
@@ -244,7 +245,8 @@ class Constant(Terminal):
      - array: numpy array of values
      - value: float or complex value (scalars only)
     """
-    pass
+    free_indices = ()
+
 
 
 class Zero(Constant):
@@ -343,6 +345,8 @@ class Variable(Terminal):
     __front__ = ('name', 'shape')
     __back__ = ('dtype', 'data')
 
+    free_indices = ()
+
     def __init__(self, name, shape, dtype=None, data=None):
         self.name = name
         self.shape = shape
@@ -361,6 +365,10 @@ class Operator(Scalar):
     @abc.abstractmethod
     def _symbol(self, /) -> str:
         pass
+
+    @cached_property
+    def free_indices(self):
+        return unique(chain.from_iterable(c.free_indices for c in self.children))
 
 
 class Sum(Operator):
@@ -541,6 +549,10 @@ class MathFunction(Scalar):
         self.children = args
         return self
 
+    @property
+    def free_indices(self):
+        return unique(chain.from_iterable(c.free_indices for c in self.children))
+
 
 class MinValue(Scalar):
     __slots__ = ('children',)
@@ -632,20 +644,21 @@ class IndexBase(Scalar, Terminal):
 
     _dtype = uint_type
 
+    # Not true object count, just for naming purposes
+    _count = 0
+
+
 
 class Index(IndexBase):
     """Free index"""
-
-    # Not true object count, just for naming purposes
-    _count = 0
 
     __slots__ = ('name', 'extent', 'count')
     __front__ = ('name', 'extent')
 
     def __init__(self, name=None, extent=None):
         self.name = name
-        Index._count += 1
-        self.count = Index._count
+        IndexBase._count += 1
+        self.count = IndexBase._count
         self.extent = extent
 
         # might need to look in extent
@@ -687,7 +700,7 @@ class VariableIndex(IndexBase):
     """An index that is constant during a single execution of the
     kernel, but whose value is not known at compile time."""
 
-    __slots__ = ('expression',)
+    __slots__ = ('expression', 'count')
 
     def __init__(self, expression):
         assert isinstance(expression, Node)
@@ -696,6 +709,12 @@ class VariableIndex(IndexBase):
         # if expression.dtype != uint_type:
         #     raise ValueError(f"expression.dtype ({expression.dtype}) != uint_type ({uint_type})")
         self.expression = expression
+        IndexBase._count += 1
+        self.count = IndexBase._count
+
+    @property
+    def free_indices(self):
+        return self.expression.free_indices
 
     @property
     def extent(self):
@@ -765,20 +784,20 @@ class Indexed(AbstractIndexed):
         # Simplify Indexed(ComponentTensor(Indexed(C, kk), jj), ii) -> Indexed(C, ll)
         # This pattern corresponds to an index replacement rule jj -> ii applied to
         # the innermost multiindex kk to produce ll.
-        if isinstance(aggregate, ComponentTensor):
-            B, = aggregate.children
-            jj = aggregate.multiindex
-            ii = multiindex
-            if isinstance(B, Indexed):
-                C, = B.children
-                kk = B.multiindex
-                ff = C.free_indices
-                if not any((j in ff) for j in jj):
-                    # Only replace indices that are not present in C
-                    rep = dict(zip(jj, ii))
-                    ll = tuple(rep.get(k, k) for k in kk)
-                    aggregate = C
-                    multiindex = ll
+        # if isinstance(aggregate, ComponentTensor):
+        #     B, = aggregate.children
+        #     jj = aggregate.multiindex
+        #     ii = multiindex
+        #     if isinstance(B, Indexed) and all(isinstance(i_, Index) for i_ in B.multiindex):
+        #         C, = B.children
+        #         kk = B.multiindex
+        #         ff = C.free_indices
+        #         if not any((j in ff) for j in jj):
+        #             # Only replace indices that are not present in C
+        #             rep = dict(zip(jj, ii))
+        #             ll = tuple(rep.get(k, k) for k in kk)
+        #             aggregate = C
+        #             multiindex = ll
 
         # All indices fixed
         if all(isinstance(i, Integral) for i in multiindex):
@@ -795,6 +814,7 @@ class Indexed(AbstractIndexed):
         new_indices = []
         for i in multiindex:
             if isinstance(i, Index):
+            # if isinstance(i, IndexBase):
                 new_indices.append(i)
             elif isinstance(i, VariableIndex):
                 new_indices.extend(i.expression.free_indices)
@@ -1104,6 +1124,10 @@ class ListTensor(Node):
     @property
     def children(self):
         return tuple(self.array.flat)
+
+    @property
+    def free_indices(self):
+        return unique(chain.from_iterable(c.free_indices for c in self.children))
 
     @property
     def shape(self):

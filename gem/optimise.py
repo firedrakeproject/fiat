@@ -8,6 +8,7 @@ from numbers import Integral
 
 import numpy
 
+import gem.gem
 from gem.utils import groupby
 from gem.node import (Memoizer, MemoizerArg, reuse_if_untouched,
                       reuse_if_untouched_arg, traversal)
@@ -15,7 +16,7 @@ from gem.gem import (Node, Failure, Gather, Identity, Constant, Literal, Zero,
                      Product, Sum, Comparison, Conditional, Division,
                      Index, VariableIndex, Indexed, FlexiblyIndexed,
                      IndexSum, ComponentTensor, ListTensor, Delta,
-                     partial_indexed, one)
+                     partial_indexed, one, as_gem_uint)
 
 
 @singledispatch
@@ -93,18 +94,37 @@ def replace_indices(node, self, subst):
     raise AssertionError("cannot handle type %s" % type(node))
 
 
-replace_indices.register(Node)(reuse_if_untouched_arg)
+replace_indices.register(gem.gem.Operator)(reuse_if_untouched_arg)
+replace_indices.register(gem.gem.IndexSum)(reuse_if_untouched_arg)
+replace_indices.register(gem.gem.ComponentTensor)(reuse_if_untouched_arg)
+replace_indices.register(gem.gem.Literal)(reuse_if_untouched_arg)
+replace_indices.register(gem.gem.Variable)(reuse_if_untouched_arg)
+replace_indices.register(gem.gem.ListTensor)(reuse_if_untouched_arg)
+replace_indices.register(gem.gem.MathFunction)(reuse_if_untouched_arg)
+
+
+@replace_indices.register(Index)
+def _(i, self, subst):
+    return as_gem_uint(dict(subst).get(i, i))
+
+
+@replace_indices.register
+def _(i: VariableIndex, self, subst):
+    new_expr = self(i.expression, subst)
+    return i if new_expr == i.expression else VariableIndex(new_expr)
+
 
 
 def _replace_indices_atomic(i, self, subst):
     if isinstance(i, VariableIndex):
         new_expr = self(i.expression, subst)
         return i if new_expr == i.expression else VariableIndex(new_expr)
-    elif isinstance(i, Index):
+    # elif isinstance(i, Index):
+    else:
         substitute = dict(subst)
         return substitute.get(i, i)
-    else:
-        return replace_indices(i, self, subst)
+    # else:
+    #     return replace_indices(i, self, subst)
 
 
 @replace_indices.register(Delta)

@@ -158,7 +158,62 @@ def emit_operations(assignments, get_indices, emit_return_accumulate=True):
               the assignments
     """
     # Prepare reference counts
-    # refcount = collect_refcount([e for v, e in assignments])
+    refcount = collect_refcount([e for v, e in assignments])
+
+    # Stage return operations
+    staging = []
+    for variable, expression in assignments:
+        if emit_return_accumulate and \
+                refcount[expression] == 1 and isinstance(expression, gem.IndexSum) \
+                and set(variable.free_indices) == set(expression.free_indices):
+            staging.append(impero.ReturnAccumulate(variable, expression))
+            refcount[expression] -= 1
+        else:
+            staging.append(impero.Return(variable, expression))
+
+    # Prepare data structures
+    def push_node(node):
+        queue.insert(get_indices(node), node)
+
+    def push_op(op):
+        queue.insert(op.loop_shape(get_indices), op)
+
+    ops = []
+
+    stager = ReferenceStager(refcount, push_node)
+    queue = Queue(functools.partial(handle, ops, push_op, stager.decref))
+
+    # Enqueue return operations
+    for op in staging:
+        push_op(op)
+
+    # Schedule operations
+    queue.process()
+
+    # Assert that nothing left unprocessed
+    assert stager.empty()
+
+    # Return
+    ops.reverse()
+    return ops
+
+
+def emit_operations_new(assignments, get_indices, emit_return_accumulate=True):
+    """Makes an ordering of operations to evaluate a multi-root
+    expression DAG.
+
+    :arg assignments: Iterable of (variable, expression) pairs.
+                      The value of expression is written into variable
+                      upon execution.
+    :arg get_indices: mapping from GEM nodes to an ordering of free
+                      indices
+    :arg emit_return_accumulate: emit ReturnAccumulate nodes? Set to
+                      False if the output variables are not guaranteed
+                      zero on entry to the kernel.
+    :returns: list of Impero terminals correctly ordered to evaluate
+              the assignments
+    """
+    # Prepare reference counts
     refcount = collect_refcount([a.expression for a in assignments])
 
     # Stage return operations
