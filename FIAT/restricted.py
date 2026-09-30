@@ -24,8 +24,40 @@ class RestrictedDualSet(DualSet):
                                          for dof in dofs if dof in indices]
         nodes = [nodes_old[i] for i in indices]
         self._dual = dual
+        entity_permutations = self._restrict_entity_permutations(dual, entity_ids)
 
-        super().__init__(nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el, entity_ids, entity_permutations)
+
+    @staticmethod
+    def _restrict_entity_permutations(dual, entity_ids):
+        """Inherit the entity permutations of the dofs kept by the restriction.
+
+        An entity whose dofs are all kept keeps their relative order, and so
+        permutes exactly as it did in ``dual``; an entity whose dofs are all
+        dropped permutes trivially. An entity that keeps only some of its dofs
+        has no permutation to inherit, since the dofs it drops may be the ones
+        the parent permutation maps the others onto, so no permutations are
+        given at all in that case.
+
+        :arg dual: the DualSet being restricted.
+        :arg entity_ids: the entity ids of the restricted dual set.
+        :returns: the entity permutations, or None if they cannot be inherited.
+        """
+        permutations_old = dual.entity_permutations
+        if permutations_old is None:
+            return None
+        entity_permutations = {}
+        for d, entities in dual.get_entity_ids().items():
+            entity_permutations[d] = {}
+            for entity, dofs in entities.items():
+                perms = permutations_old[d][entity]
+                if len(entity_ids[d][entity]) == len(dofs):
+                    entity_permutations[d][entity] = {o: list(p) for o, p in perms.items()}
+                elif len(entity_ids[d][entity]) == 0:
+                    entity_permutations[d][entity] = {o: [] for o in perms}
+                else:
+                    return None
+        return entity_permutations
 
     def get_indices(self, restriction_domain, take_closure=True):
         """Return the list of dofs with support on a given restriction domain.

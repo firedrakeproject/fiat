@@ -1,4 +1,4 @@
-from functools import singledispatch
+from functools import partial, singledispatch
 from itertools import chain
 
 import FIAT
@@ -120,7 +120,10 @@ def restrict_enriched(element, domain, take_closure):
     elif not any(isinstance(e, finat.mixed.MixedSubElement) for e in element.elements):
         elements = tuple(restrict(e, domain, take_closure)
                          for e in element.elements)
-        reconstruct = finat.EnrichedElement
+        # Restriction selects disjoint subsets of the DoFs, so the restricted
+        # subelements are nodal whenever the original ones are.
+        reconstruct = partial(finat.EnrichedElement,
+                              is_nodal_enriched=element.is_nodal_enriched)
     else:
         raise NotImplementedError("Not expecting enriched with mixture of MixedSubElement and others")
 
@@ -131,30 +134,21 @@ def restrict_enriched(element, domain, take_closure):
         return null_element
 
 
-@restrict.register(finat.HCurlElement)
-def restrict_hcurl(element, domain, take_closure):
+@restrict.register(finat.hdivcurl.WrapperElementBase)
+def restrict_hdivcurl(element, domain, take_closure):
+    """Restrict an element that wraps another with a pullback.
+
+    The pullback acts on each subelement separately, so it preserves
+    whichever subelements the restriction selects, and with them the
+    nodality of the restricted element.
+    """
     restricted = restrict(element.wrappee, domain, take_closure)
     if restricted is null_element:
         return null_element
+    elif isinstance(restricted, finat.EnrichedElement):
+        return finat.enriched.distribute_over_sum(type(element), restricted)
     else:
-        if isinstance(restricted, finat.EnrichedElement):
-            return finat.EnrichedElement(finat.HCurlElement(e)
-                                         for e in restricted.elements)
-        else:
-            return finat.HCurlElement(restricted)
-
-
-@restrict.register(finat.HDivElement)
-def restrict_hdiv(element, domain, take_closure):
-    restricted = restrict(element.wrappee, domain, take_closure)
-    if restricted is null_element:
-        return null_element
-    else:
-        if isinstance(restricted, finat.EnrichedElement):
-            return finat.EnrichedElement(finat.HDivElement(e)
-                                         for e in restricted.elements)
-        else:
-            return finat.HDivElement(restricted)
+        return type(element)(restricted)
 
 
 @restrict.register(finat.mixed.MixedSubElement)
@@ -242,7 +236,7 @@ def restrict_tpe(element, domain, take_closure):
         if all(f is not null_element for f in new_factors):
             elements.append(finat.TensorProductElement(new_factors))
     if elements:
-        return finat.EnrichedElement(elements)
+        return finat.EnrichedElement(elements, is_nodal_enriched=True)
     else:
         return null_element
 
