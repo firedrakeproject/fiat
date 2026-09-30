@@ -39,7 +39,7 @@ from FIAT.discontinuous_raviart_thomas import DiscontinuousRaviartThomas
 from FIAT.serendipity import Serendipity
 from FIAT.brezzi_douglas_marini_cube import BrezziDouglasMariniCubeEdge, BrezziDouglasMariniCubeFace
 from FIAT.discontinuous_pc import DPC
-from FIAT.hermite import CubicHermite
+from FIAT.hermite import Hermite
 from FIAT.lagrange import Lagrange
 from FIAT.gauss_lobatto_legendre import GaussLobattoLegendre
 from FIAT.gauss_legendre import GaussLegendre
@@ -89,7 +89,7 @@ supported_elements = {"Argyris": Argyris,
                       "DPC": DPC,
                       "Discontinuous Taylor": DiscontinuousTaylor,
                       "Discontinuous Raviart-Thomas": DiscontinuousRaviartThomas,
-                      "Hermite": CubicHermite,
+                      "Hermite": Hermite,
                       "Nonconforming Wu-Xu": WuXuH3NC,
                       "Nonconforming Robust Wu-Xu": WuXuRobustH3NC,
                       "Hsieh-Clough-Tocher": HsiehCloughTocher,
