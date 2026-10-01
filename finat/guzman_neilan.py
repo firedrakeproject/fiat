@@ -5,10 +5,19 @@ from finat.piola_mapped import PiolaBubbleElement
 
 
 class GuzmanNeilanFirstKindH1(PiolaBubbleElement):
-    """Pk^d enriched with Guzman-Neilan bubbles."""
-    def __init__(self, cell, order=1, quad_scheme=None):
-        cite("GuzmanNeilan2018")
-        super().__init__(FIAT.GuzmanNeilanFirstKindH1(cell, order=order, quad_scheme=quad_scheme))
+    """Pk^d enriched with Guzman-Neilan bubbles.
+
+    With variant="rational", the bubbles are the curl of rational bubbles
+    on the unsplit triangle.
+    """
+    def __init__(self, cell, order=1, quad_scheme=None, variant=None):
+        if variant == "rational":
+            cite("GuzmanNeilan2014")
+            cite("DieningStornTscherpel2025")
+        else:
+            cite("GuzmanNeilan2018")
+        super().__init__(FIAT.GuzmanNeilanFirstKindH1(cell, order=order, quad_scheme=quad_scheme, variant=variant))
+        self.is_polynomial = variant != "rational"
 
 
 class GuzmanNeilanSecondKindH1(PiolaBubbleElement):
