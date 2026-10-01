@@ -10,6 +10,10 @@ from finat.point_set import PointSet, PointSingleton
 class FiatElement(FiniteElementBase):
     """Base class for finite elements for which the tabulation is provided
     by FIAT."""
+
+    is_polynomial = True
+    """Whether the basis functions are polynomials of at most the element degree."""
+
     def __init__(self, fiat_element):
         super().__init__()
         self._element = fiat_element
@@ -96,7 +100,7 @@ class FiatElement(FiniteElementBase):
             point_indices = ()
             replace_indices = ()
             derivative = sum(alpha)
-            if derivative == self.degree and self.complex.is_simplex():
+            if self.is_polynomial and derivative == self.degree and self.complex.is_simplex():
                 # Ensure a cellwise constant tabulation
                 if fiat_table.dtype == object:
                     replace_indices = tuple((i, 0) for i in ps.expression.free_indices)
@@ -104,7 +108,7 @@ class FiatElement(FiniteElementBase):
                     fiat_table = fiat_table.reshape(*index_shape, *value_shape, -1)
                     assert np.allclose(fiat_table, fiat_table[..., 0, None])
                     fiat_table = fiat_table[..., 0]
-            elif derivative > self.degree:
+            elif self.is_polynomial and derivative > self.degree:
                 # Ensure a zero tabulation
                 if fiat_table.dtype != object:
                     assert np.allclose(fiat_table, 0.0)

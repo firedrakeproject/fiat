@@ -312,3 +312,30 @@ if petsctools is not None:
  year = {2008}
 }
 }""")
+    petsctools.add_citation("BerchenkoKoganGawlik2024", """
+@article{BerchenkoKoganGawlik2024,
+  title={{Blow-up Whitney forms, shadow forms, and Poisson processes}},
+  author={Berchenko-Kogan, Yakov and Gawlik, Evan S.},
+  journal={arXiv preprint arXiv:2402.03198},
+  year={2024}
+}""")
+    petsctools.add_citation("GuzmanNeilan2014", """
+@article{GuzmanNeilan2014,
+  title={{Conforming and divergence-free Stokes elements on general triangular meshes}},
+  author={Guzm\\'{a}n, Johnny and Neilan, Michael},
+  journal={Mathematics of Computation},
+  volume={83},
+  number={285},
+  pages={15--36},
+  year={2014}
+}""")
+    petsctools.add_citation("DieningStornTscherpel2025", """
+@article{DieningStornTscherpel2025,
+  title={{Exact integration for singular Zienkiewicz and Guzm\\'{a}n--Neilan finite elements with implementation}},
+  author={Diening, Lars and Storn, Johannes and Tscherpel, Tabea},
+  journal={Computers \\& Mathematics with Applications},
+  volume={191},
+  pages={60--85},
+  year={2025},
+  doi={10.1016/j.camwa.2025.04.019}
+}""")

@@ -26,6 +26,7 @@ from FIAT.c2_elements import AlfeldC2, BrambleZlamalC2
 from FIAT.alfeld_sorokina import AlfeldSorokina
 from FIAT.arnold_qin import ArnoldQin
 from FIAT.guzman_neilan import GuzmanNeilanFirstKindH1, GuzmanNeilanSecondKindH1, GuzmanNeilanH1div
+from FIAT.berchenko_kogan_gawlik import BerchenkoKoganGawlik  # noqa: F401
 from FIAT.christiansen_hu import ChristiansenHu
 from FIAT.johnson_mercier import JohnsonMercier
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini

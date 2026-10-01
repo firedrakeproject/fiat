@@ -131,6 +131,12 @@ register_element("Walkington", "WALK", 0, H2, "custom", (5, 5), ("tetrahedron",)
 register_element("Alfeld C2", "ALF-C2", 0, H3, "custom", (5, None), ("triangle",))
 
 register_element("Arnold-Qin", "AQ", 1, H1, "identity", (2, 2), ("triangle",))
+
+# Lowest-order blow-up Whitney forms, with rational basis functions
+register_element("Berchenko-Kogan-Gawlik H1", "BKGH1", 0, H1, "identity", (1, 1), ("triangle",))
+register_element("Berchenko-Kogan-Gawlik H(curl)", "BKGHCurl", 1, HCurl, "covariant Piola", (1, 1), ("triangle",))
+register_element("Berchenko-Kogan-Gawlik H(div)", "BKGHDiv", 1, HDiv, "contravariant Piola", (1, 1), ("triangle",))
+register_element("Berchenko-Kogan-Gawlik L2", "BKGL2", 0, L2, "identity", (1, 1), ("triangle",))
 register_element("Reduced-Arnold-Qin", "AQ-red", 1, H1, "contravariant Piola", (2, 2), ("triangle",))
 register_element("Christiansen-Hu", "CH", 1, H1, "contravariant Piola", (1, 1), simplices[1:])
 register_element("Alfeld-Sorokina", "AS", 1, H1, "contravariant Piola", (2, 2), simplices[1:])
