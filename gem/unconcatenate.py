@@ -58,7 +58,7 @@ import numpy
 from gem.node import Memoizer, reuse_if_untouched
 from gem.gem import (ComponentTensor, Concatenate, FlexiblyIndexed,
                      Index, Indexed, Literal, Node, partial_indexed,
-                     Variable, reshape, view)
+                     reshape, view)
 from gem.optimise import remove_componenttensors
 from gem.interpreter import evaluate
 
@@ -75,9 +75,8 @@ def find_group(expressions, splittable_indices):
 
     :arg expressions: a multi-root GEM expression DAG
     :arg splittable_indices: the indices that may be split along, that is,
-        those carried by the assignment variables or summed over.  A
-        Concatenate indexed by anything else has nothing to be split against,
-        and is left alone.
+        those carried by the assignment variables.  A Concatenate indexed by
+        anything else has nothing to be split against, and is left alone.
     :returns: a list of GEM nodes, or None
     """
     # Result variables
@@ -116,60 +115,16 @@ def find_group(expressions, splittable_indices):
     return index and nodes
 
 
-def is_variable_view(node: Node) -> bool:
-    """Whether a node indexes into a variable, which split_variable can slice."""
-    return (isinstance(node, FlexiblyIndexed)
-            or (isinstance(node, Indexed) and isinstance(node.children[0], Variable)))
-
-
-def find_views(expressions: list, index: Index) -> list:
-    """Finds the indexed variables that carry a concatenation index.
-
-    Parameters
-    ----------
-    expressions
-        A multi-root GEM expression DAG.
-    index
-        The :py:class:`Concatenate` index to split along.
-
-    Returns
-    -------
-    list
-        The variable views, as :py:func:`is_variable_view` defines them, whose
-        free indices include ``index``.
-    """
-    views = []
-    seen = set()
-    lifo = []
-    for root in expressions:
-        if root not in seen:
-            seen.add(root)
-            lifo.append(root)
-
-    while lifo:
-        node = lifo.pop()
-        if index not in node.free_indices:
-            continue
-        if is_variable_view(node):
-            views.append(node)
-            continue
-        for child in reversed(node.children):
-            if child not in seen:
-                seen.add(child)
-                lifo.append(child)
-    return views
-
-
 def split_variable(variable_ref, index, multiindices):
-    """Splits an indexed variable along a concatenation index.
+    """Splits a flexibly indexed variable along a concatenation index.
 
-    :param variable_ref: indexed variable to split
+    :param variable_ref: flexibly indexed variable to split
     :param index: :py:class:`Concatenate` index to split along
     :param multiindices: one multiindex for each split variable
 
     :returns: generator of split indexed variables
     """
-    assert is_variable_view(variable_ref)
+    assert isinstance(variable_ref, FlexiblyIndexed)
     other_indices = list(variable_ref.index_ordering())
     other_indices.remove(index)
     other_indices = tuple(other_indices)
@@ -220,17 +175,16 @@ def replace_node(expression, mapping, cut=None):
     return mapper(expression)
 
 
-def _unconcatenate(cache, terms):
+def _unconcatenate(cache, pairs, indices):
     # Tail-call recursive core of unconcatenate.
     # Assumes that input has already been sanitised.
-    # Each term is (variable, expression, summed indices), where the variable
-    # may be None.  Only an index carried by an assignment variable or summed
-    # over can be split against it.
-    splittable = set(chain.from_iterable(
-        chain(() if v is None else v.free_indices, s) for v, e, s in terms))
-    concat_group = find_group([e for v, e, s in terms], splittable)
+    # Only an index carried by an assignment variable can be split against it.
+    splittable = set().union(chain(*[v.free_indices for v, e in pairs]))
+    if indices is not None:
+        splittable &= indices
+    concat_group = find_group([v for v, e in pairs] + [e for v, e in pairs], splittable)
     if concat_group is None:
-        return terms
+        return pairs
 
     # Get the index split
     concat_ref = next(iter(concat_group))
@@ -259,63 +213,38 @@ def _unconcatenate(cache, terms):
             sub_ref, = remove_componenttensors((sub_ref,))
             mappings[i][concat_ref] = sub_ref
 
-    # Slice the variable views that carry the index into the same blocks
-    roots = [e for v, e, s in terms] + [v for v, e, s in terms if v is not None]
-    for variable_ref in find_views(roots, index):
-        for m, sub_ref in zip(mappings, split_variable(variable_ref, index, multiindices)):
-            m[variable_ref] = sub_ref
-
-    # Finally, split assignment terms
-    split_terms = []
-    for var, expr, summed in terms:
-        if index not in summed and (var is None or index not in var.free_indices):
-            split_terms.append((var, expr, summed))
-            continue
-        rest = tuple(i for i in summed if i != index)
-        for multiindex, m in zip(multiindices, mappings):
-            v = None if var is None else replace_node(var, m, cut)
-            e = replace_node(expr, m, cut)
-            if index in e.free_indices:
-                raise ValueError(f"Cannot split {index}: it indexes a node that is "
-                                 "neither a Concatenate nor a variable view.")
-            split_terms.append((v, e, rest + multiindex if index in summed else rest))
+    # Finally, split assignment pairs
+    split_pairs = []
+    for var, expr in pairs:
+        if index not in var.free_indices:
+            split_pairs.append((var, expr))
+        elif isinstance(var, FlexiblyIndexed):
+            for v, m in zip(split_variable(var, index, multiindices), mappings):
+                split_pairs.append((v, replace_node(expr, m, cut)))
+        else:
+            # A computed variable is split along its own Concatenate nodes
+            for m in mappings:
+                v = replace_node(var, m, cut)
+                if index in v.free_indices:
+                    raise ValueError(f"Cannot split {index} out of {type(var).__name__}")
+                split_pairs.append((v, replace_node(expr, m, cut)))
 
     # Run again, there may be other Concatenate groups
-    return _unconcatenate(cache, split_terms)
+    if indices is not None:
+        indices = (indices - {index}).union(*multiindices)
+    return _unconcatenate(cache, split_pairs, indices)
 
 
-def unconcatenate(pairs: list, cache: dict | None = None, indices: tuple = ()) -> list:
-    """Splits (indexed variable, expression) pairs along :py:class:`Concatenate` nodes.
+def unconcatenate(pairs, cache=None, indices=None):
+    """Splits a list of (indexed variable, expression) pairs along
+    :py:class:`Concatenate` nodes embedded in the expressions.
 
-    A pair splits along a Concatenate index that its variable carries, or
-    that its expression is summed over.  A sum over a direct sum is the sum of
-    the sums over its blocks:
+    :param pairs: list of (indexed variable, expression) pairs
+    :param cache: index splitting cache :py:class:`dict` (optional)
+    :param indices: the indices that may be split along (optional),
+        by default every index that a variable carries
 
-        sum_j Indexed(Concatenate(A, B), (j,)) * Indexed(Concatenate(C, D), (j,))
-            = sum_{ja} A_ja * C_ja + sum_{jb} B_jb * D_jb.
-
-    All Concatenate nodes indexed by one index must contain the same blocks.
-    FInAT guarantees this: an element blocks its tabulation and dual basis
-    along the same summands.  A view of a variable, such as an assignment
-    variable or a dat of basis coefficients, is sliced into the same blocks.
-
-    Parameters
-    ----------
-    pairs
-        A list of (indexed variable, expression) pairs.  The variable may be
-        None if the expression is only summed.
-    cache
-        Index splitting cache :py:class:`dict` (optional).
-    indices
-        The indices that every expression is summed over (optional).
-
-    Returns
-    -------
-    list
-        The split (indexed variable, expression) pairs.  A split replaces an
-        index of ``indices`` by the indices of each block, so the sums over
-        the free indices of the split expressions add up to the sums of the
-        input expressions over ``indices``.
+    :returns: list of (indexed variable, expression) pairs
     """
     # Set up cache
     if cache is None:
@@ -323,8 +252,9 @@ def unconcatenate(pairs: list, cache: dict | None = None, indices: tuple = ()) -
 
     # Eliminate index renaming due to ComponentTensor nodes
     exprs = remove_componenttensors([e for v, e in pairs])
-    terms = _unconcatenate(cache, [(v, e, tuple(indices)) for (v, _), e in zip(pairs, exprs)])
-    return [(v, e) for v, e, s in terms]
+    pairs = [(v, e) for (v, _), e in zip(pairs, exprs)]
+
+    return _unconcatenate(cache, pairs, None if indices is None else set(indices))
 
 
 @singledispatch
