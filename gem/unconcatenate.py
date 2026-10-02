@@ -51,7 +51,7 @@ unconcatenation, and then add up the results.
 """
 
 from functools import singledispatch
-from itertools import chain
+from itertools import chain, repeat
 
 import numpy
 
@@ -215,15 +215,19 @@ def split_group(cache, concat_group):
     return index, multiindices, mappings
 
 
-def _unconcatenate(cache, pairs):
-    # Tail-call recursive core of unconcatenate.
+def _unconcatenate(cache: dict, terms: list) -> list:
+    # Tail-call recursive core of unconcatenate and split_contraction.
     # Assumes that input has already been sanitised.
-    # Split only indices carried by assignment variables.  If none are found,
-    # find_group returns None and this pass leaves the expressions unchanged.
-    splittable = set().union(chain(*[v.free_indices for v, e in pairs]))
-    concat_group = find_group([e for v, e in pairs], splittable)
+    # Each term is (variable, expression, summed indices), where variable may
+    # be None.  A Concatenate splits against an index that its variable
+    # carries, which slices the variable, or against an index that it sums
+    # over, which the blocks' own indices replace.  If no such index is found,
+    # find_group returns None and this pass leaves the terms unchanged.
+    splittable = set(chain.from_iterable(
+        chain(() if v is None else v.free_indices, s) for v, e, s in terms))
+    concat_group = find_group([e for v, e, s in terms], splittable)
     if concat_group is None:
-        return pairs
+        return terms
 
     index, multiindices, mappings = split_group(cache, concat_group)
 
@@ -231,39 +235,22 @@ def _unconcatenate(cache, pairs):
         """Do not rebuild nodes independent of the concatenation index."""
         return index not in node.free_indices
 
-    # Finally, split assignment pairs
-    split_pairs = []
-    for var, expr in pairs:
-        if index not in var.free_indices:
-            split_pairs.append((var, expr))
+    split_terms = []
+    for var, expr, summed in terms:
+        if var is not None and index in var.free_indices:
+            variables = split_variable(var, index, multiindices)
+        elif index in summed:
+            variables = repeat(var)
         else:
-            for v, m in zip(split_variable(var, index, multiindices), mappings):
-                split_pairs.append((v, replace_node(expr, m, cut)))
+            split_terms.append((var, expr, summed))
+            continue
+        rest = tuple(i for i in summed if i != index)
+        for v, multiindex, mapping in zip(variables, multiindices, mappings):
+            split_terms.append((v, replace_node(expr, mapping, cut),
+                                rest + multiindex if index in summed else rest))
 
     # Run again, there may be other Concatenate groups
-    return _unconcatenate(cache, split_pairs)
-
-
-def _split_contraction(cache, expression, indices):
-    # Recursive core of split_contraction.
-    # Assumes that input has already been sanitised.
-    concat_group = find_group([expression], set(indices))
-    if concat_group is None:
-        return [(expression, indices)]
-
-    index, multiindices, mappings = split_group(cache, concat_group)
-
-    def cut(node):
-        """Do not rebuild nodes independent of the concatenation index."""
-        return index not in node.free_indices
-
-    # Split the contraction, one block at a time
-    rest = tuple(i for i in indices if i != index)
-    terms = []
-    for multiindex, mapping in zip(multiindices, mappings):
-        terms.extend(_split_contraction(cache, replace_node(expression, mapping, cut),
-                                        rest + multiindex))
-    return terms
+    return _unconcatenate(cache, split_terms)
 
 
 def split_contraction(expression, indices, cache=None):
@@ -298,7 +285,8 @@ def split_contraction(expression, indices, cache=None):
     if cache is None:
         cache = {}
     expression, = remove_componenttensors([expression])
-    return _split_contraction(cache, expression, tuple(indices))
+    terms = _unconcatenate(cache, [(None, expression, tuple(indices))])
+    return [(e, s) for v, e, s in terms]
 
 
 def unconcatenate(pairs, cache=None):
@@ -316,9 +304,8 @@ def unconcatenate(pairs, cache=None):
 
     # Eliminate index renaming due to ComponentTensor nodes
     exprs = remove_componenttensors([e for v, e in pairs])
-    pairs = [(v, e) for (v, _), e in zip(pairs, exprs)]
-
-    return _unconcatenate(cache, pairs)
+    terms = _unconcatenate(cache, [(v, e, ()) for (v, _), e in zip(pairs, exprs)])
+    return [(v, e) for v, e, s in terms]
 
 
 @singledispatch
