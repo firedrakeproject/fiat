@@ -51,14 +51,14 @@ unconcatenation, and then add up the results.
 """
 
 from functools import singledispatch
-from itertools import chain, repeat
+from itertools import chain
 
 import numpy
 
 from gem.node import Memoizer, reuse_if_untouched
 from gem.gem import (ComponentTensor, Concatenate, FlexiblyIndexed,
                      Index, Indexed, Literal, Node, partial_indexed,
-                     reshape, view)
+                     Variable, reshape, view)
 from gem.optimise import remove_componenttensors
 from gem.interpreter import evaluate
 
@@ -75,8 +75,9 @@ def find_group(expressions, splittable_indices):
 
     :arg expressions: a multi-root GEM expression DAG
     :arg splittable_indices: the indices that may be split along, that is,
-        those carried by the assignment variables.  A Concatenate indexed by
-        anything else has nothing to be split against, and is left alone.
+        those carried by the assignment variables or summed over.  A
+        Concatenate indexed by anything else has nothing to be split against,
+        and is left alone.
     :returns: a list of GEM nodes, or None
     """
     # Result variables
@@ -115,16 +116,60 @@ def find_group(expressions, splittable_indices):
     return index and nodes
 
 
-def split_variable(variable_ref, index, multiindices):
-    """Splits a flexibly indexed variable along a concatenation index.
+def is_variable_view(node: Node) -> bool:
+    """Whether a node indexes into a variable, which split_variable can slice."""
+    return (isinstance(node, FlexiblyIndexed)
+            or (isinstance(node, Indexed) and isinstance(node.children[0], Variable)))
 
-    :param variable_ref: flexibly indexed variable to split
+
+def find_views(expressions: list, index: Index) -> list:
+    """Finds the indexed variables that carry a concatenation index.
+
+    Parameters
+    ----------
+    expressions
+        A multi-root GEM expression DAG.
+    index
+        The :py:class:`Concatenate` index to split along.
+
+    Returns
+    -------
+    list
+        The variable views, as :py:func:`is_variable_view` defines them, whose
+        free indices include ``index``.
+    """
+    views = []
+    seen = set()
+    lifo = []
+    for root in expressions:
+        if root not in seen:
+            seen.add(root)
+            lifo.append(root)
+
+    while lifo:
+        node = lifo.pop()
+        if index not in node.free_indices:
+            continue
+        if is_variable_view(node):
+            views.append(node)
+            continue
+        for child in reversed(node.children):
+            if child not in seen:
+                seen.add(child)
+                lifo.append(child)
+    return views
+
+
+def split_variable(variable_ref, index, multiindices):
+    """Splits an indexed variable along a concatenation index.
+
+    :param variable_ref: indexed variable to split
     :param index: :py:class:`Concatenate` index to split along
     :param multiindices: one multiindex for each split variable
 
     :returns: generator of split indexed variables
     """
-    assert isinstance(variable_ref, FlexiblyIndexed)
+    assert is_variable_view(variable_ref)
     other_indices = list(variable_ref.index_ordering())
     other_indices.remove(index)
     other_indices = tuple(other_indices)
@@ -220,9 +265,10 @@ def _unconcatenate(cache: dict, terms: list) -> list:
     # Assumes that input has already been sanitised.
     # Each term is (variable, expression, summed indices), where variable may
     # be None.  A Concatenate splits against an index that its variable
-    # carries, which slices the variable, or against an index that it sums
-    # over, which the blocks' own indices replace.  If no such index is found,
-    # find_group returns None and this pass leaves the terms unchanged.
+    # carries or that its expression sums over.  Each block replaces the
+    # Concatenate nodes by that block and slices every variable view that
+    # carries the index.  If no such index is found, find_group returns None
+    # and this pass leaves the terms unchanged.
     splittable = set(chain.from_iterable(
         chain(() if v is None else v.free_indices, s) for v, e, s in terms))
     concat_group = find_group([e for v, e, s in terms], splittable)
@@ -230,6 +276,10 @@ def _unconcatenate(cache: dict, terms: list) -> list:
         return terms
 
     index, multiindices, mappings = split_group(cache, concat_group)
+    roots = [e for v, e, s in terms] + [v for v, e, s in terms if v is not None]
+    for variable_ref in find_views(roots, index):
+        for mapping, sub_ref in zip(mappings, split_variable(variable_ref, index, multiindices)):
+            mapping[variable_ref] = sub_ref
 
     def cut(node):
         """Do not rebuild nodes independent of the concatenation index."""
@@ -237,17 +287,17 @@ def _unconcatenate(cache: dict, terms: list) -> list:
 
     split_terms = []
     for var, expr, summed in terms:
-        if var is not None and index in var.free_indices:
-            variables = split_variable(var, index, multiindices)
-        elif index in summed:
-            variables = repeat(var)
-        else:
+        if index not in summed and (var is None or index not in var.free_indices):
             split_terms.append((var, expr, summed))
             continue
         rest = tuple(i for i in summed if i != index)
-        for v, multiindex, mapping in zip(variables, multiindices, mappings):
-            split_terms.append((v, replace_node(expr, mapping, cut),
-                                rest + multiindex if index in summed else rest))
+        for multiindex, mapping in zip(multiindices, mappings):
+            v = None if var is None else replace_node(var, mapping, cut)
+            e = replace_node(expr, mapping, cut)
+            if index in e.free_indices:
+                raise ValueError(f"Cannot split {index}: it indexes a node that is "
+                                 "neither a Concatenate nor a variable view.")
+            split_terms.append((v, e, rest + multiindex if index in summed else rest))
 
     # Run again, there may be other Concatenate groups
     return _unconcatenate(cache, split_terms)
@@ -265,7 +315,8 @@ def split_contraction(expression, indices, cache=None):
 
     All Concatenate nodes indexed by one index must contain the same blocks.
     FInAT guarantees this: an element blocks its tabulation and dual basis
-    along the same summands.
+    along the same summands.  A view of a variable, such as a dat of basis
+    coefficients, is sliced into the same blocks.
 
     Parameters
     ----------

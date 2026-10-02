@@ -69,3 +69,24 @@ def test_split_contraction_ignores_uncontracted_concatenations() -> None:
         gem.Indexed(gem.Literal([3.0, 4.0, 5.0]), (beta,)))
 
     assert split_contraction(expression, (beta,)) == [(expression, (beta,))]
+
+
+def test_split_contraction_slices_variable_views() -> None:
+    """Slice a variable view summed against a direct sum into its blocks."""
+    beta = gem.Index(extent=5)
+    coefficients = gem.Variable("w", (5,))
+    expression = gem.Product(
+        gem.Indexed(coefficients, (beta,)),
+        gem.Indexed(gem.Concatenate(gem.Literal([1.0, 2.0]),
+                                    gem.Literal([3.0, 4.0, 5.0])),
+                    (beta,)))
+
+    terms = split_contraction(expression, (beta,))
+    assert len(terms) == 2
+    assert all(set(indices) == set(term.free_indices) for term, indices in terms)
+
+    views = [next(node for node in gem.node.traversal([term])
+                  if isinstance(node, gem.FlexiblyIndexed))
+             for term, _ in terms]
+    assert [view.children[0] for view in views] == [coefficients] * 2
+    assert [view.dim2idxs[0][0] for view in views] == [0, 2]
