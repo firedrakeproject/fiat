@@ -9,6 +9,7 @@ import numpy
 import scipy
 
 from FIAT import finite_element, dual_set, expansions, jacobi, macro
+from FIAT.check_format_variant import parse_quadrature_scheme
 from FIAT.functional import (PointEvaluation,
                              ComponentPointEvaluation,
                              PointTangentialDerivative,
@@ -67,9 +68,10 @@ def dubiner_duals(ref_el, dim, trial_degree, test_degree):
     return Q, phis
 
 
-def bubble_duals(ref_el, dim, degree, quad_scheme=None):
+def bubble_duals(ref_el, dim, degree, interpolant_deg=None, quad_scheme=None):
     facet = ref_el.construct_subelement(dim)
     Q, phis = make_projected_bubble_moments(facet, degree,
+                                            interpolant_deg=interpolant_deg,
                                             quad_scheme=quad_scheme)
     return Q, phis
 
@@ -79,8 +81,12 @@ def map_duals(ref_el, dim, entity, Q_ref, Phis):
     return Q, Phis
 
 
-def generate_vector_moments(ref_el, dim, entity, Q_ref, phis):
+def generate_vector_moments(ref_el, dim, entity, Q_ref, phis, quad_degree=None, quad_scheme=None):
     Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref, avg=True)
+    Qn = Q
+    if quad_scheme is not None:
+        Qn = parse_quadrature_scheme(ref_el.construct_subelement(dim), quad_degree, quad_scheme=quad_scheme)
+        Qn = FacetQuadratureRule(ref_el, dim, entity, Qn, avg=True)
     sd = ref_el.get_spatial_dimension()
     start = 0
     if dim == sd - 1:
@@ -100,8 +106,9 @@ def generate_vector_moments(ref_el, dim, entity, Q_ref, phis):
             start += 1
             for i, comp in enumerate(comps):
                 # The first normal moment is the facet flux
-                _phi = numpy.ones_like(phi) if i == 0 and j == 0 else phi
-                yield FrobeniusIntegralMoment(ref_el, Q, numpy.outer(comp, _phi))
+                _phi = numpy.ones_like(Qn.get_weights()) if i == 0 and j == 0 else phi
+                _Q = Qn if i == 0 and j == 0 else Q
+                yield FrobeniusIntegralMoment(ref_el, _Q, numpy.outer(comp, _phi))
 
     shp = (sd,)
     comps = list(numpy.ndindex(shp))
@@ -392,8 +399,7 @@ class MacroStokesDual(StokesDual):
             entity_ids[dim] = {}
 
             if dim > 0 and dim < sd:
-                Q_ref, Phis = bubble_duals(ref_complex, dim, degree,
-                                           quad_scheme=quad_scheme)
+                Q_ref, Phis = bubble_duals(ref_complex, dim, degree, quad_scheme=None)
 
             self._reduced_dofs[dim] = None
             for entity in sorted(top[dim]):
@@ -411,7 +417,9 @@ class MacroStokesDual(StokesDual):
                     nodes.extend(FrobeniusIntegralMoment(ref_el, Q, phi) for phi in phis)
                 else:
                     # Facet dofs
-                    nodes.extend(generate_vector_moments(ref_el, dim, entity, Q_ref, Phis))
+                    nodes.extend(generate_vector_moments(ref_el, dim, entity, Q_ref, Phis,
+                                                         quad_degree=2*degree,
+                                                         quad_scheme=quad_scheme))
 
                 entity_ids[dim][entity] = list(range(cur, len(nodes)))
         super(StokesDual, self).__init__(nodes, ref_el, entity_ids)
