@@ -2,10 +2,10 @@ import numpy
 
 import gem
 from gem.interpreter import evaluate
-from gem.unconcatenate import split_contraction
+from gem.unconcatenate import unconcatenate
 
 
-def test_split_contraction_blocks_matching_concatenations() -> None:
+def test_unconcatenate_contraction_blocks_matching_concatenations() -> None:
     """Split a direct-sum contraction into one contraction per block."""
     beta = gem.Index(extent=5)
     left = gem.Indexed(
@@ -18,12 +18,11 @@ def test_split_contraction_blocks_matching_concatenations() -> None:
         (beta,))
     expression = gem.Product(left, right)
 
-    terms = split_contraction(expression, (beta,))
+    terms = unconcatenate([(None, expression)], indices=(beta,))
     assert len(terms) == 2
-    assert sorted(index.extent for _, indices in terms for index in indices) == [2, 3]
-    assert all(set(indices) == set(term.free_indices) for term, indices in terms)
+    assert sorted(index.extent for _, term in terms for index in term.free_indices) == [2, 3]
 
-    split = gem.Sum(*(gem.IndexSum(term, indices) for term, indices in terms))
+    split = gem.Sum(*(gem.IndexSum(term, term.free_indices) for _, term in terms))
     original_result, split_result = evaluate([
         gem.IndexSum(expression, (beta,)),
         split,
@@ -31,7 +30,7 @@ def test_split_contraction_blocks_matching_concatenations() -> None:
     assert numpy.array_equal(original_result.arr, split_result.arr)
 
 
-def test_split_contraction_recurses_over_multiple_indices() -> None:
+def test_unconcatenate_contraction_recurses_over_multiple_indices() -> None:
     """Split direct sums nested in a contraction over several indices."""
     beta = gem.Index(extent=5)
     gamma = gem.Index(extent=4)
@@ -45,13 +44,13 @@ def test_split_contraction_recurses_over_multiple_indices() -> None:
         (gamma,))
     expression = gem.Product(left, right)
 
-    terms = split_contraction(expression, (beta, gamma))
+    terms = unconcatenate([(None, expression)], indices=(beta, gamma))
     assert len(terms) == 4
-    extents = sorted(tuple(sorted(index.extent for index in indices))
-                     for _, indices in terms)
+    extents = sorted(tuple(sorted(index.extent for index in term.free_indices))
+                     for _, term in terms)
     assert extents == [(2, 2), (2, 2), (2, 3), (2, 3)]
 
-    split = gem.Sum(*(gem.IndexSum(term, indices) for term, indices in terms))
+    split = gem.Sum(*(gem.IndexSum(term, term.free_indices) for _, term in terms))
     original_result, split_result = evaluate([
         gem.IndexSum(expression, (beta, gamma)),
         split,
@@ -59,7 +58,7 @@ def test_split_contraction_recurses_over_multiple_indices() -> None:
     assert numpy.array_equal(original_result.arr, split_result.arr)
 
 
-def test_split_contraction_ignores_uncontracted_concatenations() -> None:
+def test_unconcatenate_contraction_ignores_uncontracted_concatenations() -> None:
     """Leave a Concatenate untouched when its index is not summed."""
     beta = gem.Index(extent=3)
     point = gem.Index(extent=2)
@@ -68,10 +67,10 @@ def test_split_contraction_ignores_uncontracted_concatenations() -> None:
                     (point,)),
         gem.Indexed(gem.Literal([3.0, 4.0, 5.0]), (beta,)))
 
-    assert split_contraction(expression, (beta,)) == [(expression, (beta,))]
+    assert unconcatenate([(None, expression)], indices=(beta,)) == [(None, expression)]
 
 
-def test_split_contraction_slices_variable_views() -> None:
+def test_unconcatenate_contraction_slices_variable_views() -> None:
     """Slice a variable view summed against a direct sum into its blocks."""
     beta = gem.Index(extent=5)
     coefficients = gem.Variable("w", (5,))
@@ -81,12 +80,12 @@ def test_split_contraction_slices_variable_views() -> None:
                                     gem.Literal([3.0, 4.0, 5.0])),
                     (beta,)))
 
-    terms = split_contraction(expression, (beta,))
+    terms = unconcatenate([(None, expression)], indices=(beta,))
     assert len(terms) == 2
-    assert all(set(indices) == set(term.free_indices) for term, indices in terms)
+    assert all(beta not in term.free_indices for _, term in terms)
 
     views = [next(node for node in gem.node.traversal([term])
                   if isinstance(node, gem.FlexiblyIndexed))
-             for term, _ in terms]
+             for _, term in terms]
     assert [view.children[0] for view in views] == [coefficients] * 2
     assert [view.dim2idxs[0][0] for view in views] == [0, 2]
