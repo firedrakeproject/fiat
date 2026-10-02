@@ -9,6 +9,7 @@
 # bfs, but the extra 20 are used in the transformation theory.
 
 from FIAT import finite_element, polynomial_set, macro
+from FIAT.bernstein import BernsteinPolynomialSet
 from FIAT.dual_set import DualSet
 from FIAT.functional import (
     PointEvaluation, PointDerivative,
@@ -109,5 +110,5 @@ class Walkington(finite_element.CiarletElement):
 
         dual = WalkingtonDualSet(ref_el, degree)
         ref_complex = macro.AlfeldSplit(ref_el)
-        poly_set = macro.CkPolynomialSet(ref_complex, degree, order=1, vorder=4, variant="bubble")
+        poly_set = BernsteinPolynomialSet(ref_complex, degree, order=1, vorder=4)
         super().__init__(poly_set, dual, degree)

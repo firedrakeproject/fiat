@@ -154,6 +154,11 @@ def test_non_nodal_enriched_element_has_no_dual_basis():
     assert not mini.has_pointwise_dual_basis
 
 
+def test_integrated_legendre_dual_evaluation():
+    element = finat.IntegratedLegendre(ufc_simplex(2), 4)
+    check_nodal(element)
+
+
 def test_enriched_element_dual_evaluation():
     enriched = restricted_lagrange_sum(ufc_simplex(2))
 

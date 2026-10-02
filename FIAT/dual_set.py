@@ -14,14 +14,24 @@ from FIAT import polynomial_set, functional
 from FIAT.reference_element import compute_unflattening_map
 
 
-class DualSet(object):
-    def __init__(self, nodes, ref_el, entity_ids, entity_permutations=None):
+class DualSet:
+    def __init__(self, nodes, ref_el, entity_ids, entity_permutations=None,
+                 coeffs=None):
         if ref_el.get_dimension() != max(entity_ids):
             entity_ids = unflatten_entity_ids(ref_el, entity_ids)
-        nodes, ref_el, entity_ids, entity_permutations = merge_entities(nodes, ref_el, entity_ids, entity_permutations)
+        nodes, ref_el, entity_ids, entity_permutations, macro_entity_ids = merge_entities(
+            nodes, ref_el, entity_ids, entity_permutations)
+        if coeffs is not None:
+            coeffs = numpy.asarray(coeffs)
+            if coeffs.shape != (len(nodes), len(nodes)):
+                raise ValueError("Dual coefficients must form a square matrix")
+
         self.nodes = nodes
+        self.coeffs = coeffs
         self.ref_el = ref_el
         self.entity_ids = entity_ids
+        # The entity ids on the simplicial complex, numbered by the merged node ordering
+        self._macro_entity_ids = macro_entity_ids
         self.entity_permutations = entity_permutations
 
         # Compute the nodes on the closure of each sub_entity.
@@ -45,6 +55,25 @@ class DualSet(object):
 
     def get_nodes(self):
         return self.nodes
+
+    def get_coeffs(self):
+        """Return the recombination coefficients of the dual set."""
+        return self.coeffs
+
+    def recombine(self, coefficients):
+        """Return a dual set with an additional node recombination.
+
+        :arg coefficients: Matrix multiplying the current dual set.
+        :returns: A dual set representing the recombined functionals.
+        """
+        coefficients = numpy.asarray(coefficients)
+        shape = (len(self.nodes), len(self.nodes))
+        if coefficients.shape != shape:
+            raise ValueError("Dual coefficients must form a square matrix")
+        if self.coeffs is not None:
+            coefficients = numpy.dot(coefficients, self.coeffs)
+        return DualSet(self.nodes, self.ref_el, self.entity_ids,
+                       self.entity_permutations, coeffs=coefficients)
 
     def get_entity_closure_ids(self):
         return self.entity_closure_ids
@@ -203,6 +232,9 @@ class DualSet(object):
                     wts = dwts[alpha]
                     expansion_values = dexpansion_values[alpha].T
                     mat[ells] += numpy.dot(wts, expansion_values[indices])
+        coeffs = self.get_coeffs()
+        if coeffs is not None:
+            mat = numpy.tensordot(coeffs, mat, axes=(1, 0))
         return mat
 
     def get_indices(self, restriction_domain, take_closure=True):
@@ -303,10 +335,14 @@ def lexsort_nodes(ref_el, nodes, entity=None, offset=0):
 
 
 def merge_entities(nodes, ref_el, entity_ids, entity_permutations):
-    """Collect DOFs from simplicial complex onto facets of parent cell."""
+    """Collect DOFs from simplicial complex onto facets of parent cell.
+
+    Also returns the entity ids on the simplicial complex, numbered by the
+    merged node ordering.
+    """
     parent_cell = ref_el.get_parent()
     if parent_cell is None:
-        return nodes, ref_el, entity_ids, entity_permutations
+        return nodes, ref_el, entity_ids, entity_permutations, entity_ids
     parent_ids = {}
     parent_permutations = None
     parent_to_children = ref_el.get_parent_to_children()
@@ -314,17 +350,21 @@ def merge_entities(nodes, ref_el, entity_ids, entity_permutations):
     if all(isinstance(node, functional.PointEvaluation) for node in nodes):
         # Merge Lagrange dual with lexicographical reordering
         parent_nodes = []
+        child_ids = {dim: {} for dim in entity_ids}
         for dim in sorted(parent_to_children):
             parent_ids[dim] = {}
             for entity in sorted(parent_to_children[dim]):
                 cur = len(parent_nodes)
                 for child_dim, child_entity in parent_to_children[dim][entity]:
+                    start = len(parent_nodes)
                     parent_nodes.extend(nodes[i] for i in entity_ids[child_dim][child_entity])
+                    child_ids[child_dim][child_entity] = list(range(start, len(parent_nodes)))
                 ids = lexsort_nodes(parent_cell, parent_nodes[cur:], entity=(dim, entity), offset=cur)
                 parent_ids[dim][entity] = ids
     else:
         # Merge everything else with the same node ordering
         parent_nodes = nodes
+        child_ids = entity_ids
         for dim in sorted(parent_to_children):
             parent_ids[dim] = {}
             for entity in sorted(parent_to_children[dim]):
@@ -332,4 +372,4 @@ def merge_entities(nodes, ref_el, entity_ids, entity_permutations):
                 for child_dim, child_entity in parent_to_children[dim][entity]:
                     parent_ids[dim][entity].extend(entity_ids[child_dim][child_entity])
 
-    return parent_nodes, parent_cell, parent_ids, parent_permutations
+    return parent_nodes, parent_cell, parent_ids, parent_permutations, child_ids

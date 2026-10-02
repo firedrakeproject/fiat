@@ -22,6 +22,22 @@
 import pytest
 import numpy as np
 
+from FIAT import IntegratedLegendre, Lagrange, Legendre, make_quadrature, ufc_simplex
+
+
+@pytest.mark.parametrize("dim", range(1, 4))
+def test_integrated_legendre_degree_one_matches_lagrange(dim):
+    """Ensure that degree-one hierarchical basis functions are hat functions."""
+    ref_el = ufc_simplex(dim)
+    points = np.array(ref_el.vertices)
+    integrated_legendre = IntegratedLegendre(ref_el, 1)
+    lagrange = Lagrange(ref_el, 1)
+
+    np.testing.assert_allclose(
+        integrated_legendre.tabulate(0, points)[(0,) * dim],
+        lagrange.tabulate(0, points)[(0,) * dim],
+    )
+
 
 @pytest.mark.parametrize("dim, family, degree", [(dim, f, degree - 1 if f == "DG" else degree)
                                                  for f in ("CG", "DG")
@@ -29,8 +45,6 @@ import numpy as np
                                                  for degree in range(1, 7)])
 def test_hierarchical_basis_values(dim, family, degree):
     """Ensure that integrating a simple monomial produces the expected results."""
-    from FIAT import ufc_simplex, Legendre, IntegratedLegendre, make_quadrature
-
     s = ufc_simplex(dim)
     q = make_quadrature(s, degree+1)
     if family == "CG":
@@ -41,8 +55,10 @@ def test_hierarchical_basis_values(dim, family, degree):
 
     for test_degree in range(degree + 1):
         v = lambda x: sum(x)**test_degree
-        coefs = [n(v) for n in fe.dual.nodes]
-        integral = np.dot(coefs, np.dot(tab, q.wts))
+        raw_coefs = [n(v) for n in fe.dual.nodes]
+        dual_coeffs = fe.dual.get_coeffs()
+        coeffs = raw_coefs if dual_coeffs is None else np.dot(dual_coeffs, raw_coefs)
+        integral = np.dot(coeffs, np.dot(tab, q.wts))
         reference = q.integrate(v)
         assert np.allclose(integral, reference, rtol=1e-14)
 
@@ -51,8 +67,6 @@ def test_hierarchical_basis_values(dim, family, degree):
                                             for f in ("CG", "DG")
                                             for degree in range(1, 7)])
 def test_hierarchical_sparsity(family, degree):
-    from FIAT import ufc_simplex, Legendre, IntegratedLegendre, make_quadrature
-
     s = ufc_simplex(1)
     q = make_quadrature(s, degree+1)
     if family == "CG":
@@ -68,6 +82,27 @@ def test_hierarchical_sparsity(family, degree):
     for k, ennz in enumerate(expected):
         A = sum(moments(tab[alpha], tab[alpha]) for alpha in tab if sum(alpha) == k)
         assert nnz(A) == ennz
+
+
+def test_integrated_legendre_dual_tabulates_points_once(monkeypatch):
+    element = IntegratedLegendre(ufc_simplex(2), 4)
+    expansion_set = element.poly_set.get_expansion_set()
+    original_tabulate = expansion_set.tabulate
+    calls = []
+
+    def tabulate(degree, points):
+        points = tuple(map(tuple, points))
+        calls.append(points)
+        return original_tabulate(degree, points)
+
+    monkeypatch.setattr(expansion_set, "tabulate", tabulate)
+    element.dual.to_riesz(element.poly_set)
+
+    points = set()
+    for node in element.dual.nodes:
+        for rule in getattr(node.Q, "rules", (node.Q,)):
+            points.update(map(tuple, rule.pts))
+    assert calls == [tuple(sorted(points))]
 
 
 if __name__ == '__main__':
