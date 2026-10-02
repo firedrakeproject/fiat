@@ -30,6 +30,12 @@ def cell(request):
     return reference_element.default_simplex(dim)
 
 
+@pytest.mark.parametrize("dim", range(4))
+def test_negative_polynomial_dimension(dim):
+    cell = reference_element.default_simplex(dim)
+    assert expansions.polynomial_dimension(cell, -1) == 0
+
+
 @pytest.mark.parametrize("degree", [10])
 def test_expansion_values(cell, degree):
     dim = cell.get_spatial_dimension()
