@@ -175,12 +175,14 @@ def replace_node(expression, mapping, cut=None):
     return mapper(expression)
 
 
-def _unconcatenate(cache, pairs):
+def _unconcatenate(cache, pairs, indices):
     # Tail-call recursive core of unconcatenate.
     # Assumes that input has already been sanitised.
     # Only an index carried by an assignment variable can be split against it.
     splittable = set().union(chain(*[v.free_indices for v, e in pairs]))
-    concat_group = find_group([e for v, e in pairs], splittable)
+    if indices is not None:
+        splittable &= indices
+    concat_group = find_group([v for v, e in pairs] + [e for v, e in pairs], splittable)
     if concat_group is None:
         return pairs
 
@@ -216,20 +218,31 @@ def _unconcatenate(cache, pairs):
     for var, expr in pairs:
         if index not in var.free_indices:
             split_pairs.append((var, expr))
-        else:
+        elif isinstance(var, FlexiblyIndexed):
             for v, m in zip(split_variable(var, index, multiindices), mappings):
+                split_pairs.append((v, replace_node(expr, m, cut)))
+        else:
+            # A computed variable is split along its own Concatenate nodes
+            for m in mappings:
+                v = replace_node(var, m, cut)
+                if index in v.free_indices:
+                    raise ValueError(f"Cannot split {index} out of {type(var).__name__}")
                 split_pairs.append((v, replace_node(expr, m, cut)))
 
     # Run again, there may be other Concatenate groups
-    return _unconcatenate(cache, split_pairs)
+    if indices is not None:
+        indices = (indices - {index}).union(*multiindices)
+    return _unconcatenate(cache, split_pairs, indices)
 
 
-def unconcatenate(pairs, cache=None):
+def unconcatenate(pairs, cache=None, indices=None):
     """Splits a list of (indexed variable, expression) pairs along
     :py:class:`Concatenate` nodes embedded in the expressions.
 
     :param pairs: list of (indexed variable, expression) pairs
     :param cache: index splitting cache :py:class:`dict` (optional)
+    :param indices: the indices that may be split along (optional),
+        by default every index that a variable carries
 
     :returns: list of (indexed variable, expression) pairs
     """
@@ -241,7 +254,7 @@ def unconcatenate(pairs, cache=None):
     exprs = remove_componenttensors([e for v, e in pairs])
     pairs = [(v, e) for (v, _), e in zip(pairs, exprs)]
 
-    return _unconcatenate(cache, pairs)
+    return _unconcatenate(cache, pairs, None if indices is None else set(indices))
 
 
 @singledispatch

@@ -5,9 +5,15 @@ from finat.piola_mapped import PiolaBubbleElement
 
 
 class BernardiRaugel(PiolaBubbleElement):
-    def __init__(self, cell, order=1, quad_scheme=None):
+    def __init__(self, cell, order=1, quad_scheme=None, rotated=False):
         cite("BernardiRaugel1985")
-        super().__init__(FIAT.BernardiRaugel(cell, order=order, quad_scheme=quad_scheme))
+        super().__init__(FIAT.BernardiRaugel(cell, order=order, quad_scheme=quad_scheme,
+                                             rotated=rotated))
+
+
+class RotatedBernardiRaugel(BernardiRaugel):
+    def __init__(self, cell, order=1, quad_scheme=None):
+        super().__init__(cell, order=order, quad_scheme=quad_scheme, rotated=True)
 
 
 class BernardiRaugelBubble(BernardiRaugel):

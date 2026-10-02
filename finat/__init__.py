@@ -19,7 +19,7 @@ from .aw import ArnoldWinther, ArnoldWintherNC                     # noqa: F401
 from .hz import HuZhang                                            # noqa: F401
 from .bell import Bell                                             # noqa: F401
 from .wuxu import WuXuH3NC, WuXuRobustH3NC                         # noqa: F401
-from .bernardi_raugel import BernardiRaugel, BernardiRaugelBubble  # noqa: F401
+from .bernardi_raugel import BernardiRaugel, BernardiRaugelBubble, RotatedBernardiRaugel  # noqa: F401
 from .hct import HsiehCloughTocher, ReducedHsiehCloughTocher       # noqa: F401
 from .arnold_qin import ArnoldQin, ReducedArnoldQin                # noqa: F401
 from .christiansen_hu import ChristiansenHu                        # noqa: F401
@@ -27,7 +27,7 @@ from .c2_elements import AlfeldC2, BrambleZlamalC2                 # noqa: F401
 from .alfeld_sorokina import AlfeldSorokina                        # noqa: F401
 from .guzman_neilan import GuzmanNeilanFirstKindH1, GuzmanNeilanSecondKindH1, GuzmanNeilanBubble, GuzmanNeilanH1div  # noqa: F401
 from .powell_sabin import QuadraticPowellSabin6, QuadraticPowellSabin12  # noqa: F401
-from .hermite import Hermite                                       # noqa: F401
+from .hermite import Hermite, ReducedHermite                       # noqa: F401
 from .johnson_mercier import JohnsonMercier                        # noqa: F401
 from .mtw import MardalTaiWinther                                  # noqa: F401
 from .morley import Morley                                         # noqa: F401
@@ -44,6 +44,7 @@ from .nodal_enriched import NodalEnrichedElement                   # noqa: F401
 from .quadrature_element import QuadratureElement, make_quadrature_element  # noqa: F401
 from .restricted import RestrictedElement                          # noqa: F401
 from .runtime_tabulated import RuntimeTabulated                    # noqa: F401
+from .functional import Functional                                  # noqa: F401
 from . import quadrature                                           # noqa: F401
 from . import cell_tools                                           # noqa: F401
 from . import element_factory                                      # noqa: F401
