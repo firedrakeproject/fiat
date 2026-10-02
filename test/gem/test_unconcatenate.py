@@ -1,12 +1,18 @@
 import numpy
+import pytest
 
 import gem
 from gem.interpreter import evaluate
 from gem.unconcatenate import unconcatenate
 
 
-def test_unconcatenate_contraction_blocks_matching_concatenations() -> None:
-    """Split a direct-sum contraction into one contraction per block."""
+def contract(pairs: list) -> gem.Node:
+    """Sum each product of variable and expression over the variable's indices."""
+    return gem.Sum(*(gem.IndexSum(gem.Product(v, e), v.free_indices) for v, e in pairs))
+
+
+def test_unconcatenate_computed_variable() -> None:
+    """Split a computed variable along its own Concatenate nodes."""
     beta = gem.Index(extent=5)
     left = gem.Indexed(
         gem.Concatenate(gem.Literal([1.0, 2.0]),
@@ -16,22 +22,21 @@ def test_unconcatenate_contraction_blocks_matching_concatenations() -> None:
         gem.Concatenate(gem.Literal([6.0, 7.0]),
                         gem.Literal([8.0, 9.0, 10.0])),
         (beta,))
-    expression = gem.Product(left, right)
 
-    terms = unconcatenate([(None, expression)], indices=(beta,))
-    assert len(terms) == 2
-    assert sorted(index.extent for _, term in terms for index in term.free_indices) == [2, 3]
+    pairs = unconcatenate([(left, right)])
+    assert len(pairs) == 2
+    assert sorted(index.extent for v, _ in pairs for index in v.free_indices) == [2, 3]
+    assert all(beta not in e.free_indices for _, e in pairs)
 
-    split = gem.Sum(*(gem.IndexSum(term, term.free_indices) for _, term in terms))
     original_result, split_result = evaluate([
-        gem.IndexSum(expression, (beta,)),
-        split,
+        gem.IndexSum(gem.Product(left, right), (beta,)),
+        contract(pairs),
     ])
     assert numpy.array_equal(original_result.arr, split_result.arr)
 
 
-def test_unconcatenate_contraction_recurses_over_multiple_indices() -> None:
-    """Split direct sums nested in a contraction over several indices."""
+def test_unconcatenate_computed_variable_multiple_indices() -> None:
+    """Split a computed variable along each index that it carries."""
     beta = gem.Index(extent=5)
     gamma = gem.Index(extent=4)
     left = gem.Indexed(
@@ -42,50 +47,46 @@ def test_unconcatenate_contraction_recurses_over_multiple_indices() -> None:
         gem.Concatenate(gem.Literal([2.0, 3.0]),
                         gem.Literal([4.0, 5.0])),
         (gamma,))
-    expression = gem.Product(left, right)
+    variable = gem.Product(left, right)
+    expression = gem.Literal(2.0)
 
-    terms = unconcatenate([(None, expression)], indices=(beta, gamma))
-    assert len(terms) == 4
-    extents = sorted(tuple(sorted(index.extent for index in term.free_indices))
-                     for _, term in terms)
+    pairs = unconcatenate([(variable, expression)])
+    assert len(pairs) == 4
+    extents = sorted(tuple(sorted(index.extent for index in v.free_indices))
+                     for v, _ in pairs)
     assert extents == [(2, 2), (2, 2), (2, 3), (2, 3)]
 
-    split = gem.Sum(*(gem.IndexSum(term, term.free_indices) for _, term in terms))
     original_result, split_result = evaluate([
-        gem.IndexSum(expression, (beta, gamma)),
-        split,
+        gem.IndexSum(gem.Product(variable, expression), (beta, gamma)),
+        contract(pairs),
     ])
     assert numpy.array_equal(original_result.arr, split_result.arr)
 
 
-def test_unconcatenate_contraction_ignores_uncontracted_concatenations() -> None:
-    """Leave a Concatenate untouched when its index is not summed."""
+def test_unconcatenate_computed_variable_outside_concatenate() -> None:
+    """Refuse to split an index that a computed variable carries elsewhere."""
     beta = gem.Index(extent=3)
-    point = gem.Index(extent=2)
-    expression = gem.Product(
-        gem.Indexed(gem.Concatenate(gem.Literal([1.0]), gem.Literal([2.0])),
-                    (point,)),
+    variable = gem.Product(
+        gem.Indexed(gem.Concatenate(gem.Literal([1.0]), gem.Literal([2.0, 3.0])),
+                    (beta,)),
         gem.Indexed(gem.Literal([3.0, 4.0, 5.0]), (beta,)))
 
-    assert unconcatenate([(None, expression)], indices=(beta,)) == [(None, expression)]
+    with pytest.raises(ValueError):
+        unconcatenate([(variable, gem.Literal(1.0))])
 
 
-def test_unconcatenate_contraction_slices_variable_views() -> None:
-    """Slice a variable view summed against a direct sum into its blocks."""
+def test_unconcatenate_restricted_indices() -> None:
+    """Split only along the given indices, even if the variable carries more."""
     beta = gem.Index(extent=5)
-    coefficients = gem.Variable("w", (5,))
-    expression = gem.Product(
-        gem.Indexed(coefficients, (beta,)),
+    gamma = gem.Index(extent=4)
+    variable = gem.Product(
         gem.Indexed(gem.Concatenate(gem.Literal([1.0, 2.0]),
                                     gem.Literal([3.0, 4.0, 5.0])),
-                    (beta,)))
+                    (beta,)),
+        gem.Indexed(gem.Concatenate(gem.Literal([2.0, 3.0]),
+                                    gem.Literal([4.0, 5.0])),
+                    (gamma,)))
 
-    terms = unconcatenate([(None, expression)], indices=(beta,))
-    assert len(terms) == 2
-    assert all(beta not in term.free_indices for _, term in terms)
-
-    views = [next(node for node in gem.node.traversal([term])
-                  if isinstance(node, gem.FlexiblyIndexed))
-             for _, term in terms]
-    assert [view.children[0] for view in views] == [coefficients] * 2
-    assert [view.dim2idxs[0][0] for view in views] == [0, 2]
+    pairs = unconcatenate([(variable, gem.Literal(1.0))], indices=(beta,))
+    assert len(pairs) == 2
+    assert all(gamma in v.free_indices and beta not in v.free_indices for v, _ in pairs)
