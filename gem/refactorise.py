@@ -2,17 +2,18 @@
 refactorisation."""
 
 from collections import Counter, OrderedDict, defaultdict, namedtuple
+from collections.abc import Callable, Iterable
 from functools import singledispatch
 from itertools import product
 from sys import intern
 
 from gem.node import Memoizer, MemoizerArg, traversal
-from gem.gem import (Node, Conditional, IndexSum, Zero, Product, Sum,
+from gem.gem import (Node, Conditional, Index, IndexSum, Zero, Product, Sum,
                      Indexed, ListTensor, one, MathFunction)
 from gem.optimise import (delta_elimination, filtered_replace_indices,
-                          remove_componenttensors, sum_factorise,
-                          traverse_product, traverse_sum, unroll_indexsum,
-                          make_rename_map, make_renamer)
+                          preserve_linear_maps, remove_componenttensors,
+                          sum_factorise, traverse_product, traverse_sum,
+                          unroll_indexsum, make_rename_map, make_renamer)
 
 
 # Refactorisation labels
@@ -305,23 +306,36 @@ def _collect_monomials_conditional(expression, self):
     return result
 
 
-def collect_monomials(expressions, classifier):
-    """Refactorises expressions into a sum-of-products form, using
-    distributivity rules (i.e. a*(b + c) -> a*b + a*c).  Expansion
-    proceeds until all "compound" expressions are broken up.
+def _collect_monomial_sums(
+        expressions: Iterable[Node],
+        classifier: Callable[[Node], str]) -> list[MonomialSum]:
+    """Collect monomial sums using the supplied node classifier.
 
-    :arg expressions: GEM expressions to refactorise
-    :arg classifier: a function that can classify any GEM expression
-                     as ``ATOMIC``, ``COMPOUND``, or ``OTHER``.  This
-                     classification drives the factorisation.
+    Parameters
+    ----------
+    expressions : iterable of Node
+        GEM expressions to refactorise.
+    classifier : callable
+        Function labelling each node as ``ATOMIC``, ``COMPOUND``, or
+        ``OTHER``.
 
-    :returns: list of :py:class:`MonomialSum`s
+    Returns
+    -------
+    list of MonomialSum
+        Polynomial representations of the expressions.
 
-    :raises FactorisationError: Failed to break up some "compound"
-                                expressions with expansion.
+    Raises
+    ------
+    FactorisationError
+        If a compound expression cannot be expanded.
+
+    Notes
+    -----
+    ``expressions`` must already have had its ComponentTensors removed, so
+    that a caller identifying nodes to classify sees the nodes this
+    collector will visit.
+
     """
-    # Get ComponentTensors out of the way
-    expressions = remove_componenttensors(expressions)
 
     # Get ListTensors out of the way
     must_unroll = []  # indices to unroll
@@ -342,3 +356,64 @@ def collect_monomials(expressions, classifier):
     mapper.rename_map = make_rename_map()
     mapper.index_replacer = MemoizerArg(filtered_replace_indices)
     return list(map(mapper, expressions))
+
+
+def collect_monomials(
+        expressions: Iterable[Node],
+        classifier: Callable[[Node], str],
+        linear_indices: Iterable[Index] = ()) -> list[MonomialSum]:
+    """Collect structure-preserving sum-of-products representations.
+
+    Parameters
+    ----------
+    expressions
+        GEM expressions to refactorise.
+    classifier
+        Function that labels GEM nodes for polynomial collection.
+    linear_indices
+        Free indices identifying the multilinear axes.  Sums depending on
+        exactly one such axis represent linear maps and remain atomic.
+
+    Returns
+    -------
+    list of MonomialSum
+        One polynomial representation for each input expression.
+
+    Notes
+    -----
+    A one-axis sum is a finite element linear operand: examples include a
+    sparse basis transformation and a tensor-product tabulation factor.
+    Preserving it keeps domain-specific basis structure available for
+    contraction optimisation.  This does not make the map opaque: its GEM
+    expression remains available for scalar simplification and code motion.
+
+    Sums involving several linear axes separate form monomials and are
+    distributed.  COFFEE subsequently chooses scalar factorisations across
+    the resulting operands.  Keeping these two stages distinct avoids a
+    Cartesian expansion of basis-map entries before loop placement.
+
+    """
+    # Remove ComponentTensors here, not in the collector.  Removing them
+    # rebuilds nodes, and the maps found below must be the very nodes that
+    # the collector classifies.
+    expressions = remove_componenttensors(tuple(expressions))
+    linear_indices = tuple(linear_indices)
+    if not linear_indices:
+        return _collect_monomial_sums(expressions, classifier)
+
+    result = []
+    for expression in expressions:
+        terms, linear_maps = preserve_linear_maps(expression, linear_indices)
+        if not linear_maps:
+            monomial_sum, = _collect_monomial_sums((expression,), classifier)
+            result.append(monomial_sum)
+            continue
+
+        map_ids = frozenset(map(id, linear_maps))
+
+        def preserve_map(node: Node, map_ids=map_ids) -> str:
+            return ATOMIC if id(node) in map_ids else classifier(node)
+
+        result.append(MonomialSum.sum(
+            *_collect_monomial_sums(terms, preserve_map)))
+    return result
