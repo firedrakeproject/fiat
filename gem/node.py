@@ -103,7 +103,12 @@ class Node(object):
         return hash((type(self), *self._arguments))
 
 
-def _make_traversal_children(node):
+def traversal_children(node):
+    """The children a DAG walk descends into, index expressions included.
+
+    :arg node: a GEM expression
+    :returns: the child nodes, plus the nodes hidden in index expressions
+    """
     if isinstance(node, (gem.Indexed, gem.FlexiblyIndexed)):
         # Include child nodes hidden in index expressions.
         return node.children + node.indirect_children
@@ -117,7 +122,7 @@ def pre_traversal(expression_dags):
     Notes
     -----
     This function also walks through nodes in index expressions
-    (e.g., `VariableIndex`s); see ``_make_traversal_children()``.
+    (e.g., `VariableIndex`s); see ``traversal_children()``.
 
     """
     seen = set()
@@ -133,7 +138,7 @@ def pre_traversal(expression_dags):
     while lifo:
         node = lifo.pop()
         yield node
-        children = _make_traversal_children(node)
+        children = traversal_children(node)
         for child in reversed(children):
             if child not in seen:
                 seen.add(child)
@@ -146,7 +151,7 @@ def post_traversal(expression_dags):
     Notes
     -----
     This function also walks through nodes in index expressions
-    (e.g., `VariableIndex`s); see ``_make_traversal_children()``.
+    (e.g., `VariableIndex`s); see ``traversal_children()``.
 
 
     """
@@ -158,13 +163,13 @@ def post_traversal(expression_dags):
     for root in expression_dags:
         if root not in seen:
             seen.add(root)
-            lifo.append((root, list(_make_traversal_children(root))))
+            lifo.append((root, list(traversal_children(root))))
 
     while lifo:
         node, deps = lifo[-1]
         for i, dep in enumerate(deps):
             if dep is not None and dep not in seen:
-                lifo.append((dep, list(_make_traversal_children(dep))))
+                lifo.append((dep, list(traversal_children(dep))))
                 deps[i] = None
                 break
         else:
@@ -184,12 +189,12 @@ def collect_refcount(expression_dags):
     -----
     This function also collects reference counts of nodes
     in index expressions (e.g., `VariableIndex`s); see
-    ``_make_traversal_children()``.
+    ``traversal_children()``.
 
     """
     result = collections.Counter(expression_dags)
     for node in traversal(expression_dags):
-        result.update(_make_traversal_children(node))
+        result.update(traversal_children(node))
     return result
 
 
