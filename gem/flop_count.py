@@ -27,13 +27,28 @@ def statement_block(tree, temporaries):
 def statement_for(tree, temporaries):
     extent = tree.index.extent
     assert extent is not None
-    child, = tree.children
-    token = _active_indices.set(_active_indices.get() | {tree.index})
+    active_token = _active_indices.set(
+        _active_indices.get() | {tree.index})
     try:
+        index_values = _index_values.get()
+        if tree.index.parents and all(
+                parent in index_values for parent in tree.index.parents):
+            extent = tree.index.iteration_extent(index_values)
+        child, = tree.children
+        if tree.index in _control_indices.get():
+            flops = 0
+            for value in range(extent):
+                token = _index_values.set(
+                    index_values | {tree.index: value})
+                try:
+                    flops += statement(child, temporaries)
+                finally:
+                    _index_values.reset(token)
+            return flops
         flops = statement(child, temporaries)
+        return flops * extent
     finally:
-        _active_indices.reset(token)
-    return flops * extent
+        _active_indices.reset(active_token)
 
 
 @statement.register(imp.Initialise)
@@ -143,13 +158,36 @@ def flops_dense_linear_algebra(expr, temporaries):
 @flops.register(gem.ComponentTensor)
 def flops_componenttensor(expr, temporaries):
     body, = expr.children
-    # Scheduling emits an assignment over the indices that no enclosing For
-    # already iterates.  Count those extents here; the loops that carry the
-    # rest count them.
-    implicit = tuple(index for index in expr.multiindex
-                     if index not in _active_indices.get())
-    extent = numpy.prod([index.extent for index in implicit], dtype=int)
-    return extent * expression_flops(body, temporaries)
+    implicit_indices = tuple(
+        index for index in expr.multiindex
+        if index not in _active_indices.get())
+    if not implicit_indices:
+        return expression_flops(body, temporaries)
+    control = _control_indices.get().intersection(implicit_indices)
+    if not control and not any(
+            index.parents for index in implicit_indices):
+        extent = numpy.prod(
+            [index.extent for index in implicit_indices], dtype=int)
+        return extent * expression_flops(body, temporaries)
+
+    def count(position):
+        if position == len(implicit_indices):
+            return expression_flops(body, temporaries)
+        index = implicit_indices[position]
+        values = _index_values.get()
+        extent = index.extent
+        if index.parents:
+            extent = index.iteration_extent(values)
+        total = 0
+        for value in range(extent):
+            token = _index_values.set(values | {index: value})
+            try:
+                total += count(position + 1)
+            finally:
+                _index_values.reset(token)
+        return total
+
+    return count(0)
 
 
 def expression_flops(expression, temporaries, top=False):
@@ -173,14 +211,35 @@ def count_flops(impero_c):
     :returns: approximate flop count for the tree.
     """
     try:
-        token = _active_indices.set(frozenset())
+        control_token = _control_indices.set(
+            frozenset(_find_control_indices(impero_c.tree)))
+        index_token = _index_values.set({})
+        active_token = _active_indices.set(frozenset())
         try:
             return statement(impero_c.tree, set(impero_c.temporaries))
         finally:
-            _active_indices.reset(token)
+            _active_indices.reset(active_token)
+            _index_values.reset(index_token)
+            _control_indices.reset(control_token)
     except (ValueError, NotImplementedError):
         return 0
 
 
+_index_values = ContextVar("flop_count_index_values", default={})
 _active_indices = ContextVar("flop_count_active_indices",
                              default=frozenset())
+_control_indices = ContextVar("flop_count_control_indices",
+                              default=frozenset())
+
+
+def _find_control_indices(tree):
+    """Find loop indices controlling dependent loop bounds."""
+    result = set()
+    if isinstance(tree, imp.For):
+        if tree.index.parents:
+            result.update(tree.index.parents)
+        result.update(_find_control_indices(tree.children[0]))
+    elif isinstance(tree, imp.Block):
+        for child in tree.children:
+            result.update(_find_control_indices(child))
+    return result

@@ -6,13 +6,26 @@ import pytest
 import pprint
 
 from gem.interpreter import evaluate
+from gem.cost import operation_count
+from gem.flop_count import count_flops
+from gem.impero_utils import compile_gem
 from gem.node import traversal
-from gem.optimise import contraction
+from gem.driver import contraction
 from finat.physically_mapped import MappedTabulation, PhysicallyMappedElement
 
 
+def test_numeric_zero_mapped_tabulation_is_sparse() -> None:
+    """Discard numeric zeros when constructing mapped rows."""
+    matrix = gem.Literal(np.eye(3))
+    mapped = MappedTabulation(matrix, {None: gem.Literal(np.eye(3))})
+
+    assert mapped._width == 1
+    assert np.array_equal(mapped._columns.array[:, 0], np.arange(3))
+    assert mapped._values.shape == (1,)
+
+
 def test_sparse_mapped_tabulation():
-    """Apply a sparse basis map at the cost of its nonzeros."""
+    """Check the values and arithmetic work of a padded sparse basis map."""
     coefficient = gem.Variable("coefficient", ())
     matrix = gem.ListTensor(np.asarray([
         [gem.Literal(1.0), gem.Zero(), coefficient],
@@ -29,11 +42,11 @@ def test_sparse_mapped_tabulation():
     i, j = gem.indices(2)
     mapped = contraction(gem.Indexed(mapped_tabulation[None], (i, j)))
 
-    # The three unit entries cost no multiplication, and the one remaining
-    # nonzero costs exactly one. Nothing is selected by a branch.
     products = [node for node in traversal((mapped,))
                 if isinstance(node, gem.Product)]
-    assert len(products) == 1
+    assert sum(map(operation_count, products)) == 8
+    output = gem.Indexed(gem.Variable("output", (2, 2)), (i, j))
+    assert count_flops(compile_gem([(output, mapped)], (i, j))) == 16
     assert not any(isinstance(node, gem.Conditional)
                    for node in traversal((mapped,)))
 

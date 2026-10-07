@@ -135,9 +135,11 @@ def handle(ops, push, decref, node):
     elif isinstance(node, impero.Return):
         ops.append(node)
         decref(node.expression)
+        decref(node.variable)
     elif isinstance(node, impero.ReturnAccumulate):
         ops.append(node)
         decref(node.indexsum.children[0])
+        decref(node.variable)
     else:
         raise AssertionError("no handler for node type %s" % type(node))
 
@@ -157,8 +159,10 @@ def emit_operations(assignments, get_indices, emit_return_accumulate=True):
     :returns: list of Impero terminals correctly ordered to evaluate
               the assignments
     """
-    # Prepare reference counts
-    refcount = collect_refcount([e for v, e in assignments])
+    # Prepare reference counts.  Return variables participate too: their
+    # index expressions (e.g. `gem.VariableIndex` gather tables) may need
+    # evaluating just like the right-hand sides.
+    refcount = collect_refcount([node for pair in assignments for node in pair])
 
     # Stage return operations
     staging = []
