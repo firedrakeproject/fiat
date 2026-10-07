@@ -6,7 +6,9 @@ import pytest
 import pprint
 
 from gem.interpreter import evaluate
-from gem.cost import estimate_cost, operation_count
+from gem.cost import operation_count
+from gem.flop_count import count_flops
+from gem.impero_utils import compile_gem
 from gem.node import traversal
 from gem.driver import contraction
 from finat.physically_mapped import MappedTabulation, PhysicallyMappedElement
@@ -43,7 +45,8 @@ def test_sparse_mapped_tabulation():
     products = [node for node in traversal((mapped,))
                 if isinstance(node, gem.Product)]
     assert sum(map(operation_count, products)) == 8
-    assert estimate_cost((mapped,))[0] == 16
+    output = gem.Indexed(gem.Variable("output", (2, 2)), (i, j))
+    assert count_flops(compile_gem([(output, mapped)], (i, j))) == 16
     assert not any(isinstance(node, gem.Conditional)
                    for node in traversal((mapped,)))
 
