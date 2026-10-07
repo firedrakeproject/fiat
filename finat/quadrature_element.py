@@ -9,7 +9,7 @@ from gem.interpreter import evaluate
 from gem.utils import cached_property
 
 from finat.finiteelementbase import FiniteElementBase
-from finat.quadrature import make_quadrature, AbstractQuadratureRule
+from finat.quadrature import make_quadrature, AbstractQuadratureRule, QuadratureRule
 
 
 def make_quadrature_element(fiat_ref_cell, degree, scheme="default", codim=0):
@@ -113,18 +113,18 @@ class QuadratureElement(FiniteElementBase):
         return ()
 
     @cached_property
+    def _weights(self):
+        if isinstance(self._rule, QuadratureRule):
+            return self._rule.weights
+        weights, = evaluate([self._rule.weight_expression])
+        return weights.arr.flatten()
+
+    @cached_property
     def fiat_equivalent(self):
         ps = self._point_set
         if isinstance(ps, UnknownPointSet):
             raise ValueError("A quadrature element with rule with runtime points has no fiat equivalent!")
-        weights = getattr(self._rule, 'weights', None)
-        if weights is None:
-            # we need the weights.
-            weights, = evaluate([self._rule.weight_expression])
-            weights = weights.arr.flatten()
-            self._rule.weights = weights
-
-        return FIAT.QuadratureElement(self.cell, ps.points, weights)
+        return FIAT.QuadratureElement(self.cell, ps.points, self._weights)
 
     def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
         '''Return code for evaluating the element at known points on the
@@ -148,15 +148,35 @@ class QuadratureElement(FiniteElementBase):
         if order:
             raise ValueError("Derivatives are not defined on a QuadratureElement.")
 
-        if not self._rule.point_set.almost_equal(ps):
-            raise ValueError("Mismatch of quadrature points!")
+        # A union of points has no structure of its own to tabulate on.
+        if len(ps.point_sets) > 1:
+            return self._stack_tabulations(order, ps, entity, coordinate_mapping=coordinate_mapping)
 
-        # Return an outer product of identity matrices
         basis_indices = self.get_indices()
-        point_indices = ps.indices
-        if len(basis_indices) > len(point_indices):
-            point_indices = (entity_id, *point_indices)
-        delta = gem.Delta(point_indices, basis_indices)
+        ps_indices = ps.indices
+        if isinstance(self._point_set, FacetPointSet):
+            # A FacetPointSet carries a facet index, absent from the rule's.
+            ps_indices = (entity_id, *ps_indices)
+
+        rule_ps = self._rule.point_set
+        blocks = rule_ps.point_sets
+        matches = [k for k, block in enumerate(blocks) if block.almost_equal(ps)]
+        if not matches:
+            raise ValueError("Mismatch of quadrature points!")
+        k, = matches
+
+        if len(blocks) > 1:
+            # `ps` is one point set of the union: tabulate onto the rows of the
+            # identity it owns, and zero onto the others.  Concatenating along
+            # the basis index lets the contraction with a coefficient split.
+            beta = tuple(gem.Index(extent=index.extent) for index in ps_indices)
+            own = gem.ComponentTensor(gem.Delta(ps_indices, beta), beta)
+            branches = [own if j == k else gem.Zero(tuple(i.extent for i in block.indices))
+                        for j, block in enumerate(blocks)]
+            delta = gem.Indexed(gem.Concatenate(*branches), basis_indices)
+        else:
+            # Return an outer product of identity matrices
+            delta = gem.Delta(ps_indices, basis_indices)
 
         sd = self.cell.get_spatial_dimension()
         return {(0,) * sd: gem.ComponentTensor(delta, basis_indices)}
@@ -173,6 +193,32 @@ class QuadratureElement(FiniteElementBase):
         Q = gem.Delta(ps.indices, multiindex)
         Q = gem.ComponentTensor(Q, multiindex)
         return Q, ps
+
+    @cached_property
+    def _summand_rules(self):
+        """The rules of the summands this element is a direct sum of.
+
+        :returns: one :class:`~finat.quadrature.QuadratureRule` for each
+            point set of a :class:`~finat.point_set.UnionPointSet` rule, in
+            the order they are stacked, or an empty tuple if the rule has a
+            single point set.
+
+        A union of point sets is how the points of a direct sum are stacked,
+        so splitting it back up recovers a rule for each summand, each on
+        the points its own functionals evaluate on.
+        """
+        rule_ps = self._rule.point_set
+        if len(rule_ps.point_sets) == 1:
+            return ()
+
+        rules = []
+        offset = 0
+        for ps in rule_ps.point_sets:
+            n = len(ps.points)
+            rules.append(QuadratureRule(ps, self._weights[offset:offset + n],
+                                        ref_el=self._rule.ref_el))
+            offset += n
+        return tuple(rules)
 
     @property
     def mapping(self):
