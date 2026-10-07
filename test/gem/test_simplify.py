@@ -637,3 +637,28 @@ def test_unflatten_incompatible_output_layouts(operation):
         numpy.add.at(actual, rows, values)
     expected, = evaluate([expression])
     assert numpy.array_equal(actual, expected.arr)
+
+
+def test_unflatten_preserves_external_jagged_parent():
+    p = gem.JaggedIndex(extent=3)
+    q = gem.JaggedIndex(extent=3, parents=(p,))
+    triangle = gem.Literal(numpy.fromfunction(lambda i, j: i + j < 3, (3, 3)))
+    table = gem.FlattenedTensor(gem.Indexed(triangle, (p, q)), (p, q))
+    i, s = gem.Index(extent=6), gem.Index(extent=3)
+    k = gem.JaggedIndex(extent=3, parents=(s,))
+    b = gem.Indexed(triangle, (s, k))
+    expression = gem.IndexSum(gem.Indexed(table, (i,)) * b + b, (i, k))
+    actual, = evaluate([contraction(expression)])
+    assert numpy.array_equal(actual.arr, [36., 24., 12.])
+
+
+def test_distribute_sum_conditions_on_free_parent():
+    s = gem.Index(extent=3)
+    k = gem.JaggedIndex(extent=3, parents=(s,))
+    triangle = gem.Literal(numpy.fromfunction(lambda i, j: i + j < 3, (3, 3)))
+    b = gem.Indexed(triangle, (s, k))
+    a = gem.Indexed(gem.Literal(numpy.ones(3)), (s,))
+    expression = gem.IndexSum(a + b, (k,))
+    distributed = gem.Sum(*distribute_sum(expression, lambda node: isinstance(node, gem.Sum)))
+    actual, = evaluate([distributed])
+    assert numpy.array_equal(actual.arr, [6., 4., 2.])

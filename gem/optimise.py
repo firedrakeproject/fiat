@@ -818,22 +818,33 @@ def _distributed_indexsum_term(
     if not missing:
         return IndexSum(term, indices)
 
-    if any(index.parents for index in indices):
-        points = jagged_lattice(indices)
-        if active:
-            positions = tuple(indices.index(index) for index in active)
-            multiplicity = numpy.zeros(
-                tuple(index.extent for index in active))
-            numpy.add.at(
-                multiplicity,
-                tuple(points[:, position] for position in positions),
-                1,
-            )
-            factor = Indexed(Literal(multiplicity), active)
-        else:
-            factor = Literal(float(len(points)))
+    domain = OrderedDict()
+
+    def include(index):
+        for parent in index.parents:
+            include(parent)
+        domain.setdefault(index)
+
+    for index in indices:
+        include(index)
+    parents = {parent for index in domain for parent in index.parents}
+    if all(not index.parents and index not in parents for index in missing):
+        return IndexSum(Product(term, index_space_literal(missing)), active)
+
+    retained = set(domain).difference(indices).union(active)
+    for index in reversed(domain):
+        if index in retained:
+            retained.update(index.parents)
+    retained = tuple(index for index in domain if index in retained)
+    points = jagged_lattice(tuple(domain))
+    if retained:
+        positions = tuple(tuple(domain).index(index) for index in retained)
+        multiplicity = numpy.zeros(tuple(index.extent for index in retained))
+        numpy.add.at(multiplicity, tuple(points[:, p] for p in positions), 1)
+        factor = Indexed(Literal(multiplicity), retained)
     else:
-        factor = index_space_literal(missing)
+        factor = Literal(float(len(points)))
+    active = tuple(index for index in retained if index in indices)
     return IndexSum(Product(term, factor), active)
 
 
