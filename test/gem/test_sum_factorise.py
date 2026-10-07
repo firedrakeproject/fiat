@@ -264,3 +264,19 @@ def test_estimate_cost_counts_the_contraction():
     assert flops > 0
     assert storage >= largest > 0
     assert nodes > 0
+
+
+@pytest.mark.parametrize("extent", [2, 3, 5])
+def test_distributed_linear_map_preserves_multiplicity(extent):
+    i, j = gem.Index(extent=2), gem.Index(extent=2)
+    k = gem.Index(extent=extent)
+    a = gem.Indexed(gem.Literal(numpy.ones((2, extent))), (i, k))
+    b = gem.Indexed(gem.Literal(numpy.ones(2)), (i,))
+    c = gem.Indexed(gem.Literal(numpy.ones(2)), (j,))
+    expression = gem.IndexSum((a + b) * c + b * c, (k,))
+    arguments = (i, j)
+    monomials, = collect_monomials(
+        [expression], partial(_classify, frozenset(arguments)), arguments)
+    optimized = optimise_monomial_sum(monomials, arguments)
+    actual, = evaluate([gem.ComponentTensor(optimized, arguments)])
+    assert numpy.array_equal(actual.arr, numpy.full((2, 2), 3 * extent))

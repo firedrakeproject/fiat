@@ -86,6 +86,18 @@ def iteration_count(indices: Iterable[Index]) -> int:
     return int(numpy.prod([index.extent for index in indices], dtype=int))
 
 
+def index_space_literal(indices: Iterable[Index]) -> Literal:
+    """The cardinality of a rectangular index space, as a scalar.
+
+    The empty product is one, so contracting it counts the tuples in the
+    index space.
+
+    :arg indices: indices spanning the space
+    :returns: the number of points, as a floating point literal
+    """
+    return Literal(float(iteration_count(indices)))
+
+
 def operation_count(node: Node) -> int:
     """Estimate the scalar operations performed by one GEM node.
 
