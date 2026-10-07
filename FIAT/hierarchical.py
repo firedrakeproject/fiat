@@ -9,11 +9,45 @@
 import numpy
 
 from FIAT import finite_element, dual_set, functional
-from FIAT.reference_element import symmetric_simplex
+from FIAT.expansions import polynomial_dimension
+from FIAT.reference_element import symmetric_simplex, lattice_iter
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.polynomial_set import ONPolynomialSet, make_bubbles
 from FIAT.check_format_variant import check_format_variant, parse_quadrature_scheme
 from FIAT.P0 import P0
+
+
+def make_projected_bubble_moments(ref_el, degree, interpolant_deg=None, quad_scheme=None):
+    """Tabulate moments against projected bubbles of the given degree."""
+    if interpolant_deg is None:
+        interpolant_deg = degree
+    sd = ref_el.get_spatial_dimension()
+    num_cells = len(ref_el.get_topology()[sd])
+    deg = numpy.array([sum(alpha) for alpha in lattice_iter(0, degree - sd, sd)])
+    lex2hier = numpy.argsort(deg, kind="stable")
+
+    Q = parse_quadrature_scheme(ref_el, degree + interpolant_deg, quad_scheme)
+    P = ONPolynomialSet(ref_el, degree, scale="orthonormal")
+    phis = P.tabulate(Q.get_points())[(0,) * sd]
+    duals = numpy.multiply(phis, Q.get_weights())
+
+    B = make_bubbles(ref_el, degree)
+    bubbles = B.tabulate(Q.get_points())[(0,) * sd]
+    bubbles = bubbles.reshape(num_cells, len(B)//num_cells, -1)
+    bubbles = bubbles[:, lex2hier, :]
+    bubbles = bubbles.reshape(len(B), -1)
+    coeffs = numpy.dot(duals, bubbles.T)
+    coeffs = coeffs.reshape(num_cells, len(duals)//num_cells, num_cells, -1)
+
+    for k in range(degree-sd):
+        dimPk0 = polynomial_dimension(ref_el, k) // num_cells
+        dimPk1 = polynomial_dimension(ref_el, k-1) // num_cells
+        dimPkd = polynomial_dimension(ref_el, k+sd) // num_cells
+        coeffs[:, :dimPkd, :, dimPk1:dimPk0] = 0
+
+    coeffs = coeffs.reshape(len(duals), -1)
+    coeffs /= numpy.linalg.norm(coeffs, axis=0)
+    return Q, numpy.dot(coeffs.T, phis)
 
 
 def make_dual_bubbles(ref_el, degree, codim=0, interpolant_deg=None, quad_scheme=None, scale="orthonormal"):
