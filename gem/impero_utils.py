@@ -128,14 +128,26 @@ def inline_temporaries(expressions, ops):
     for op in ops:
         if isinstance(op, imp.Evaluate):
             expr = op.expression
-            if expr.shape == () and refcount[expr] == 1:
+            reduction_view = (isinstance(expr, gem.ComponentTensor)
+                              and isinstance(expr.children[0], gem.IndexSum))
+            if (expr.shape == () or reduction_view) and refcount[expr] == 1:
                 candidates.add(expr)
+
+    # A reduction view carries no name of its own, so it can only be inlined
+    # where the consumer indexes straight through it.  Inverse, Solve and
+    # FlexiblyIndexed read the tensor whole and need it materialised.
+    indexed = {child for node in traversal(expressions)
+               if isinstance(node, gem.Indexed)
+               for child in node.children}
+    candidates = {expr for expr in candidates
+                  if not isinstance(expr, gem.ComponentTensor) or expr in indexed}
 
     # Prevent inlining that pulls expressions into inner loops
     for node in traversal(expressions):
         for child in node.children:
             if child in candidates and set(child.free_indices) < set(node.free_indices):
-                candidates.remove(child)
+                if not isinstance(child, gem.ComponentTensor):
+                    candidates.remove(child)
 
     # Filter out candidates
     return [op for op in ops if not (isinstance(op, imp.Evaluate) and op.expression in candidates)]
