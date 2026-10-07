@@ -7,7 +7,8 @@ import gem
 import numpy
 from FIAT.quadrature import GaussLegendreQuadratureLineRule
 from FIAT.quadrature_schemes import create_quadrature as fiat_scheme
-from FIAT.reference_element import HEXAHEDRON, LINE, QUADRILATERAL, TENSORPRODUCT
+from FIAT.reference_element import (HEXAHEDRON, LINE, QUADRILATERAL,
+                                    TENSORPRODUCT, ufc_simplex)
 from gem.utils import safe_repr
 from recursivenodes.quadrature import gaussjacobi
 
@@ -39,7 +40,7 @@ def make_quadrature(ref_el, degree, scheme="default"):
     uses collapsed Gauss rules at high degree. The ``canonical`` scheme uses
     collapsed Gauss rules with flat points. The ``KMV`` scheme uses spectral
     lumped rules. The ``collapsed`` scheme retains the tensor-product Duffy
-    structure for sum factorization.
+    structure for sum factorization on UFC simplices.
 
     """
     if ref_el.get_shape() == TENSORPRODUCT:
@@ -89,7 +90,7 @@ def collapsed_gauss_jacobi_quadrature(ref_el, degree):
     Parameters
     ----------
     ref_el : FIAT.reference_element.Cell
-        The simplex to create the quadrature rule on.
+        The UFC simplex to create the quadrature rule on.
     degree : int
         The degree of polynomial that the rule should integrate exactly.
 
@@ -109,6 +110,8 @@ def collapsed_gauss_jacobi_quadrature(ref_el, degree):
     if ref_el.is_macrocell():
         raise NotImplementedError("Collapsed quadrature is not supported on split cells")
     dim = ref_el.get_spatial_dimension()
+    if ref_el != ufc_simplex(dim):
+        raise NotImplementedError("Collapsed quadrature requires UFC simplices")
     num_points = (degree + 1 + 1) // 2  # exact integration
     factors = []
     for axis in range(dim):

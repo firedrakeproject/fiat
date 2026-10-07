@@ -18,7 +18,7 @@ from gem.gem import (ComponentTensor, Delta, FlattenedTensor, Index, IndexSum,
                      Indexed, JaggedIndex, Literal, Node, Sum, VariableIndex,
                      jagged_lattice, jagged_layout, lattice_points, uint_type)
 from gem.node import Memoizer, MemoizerArg, reuse_if_untouched, traversal
-from gem.optimise import (delta_elimination, distribute_sum,
+from gem.optimise import (_distributed_indexsum_term, delta_elimination, distribute_sum,
                           filtered_replace_indices, make_sum, sum_factorise,
                           traverse_product, traverse_sum)
 
@@ -279,10 +279,7 @@ def _prepare_unflattening(
         mapper.replacements[other] = replacer(
             tensor.children[0], tuple(zip(tensor.multiindex, multiindex)))
 
-    shape = tuple(index.extent for index in multiindex)
-    points = gather.children[0].lattice_points()
-    ordering = numpy.zeros(shape, dtype=uint_type)
-    ordering[tuple(points.T)] = numpy.arange(len(points))
+    ordering = _lattice_ranks(jagged_layout(multiindex))
     if permutation is not None:
         inverse = numpy.empty(len(permutation), dtype=uint_type)
         inverse[numpy.asarray(permutation)] = numpy.arange(
@@ -340,16 +337,14 @@ def _unflatten_contractions(node: Node, self) -> Node:
         rest = tuple(other for other in node.multiindex if other != index)
         pieces = []
         for own, term in rewritten:
-            term = self(IndexSum(
-                term, own + tuple(i for i in rest if i in term.free_indices)))
+            term = self(_distributed_indexsum_term(term, own + rest))
             indices, factors = traverse_product(term)
             indices, factors = delta_elimination(indices, factors)
             pieces.append(sum_factorise(indices, factors))
         if leftover:
             residual = make_sum(leftover)
-            indices = tuple(i for i in (index,) + rest
-                            if i in residual.free_indices)
-            pieces.append(self(IndexSum(residual, indices)))
+            pieces.append(self(_distributed_indexsum_term(
+                residual, (index,) + rest)))
         return make_sum(pieces)
     return node
 
@@ -405,7 +400,8 @@ def unflatten_free_indices(
             continue
         else:
             predicate = (lambda node: isinstance(node, Delta)) \
-                if any(isinstance(node, Delta) for node in nodes) else None
+                if any(isinstance(node, Delta) for node in nodes) else \
+                (lambda node: isinstance(node, FlattenedTensor))
             groups = OrderedDict()
             for term in distribute_sum(
                     current_expression, predicate=predicate):

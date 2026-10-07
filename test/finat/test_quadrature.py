@@ -3,6 +3,7 @@ import pytest
 
 import gem
 from FIAT import ufc_cell
+from FIAT.reference_element import default_simplex
 from FIAT.quadrature_schemes import create_quadrature as fiat_scheme
 from finat.quadrature import make_quadrature
 
@@ -41,3 +42,9 @@ def test_collapsed_quadrature(cell_name, degree):
         monomial = lambda pts: numpy.prod(pts ** numpy.asarray(alpha), axis=-1)
         exact = numpy.dot(ref_weights, monomial(ref_points))
         assert numpy.allclose(numpy.dot(weights, monomial(ps.points)), exact)
+
+
+@pytest.mark.parametrize("dimension", [1, 2, 3])
+def test_collapsed_quadrature_rejects_nonunit_simplex(dimension):
+    with pytest.raises(NotImplementedError, match="UFC simplices"):
+        make_quadrature(default_simplex(dimension), 2, scheme="collapsed")

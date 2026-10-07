@@ -597,3 +597,43 @@ def test_product_of_sums_over_one_index():
     square = gem.IndexSum(gem.Product(first(gather), second(gather)), (k0, k1))
     result, = evaluate([square])
     assert numpy.isclose(result.arr, (1.0 + 2.0 + 3.0) ** 2)
+
+
+@pytest.mark.parametrize("extent", [2, 3, 4])
+def test_unflatten_contraction_preserves_multiplicity(extent):
+    p = gem.JaggedIndex(extent=extent)
+    q = gem.JaggedIndex(extent=extent, parents=(p,))
+    values = numpy.fromfunction(lambda i, j: i + j < extent, (extent, extent))
+    table = gem.FlattenedTensor(gem.Indexed(gem.Literal(values), (p, q)), (p, q))
+    i, k = gem.Index(extent=table.shape[0]), gem.Index(extent=2)
+    vector = gem.Indexed(gem.Literal([2., 3.]), (k,))
+    expression = gem.IndexSum(gem.Indexed(table, (i,)) + vector, (i, k))
+    actual, = evaluate([contraction(expression)])
+    assert actual.arr == 7 * table.shape[0]
+
+
+@pytest.mark.parametrize("operation", [gem.Sum, gem.Product])
+def test_unflatten_incompatible_output_layouts(operation):
+    p = gem.JaggedIndex(extent=3)
+    q = gem.JaggedIndex(extent=3, parents=(p,))
+    values = numpy.fromfunction(lambda i, j: i + j < 3, (3, 3))
+    left = gem.FlattenedTensor(gem.Indexed(gem.Literal(values), (p, q)), (p, q))
+    r = gem.Index(extent=6)
+    right = gem.FlattenedTensor(gem.Indexed(gem.Literal(numpy.arange(6.)), (r,)), (r,))
+    i = gem.Index(extent=6)
+    expression = operation(gem.Indexed(left, (i,)), gem.Indexed(right, (i,)))
+    output = gem.Indexed(gem.Variable("out", (6,)), (i,))
+    actual = numpy.zeros(6)
+    for variable, value in unflatten_returns([(output, expression)]):
+        indices = variable.free_indices
+        points = jagged_lattice(indices)
+        point_indices = tuple(points.T)
+        index, = variable.multiindex
+        if isinstance(index, gem.Index):
+            rows = points[:, indices.index(index)]
+        else:
+            rows = evaluate([index.expression])[0].broadcast(indices)[point_indices]
+        values = evaluate([value])[0].broadcast(indices)[point_indices]
+        numpy.add.at(actual, rows, values)
+    expected, = evaluate([expression])
+    assert numpy.array_equal(actual, expected.arr)
