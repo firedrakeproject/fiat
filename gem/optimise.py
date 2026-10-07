@@ -9,7 +9,7 @@ from numbers import Integral
 
 import numpy
 
-from gem.cost import estimate_cost, index_space_literal, iteration_count
+from gem.cost import estimate_cost, index_space_literal
 from gem.utils import groupby
 from gem.node import (Memoizer, MemoizerArg, reuse_if_untouched,
                       reuse_if_untouched_arg, traversal, traversal_children)
@@ -1307,11 +1307,8 @@ def tabulate_indirect_contractions(expression: Node) -> Node:
     if not gathers:
         return expression
 
-    # Gathers that select the same rows with the same arguments read one
-    # tabulation, so they pay for it once between them.
-    readers = Counter((frozenset(gather.expression.free_indices), nrows)
-                      for gather, nrows in gathers.items())
     row_indices = {}
+    candidates = OrderedDict()
 
     def rename(node, self, substitution):
         target, replacement = substitution
@@ -1322,35 +1319,29 @@ def tabulate_indirect_contractions(expression: Node) -> Node:
             return Indexed(self(aggregate, substitution), multiindex)
         return reuse_if_untouched_arg(node, self, substitution)
 
-    def hoist(node):
+    for node in traversal((expression,)):
+        if not isinstance(node, IndexSum):
+            continue
         body, = node.children
         free = frozenset(body.free_indices)
         contracted = frozenset(node.multiindex)
-
-        candidates = []
         for gather, nrows in gathers.items():
             arguments = frozenset(gather.expression.free_indices)
-            if arguments <= free and arguments.isdisjoint(contracted):
-                sharing = readers[(arguments, nrows)]
-                saving = sharing * iteration_count(arguments) - nrows
-                if saving > 0:
-                    candidates.append((saving, gather, arguments, nrows))
-
-        for _, gather, arguments, nrows in sorted(candidates, key=lambda c: -c[0]):
-            # One index per table, so that gathers sharing a tabulation build
-            # the same node and evaluate it one time.
-            row = row_indices.setdefault((arguments, nrows), Index(extent=nrows))
+            if not (arguments <= free and arguments.isdisjoint(contracted)):
+                continue
+            row = row_indices.setdefault(nrows, Index(extent=nrows))
             per_row = MemoizerArg(rename)(body, (gather, row))
-            # The body must reach the arguments only through this gather.
             if arguments.isdisjoint(per_row.free_indices):
                 table = ComponentTensor(IndexSum(per_row, node.multiindex), (row,))
-                return Indexed(table, (gather,))
-        return node
+                candidates.setdefault(table, {})[node] = Indexed(table, (gather,))
 
-    def visit(node, self):
-        node = reuse_if_untouched(node, self)
-        if isinstance(node, IndexSum):
-            node = hoist(node)
-        return node
+    for replacements in candidates.values():
+        def replace(node, self):
+            if node in replacements:
+                return replacements[node]
+            return reuse_if_untouched(node, self)
 
-    return Memoizer(visit)(expression)
+        candidate = Memoizer(replace)(expression)
+        if estimate_cost((candidate,)) < estimate_cost((expression,)):
+            expression = candidate
+    return expression

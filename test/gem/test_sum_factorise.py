@@ -399,3 +399,46 @@ def test_gathers_sharing_a_table_tabulate_it_once() -> None:
                    for k in range(nwidth))
     result, = evaluate([gem.ComponentTensor(tabulated, (j,))])
     assert numpy.allclose(result.arr, expected)
+
+
+@pytest.mark.parametrize("extent", [2, 3, 5])
+def test_distributed_linear_map_preserves_multiplicity(extent):
+    i, j = gem.Index(extent=2), gem.Index(extent=2)
+    k = gem.Index(extent=extent)
+    a = gem.Indexed(gem.Literal(numpy.ones((2, extent))), (i, k))
+    b = gem.Indexed(gem.Literal(numpy.ones(2)), (i,))
+    c = gem.Indexed(gem.Literal(numpy.ones(2)), (j,))
+    expression = gem.IndexSum((a + b) * c + b * c, (k,))
+    arguments = (i, j)
+    monomials, = collect_monomials(
+        [expression], partial(_classify, frozenset(arguments)), arguments)
+    optimized = optimise_monomial_sum(monomials, arguments)
+    actual, = evaluate([gem.ComponentTensor(optimized, arguments)])
+    assert numpy.array_equal(actual.arr, numpy.full((2, 2), 3 * extent))
+
+
+@pytest.mark.parametrize("nrows,npoints,nargs", [(6, 3, 4), (4, 5, 3)])
+@pytest.mark.parametrize("distinct", ["tables", "weights", "neither"])
+def test_indirect_tabulation_costs_equivalent_bodies(nrows, npoints, nargs, distinct):
+    j, q = gem.Index(extent=nargs), gem.Index(extent=npoints)
+    tables = [gem.Literal(numpy.arange(nrows * npoints, dtype=float)
+                          .reshape(nrows, npoints) + offset)
+              for offset in (0, 1)]
+    weights = [gem.Literal(numpy.arange(1.0, npoints + 1) + offset)
+               for offset in (0, 1)]
+    terms = []
+    for number in range(2):
+        columns = gem.Literal(numpy.arange(nargs) + number, dtype=gem.uint_type)
+        row = gem.VariableIndex(gem.Indexed(columns, (j,)))
+        table = tables[number if distinct == "tables" else 0]
+        weight = weights[number if distinct == "weights" else 0]
+        terms.append(gem.IndexSum(
+            gem.Indexed(table, (row, q)) * gem.Indexed(weight, (q,)), (q,)))
+    expression = optimise.make_sum(terms)
+    optimized = optimise.tabulate_indirect_contractions(expression)
+    assert cost.estimate_cost((optimized,)) <= cost.estimate_cost((expression,))
+    if distinct == "neither":
+        assert cost.estimate_cost((optimized,))[0] < cost.estimate_cost((expression,))[0]
+    expected, actual = evaluate([gem.ComponentTensor(e, (j,))
+                                for e in (expression, optimized)])
+    assert numpy.allclose(actual.arr, expected.arr)

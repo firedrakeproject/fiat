@@ -6,6 +6,7 @@ import pytest
 import pprint
 
 from gem.interpreter import evaluate
+from gem.cost import estimate_cost, operation_count
 from gem.node import traversal
 from gem.driver import contraction
 from finat.physically_mapped import MappedTabulation, PhysicallyMappedElement
@@ -22,7 +23,7 @@ def test_numeric_zero_mapped_tabulation_is_sparse() -> None:
 
 
 def test_sparse_mapped_tabulation():
-    """Apply a sparse basis map at the cost of its nonzeros."""
+    """Check the values and arithmetic work of a padded sparse basis map."""
     coefficient = gem.Variable("coefficient", ())
     matrix = gem.ListTensor(np.asarray([
         [gem.Literal(1.0), gem.Zero(), coefficient],
@@ -39,11 +40,10 @@ def test_sparse_mapped_tabulation():
     i, j = gem.indices(2)
     mapped = contraction(gem.Indexed(mapped_tabulation[None], (i, j)))
 
-    # The three unit entries cost no multiplication, and the one remaining
-    # nonzero costs exactly one. Nothing is selected by a branch.
     products = [node for node in traversal((mapped,))
                 if isinstance(node, gem.Product)]
-    assert len(products) == 1
+    assert sum(map(operation_count, products)) == 8
+    assert estimate_cost((mapped,))[0] == 16
     assert not any(isinstance(node, gem.Conditional)
                    for node in traversal((mapped,)))
 
