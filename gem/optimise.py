@@ -807,6 +807,14 @@ def traverse_sum(expression, stop_at=None):
     return result
 
 
+def _distributed_indexsum_term(
+        term: Node, indices: tuple[Index, ...]) -> Node:
+    """Preserve a contraction domain after distributing one term."""
+    active = tuple(index for index in indices if index in term.free_indices)
+    missing = tuple(index for index in indices if index not in active)
+    return IndexSum(Product(term, index_space_literal(missing)), active)
+
+
 def distribute_sum(expr: Node, predicate: Callable[[Node], bool]) -> list[Node]:
     """Distribute selected sums through products and contractions.
 
@@ -852,9 +860,7 @@ def distribute_sum(expr: Node, predicate: Callable[[Node], bool]) -> list[Node]:
             elif isinstance(node, IndexSum):
                 body, = node.children
                 results[key] = [
-                    IndexSum(term, tuple(
-                        index for index in node.multiindex
-                        if index in term.free_indices))
+                    _distributed_indexsum_term(term, node.multiindex)
                     for term in results[id(body)]]
             else:  # Product
                 a, b = node.children
