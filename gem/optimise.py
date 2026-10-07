@@ -325,12 +325,15 @@ def select_expression(expressions, index):
     return ComponentTensor(selected, alpha)
 
 
-def delta_elimination(sum_indices, factors, index_replacer=None):
+def delta_elimination(sum_indices, factors, index_replacer=None, indirect_only=False):
     """IndexSum-Delta cancellation.
 
     :arg sum_indices: free indices for contractions
     :arg factors: product factors
     :kwarg index_replacer: MemoizerArg(filtered_replace_indices)
+    :kwarg indirect_only: only cancel a Delta that compares a
+                          :class:`~.VariableIndex`, leaving one between two
+                          plain indices to a later pass
 
     :returns: optimised (sum_indices, factors)
     """
@@ -347,9 +350,15 @@ def delta_elimination(sum_indices, factors, index_replacer=None):
         else:
             return Indexed(ComponentTensor(expression, (from_,)), (to_,))
 
-    delta_queue = [(f, index)
-                   for f in factors if isinstance(f, Delta)
-                   for index in (f.i, f.j) if index in sum_indices]
+    def cancellable(factors):
+        return [(f, index)
+                for f in factors if isinstance(f, Delta)
+                if not indirect_only
+                or isinstance(f.i, VariableIndex) or isinstance(f.j, VariableIndex)
+                for index in (f.i, f.j)
+                if index in sum_indices]
+
+    delta_queue = cancellable(factors)
     while delta_queue:
         delta, from_ = delta_queue[0]
         to_, = list({delta.i, delta.j} - {from_})
@@ -358,9 +367,7 @@ def delta_elimination(sum_indices, factors, index_replacer=None):
 
         factors = [substitute(f, from_, to_) for f in factors]
 
-        delta_queue = [(f, index)
-                       for f in factors if isinstance(f, Delta)
-                       for index in (f.i, f.j) if index in sum_indices]
+        delta_queue = cancellable(factors)
 
     return sum_indices, factors
 
@@ -440,6 +447,59 @@ def _independent_contractions(sum_indices, groups):
         else:
             rest.append(group)
     return list(subproblems.values()), rest
+
+
+def _contract(terms, sum_index):
+    """Sum one index out of a list of product terms.
+
+    :arg terms: list of product terms
+    :arg sum_index: the index to contract
+    :returns: (terms after the contraction, its flop count)
+    """
+    # Select terms that need to be part of the contraction
+    contract = [t for t in terms if sum_index in t.free_indices]
+    deferred = [t for t in terms if sum_index not in t.free_indices]
+
+    # Optimise associativity
+    product, flops = associate(Product, contract)
+    term = IndexSum(product, (sum_index,))
+    flops += numpy.prod([i.extent for i in product.free_indices], dtype=int)
+
+    # Replace the contracted terms with the result of the contraction.
+    return deferred + [term], flops
+
+
+def _contract_in_order(sum_indices, groups):
+    """Contract indices in the given order.
+
+    :returns: (GEM expression, its flop count)
+    """
+    terms = groups[:]
+    flops = 0
+    for sum_index in sum_indices:
+        terms, flops_ = _contract(terms, sum_index)
+        flops += flops_
+
+    # If some contraction indices were independent, then we may still
+    # have several terms at this point.
+    expression, flops_ = associate(Product, terms)
+    return expression, flops + flops_
+
+
+def _contract_greedily(sum_indices, groups):
+    """Contract indices cheapest first.
+
+    :returns: (GEM expression, its flop count)
+    """
+    remaining = list(sum_indices)
+    ordering = []
+    terms = groups[:]
+    while remaining:
+        sum_index = min(remaining, key=lambda index: _contract(terms, index)[1])
+        remaining.remove(sum_index)
+        ordering.append(sum_index)
+        terms, _ = _contract(terms, sum_index)
+    return _contract_in_order(ordering, groups)
 
 
 # Planning a tree visits 3**factors subset pairs, while searching the
@@ -556,35 +616,16 @@ def _sum_factorise_connected(sum_indices, groups):
         return _plan_contraction(sum_indices, groups)
 
     if len(sum_indices) > 6:
-        raise NotImplementedError("Too many indices for sum factorisation!")
+        # Exhaustive search costs a factorial in the number of indices.
+        expression, _ = _contract_greedily(sum_indices, groups)
+        return expression
 
     expression = None
     best_flops = numpy.inf
 
     # Consider all orderings of contraction indices
     for ordering in permutations(sum_indices):
-        terms = groups[:]
-        flops = 0
-        # Apply contraction index by index
-        for sum_index in ordering:
-            # Select terms that need to be part of the contraction
-            contract = [t for t in terms if sum_index in t.free_indices]
-            deferred = [t for t in terms if sum_index not in t.free_indices]
-
-            # Optimise associativity
-            product, flops_ = associate(Product, contract)
-            term = IndexSum(product, (sum_index,))
-            flops += flops_ + numpy.prod([i.extent for i in product.free_indices], dtype=int)
-
-            # Replace the contracted terms with the result of the
-            # contraction.
-            terms = deferred + [term]
-
-        # If some contraction indices were independent, then we may
-        # still have several terms at this point.
-        expr, flops_ = associate(Product, terms)
-        flops += flops_
-
+        expr, flops = _contract_in_order(ordering, groups)
         if flops < best_flops:
             expression = expr
             best_flops = flops
@@ -697,7 +738,7 @@ def _product_descent(expr):
     return ()
 
 
-def traverse_product(expression, stop_at=None, rename_map=None, index_replacer=None):
+def traverse_product(expression, stop_at=None, renamer=None, index_replacer=None):
     """Traverses a product tree and collects factors, also descending into
     tensor contractions (IndexSum).  The numerators of divisions are
     also broken up, but not the denominators.
@@ -707,16 +748,18 @@ def traverse_product(expression, stop_at=None, rename_map=None, index_replacer=N
                   and returns true for some subexpression, that
                   subexpression is not broken into further factors
                   even if it is a product-like expression.
-    :arg rename_map: an rename map for consistent index renaming
+    :arg renamer: Optional renamer from :py:func:`make_renamer`.  Pass one
+                  that has already seen the indices bound outside
+                  ``expression``, so that the contracted indices hoisted
+                  out of it stay distinct from those.
     :kwarg index_replacer: MemoizerArg(filtered_replace_indices)
 
     :returns: (sum_indices, terms)
               - sum_indices: list of indices to sum over
               - terms: list of product terms
     """
-    if rename_map is None:
-        rename_map = make_rename_map()
-    renamer = make_renamer(rename_map)
+    if renamer is None:
+        renamer = make_renamer(make_rename_map())
     if index_replacer is None:
         index_replacer = MemoizerArg(filtered_replace_indices)
 
@@ -924,19 +967,21 @@ def repeated_contractions(expression):
     return frozenset(expr for expr, count in counts.items() if count > 1)
 
 
-def _delta_axes(node: Node, self: Memoizer) -> frozenset:
-    """The axes compared by the Deltas below a node, including its own.
+def _indirect_delta_axes(node: Node, self: Memoizer) -> frozenset:
+    """The axes compared by the indirect Deltas below a node, including its own.
 
-    Memoising this over the DAG keeps the search for a cancellable Delta
-    linear, rather than re-walking the subtree at every enclosing
-    contraction.
+    An indirect Delta compares a :class:`~.VariableIndex`, and is the only
+    kind `cancel_nested_deltas` cancels.  Memoising this over the DAG keeps
+    the search for one linear, rather than re-walking the subtree at every
+    enclosing contraction.
 
     :arg node: a GEM expression
     :arg self: memoizer visiting the DAG
-    :returns: the indices some Delta at or below ``node`` compares
+    :returns: the indices some indirect Delta at or below ``node`` compares
     """
     axes = frozenset().union(*map(self, traversal_children(node)))
-    if isinstance(node, Delta):
+    if isinstance(node, Delta) and any(isinstance(i, VariableIndex)
+                                       for i in (node.i, node.j)):
         axes = axes | {node.i, node.j}
     return axes
 
@@ -1025,18 +1070,23 @@ def pull_back_indirect_delta(
 
 
 def cancel_nested_deltas(expression: Node) -> Node:
-    """Apply `delta_elimination` at every contraction of a whole DAG.
+    """Cancel the indirect Deltas at every contraction of a whole DAG.
 
     `delta_elimination` only inspects top-level product factors, so a Delta
     inside a preserved linear map is invisible to it.  Flattening the product
     tree first exposes it, and hoists the contractions it sits under so that
     substituting the Delta's variable index cannot capture them.
 
+    A Delta comparing a :class:`~.VariableIndex` is the only kind handled
+    here.  It is the only kind that has to be: nothing downstream can lower
+    one.  A Delta between two plain indices is left to monomial collection,
+    which cancels it knowing what the substitution costs there.
+
     :arg expression: root of a scalar GEM expression
     :returns: the expression with those Deltas cancelled
     """
     replacer = MemoizerArg(filtered_replace_indices)
-    delta_axes = Memoizer(_delta_axes)
+    delta_axes = Memoizer(_indirect_delta_axes)
 
     def visit(node, self):
         node = reuse_if_untouched(node, self)
@@ -1045,12 +1095,17 @@ def cancel_nested_deltas(expression: Node) -> Node:
         if not delta_axes(node).intersection(node.multiindex):
             return node
         sum_indices, factors = traverse_product(node, index_replacer=replacer)
-        sum_indices, factors = pull_back_indirect_delta(
+        cancelled, new_factors = pull_back_indirect_delta(
             sum_indices, factors, replacer)
-        sum_indices, factors = delta_elimination(
-            sum_indices, factors, index_replacer=replacer)
-        factors = [replacer(factor, ()) for factor in factors]
-        return IndexSum(make_product(factors), tuple(sum_indices))
+        cancelled, new_factors = delta_elimination(
+            cancelled, new_factors, index_replacer=replacer, indirect_only=True)
+        if tuple(cancelled) == tuple(sum_indices) and tuple(new_factors) == tuple(factors):
+            # Nothing cancelled, so rebuilding would only flatten the
+            # contractions this node nests into a single product, and sum
+            # factorisation needs them nested.
+            return node
+        factors = [replacer(factor, ()) for factor in new_factors]
+        return IndexSum(make_product(factors), tuple(cancelled))
 
     return Memoizer(visit)(expression)
 
@@ -1241,8 +1296,8 @@ def tabulate_indirect_contractions(expression: Node) -> Node:
     This function evaluates the contraction for each row, then reads those
     results through the map.  The rewrite is correct only if the map does not
     change with the contracted indices, and no other part of the contraction
-    uses the argument.  It is faster only if the map has more arguments than
-    the table has rows.
+    uses the argument.  It is faster only when the gathers that share a
+    tabulation have more arguments between them than the table has rows.
 
     :arg expression: the root of a scalar GEM expression
     :returns: the expression with each such contraction evaluated one time
@@ -1251,6 +1306,12 @@ def tabulate_indirect_contractions(expression: Node) -> Node:
     gathers = _indirect_gathers(expression)
     if not gathers:
         return expression
+
+    # Gathers that select the same rows with the same arguments read one
+    # tabulation, so they pay for it once between them.
+    readers = Counter((frozenset(gather.expression.free_indices), nrows)
+                      for gather, nrows in gathers.items())
+    row_indices = {}
 
     def rename(node, self, substitution):
         target, replacement = substitution
@@ -1270,12 +1331,15 @@ def tabulate_indirect_contractions(expression: Node) -> Node:
         for gather, nrows in gathers.items():
             arguments = frozenset(gather.expression.free_indices)
             if arguments <= free and arguments.isdisjoint(contracted):
-                saving = iteration_count(arguments) - nrows
+                sharing = readers[(arguments, nrows)]
+                saving = sharing * iteration_count(arguments) - nrows
                 if saving > 0:
                     candidates.append((saving, gather, arguments, nrows))
 
         for _, gather, arguments, nrows in sorted(candidates, key=lambda c: -c[0]):
-            row = Index(extent=nrows)
+            # One index per table, so that gathers sharing a tabulation build
+            # the same node and evaluate it one time.
+            row = row_indices.setdefault((arguments, nrows), Index(extent=nrows))
             per_row = MemoizerArg(rename)(body, (gather, row))
             # The body must reach the arguments only through this gather.
             if arguments.isdisjoint(per_row.free_indices):
