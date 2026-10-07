@@ -133,6 +133,13 @@ class TensorProductElement(FiniteElementBase):
         return result
 
     def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
+        if len(ps.point_sets) > 1:
+            # A union of points does not factor, so tabulate on each of its
+            # point sets, where the product structure survives to be sum
+            # factorised.
+            return self._stack_tabulations(order, ps, entity,
+                                           coordinate_mapping=coordinate_mapping)
+
         entities = self._factor_entity(entity)
         entity_dim, _ = zip(*entities)
 
