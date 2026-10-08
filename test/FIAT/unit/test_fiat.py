@@ -51,6 +51,7 @@ from FIAT.hu_zhang import HuZhang                               # noqa: F401
 from FIAT.bernardi_raugel import BernardiRaugel                 # noqa: F401
 from FIAT.argyris import Argyris                                # noqa: F401
 from FIAT.hermite import Hermite                                # noqa: F401
+from FIAT.walkington import Walkington                          # noqa: F401
 from FIAT.morley import Morley                                  # noqa: F401
 from FIAT.hct import HsiehCloughTocher                          # noqa: F401
 from FIAT.c2_elements import AlfeldC2, BrambleZlamalC2          # noqa: F401
@@ -358,6 +359,8 @@ elements = [
     "Hermite(T)",
     "Hermite(S)",
     "Hermite(T, reduced=True)",
+    "Walkington(S)",
+    "Walkington(S, reduced=True)",
     "Morley(T)",
     "Morley(S)",
     "BernardiRaugel(T)",

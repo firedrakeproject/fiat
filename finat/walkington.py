@@ -26,3 +26,21 @@ class Walkington(PhysicallyMappedElement, ScalarFiatElement):
 
     def space_dimension(self):
         return 45
+
+
+class ReducedWalkington(PhysicallyMappedElement, ScalarFiatElement):
+    def __init__(self, cell, degree=5):
+        cite("Walkington2010")
+        super().__init__(FIAT.Walkington(cell, degree=degree, reduced=True))
+
+        reduced_dofs = deepcopy(self._element.entity_dofs())
+        sd = cell.get_spatial_dimension()
+        for entity in reduced_dofs[sd - 1]:
+            reduced_dofs[sd - 1][entity] = []
+        self._entity_dofs = reduced_dofs
+
+    def entity_dofs(self):
+        return self._entity_dofs
+
+    def space_dimension(self):
+        return 40

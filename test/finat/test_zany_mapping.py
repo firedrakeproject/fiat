@@ -161,6 +161,7 @@ def test_rotated_bernardi_raugel(ref_to_phys):
                          finat.Morley,
                          finat.Hermite,
                          finat.Walkington,
+                         finat.ReducedWalkington,
                          ])
 def test_C1_tetrahedron(ref_to_phys, element):
     check_zany_mapping(element, ref_to_phys[3])
