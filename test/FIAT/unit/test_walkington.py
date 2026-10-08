@@ -100,3 +100,21 @@ def test_walkington_space(cell):
     # Test that the reduced space includes all quartics
     dimP4 = polynomial_dimension(cell, degree-1)
     assert span_greater_equal(V_tab[(0,)*sd][:space_dim], P_tab[(0,)*sd][:dimP4])
+
+
+def test_reduced_walkington_space(cell):
+    fe = Walkington(cell, 5, reduced=True)
+    V = fe.get_nodal_basis()
+    ref_complex = V.ref_el
+    pts = []
+    top = ref_complex.topology
+    for dim in top:
+        for entity in top[dim]:
+            pts.extend(ref_complex.make_points(dim, entity, 5))
+    V_tab = V.tabulate(pts)
+
+    P = ONPolynomialSet(cell, 3)
+    P_tab = P.tabulate(pts)
+
+    sd = cell.get_spatial_dimension()
+    assert span_greater_equal(V_tab[(0,)*sd][:40], P_tab[(0,)*sd])

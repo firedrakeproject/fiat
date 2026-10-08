@@ -15,3 +15,12 @@ class Walkington(PhysicallyMappedElement, ScalarFiatElement):
     # have a 45 DOF element.
     def space_dimension(self):
         return 45
+
+
+class ReducedWalkington(PhysicallyMappedElement, ScalarFiatElement):
+    def __init__(self, cell, degree=5):
+        cite("Walkington2010")
+        super().__init__(FIAT.Walkington(cell, degree=degree, reduced=True))
+
+    def space_dimension(self):
+        return 40
