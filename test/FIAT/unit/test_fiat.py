@@ -51,6 +51,7 @@ from FIAT.hu_zhang import HuZhang                               # noqa: F401
 from FIAT.bernardi_raugel import BernardiRaugel                 # noqa: F401
 from FIAT.argyris import Argyris                                # noqa: F401
 from FIAT.hermite import Hermite                                # noqa: F401
+from FIAT.walkington import Walkington                          # noqa: F401
 from FIAT.morley import Morley                                  # noqa: F401
 from FIAT.hct import HsiehCloughTocher                          # noqa: F401
 from FIAT.c2_elements import AlfeldC2, BrambleZlamalC2          # noqa: F401
@@ -357,9 +358,13 @@ elements = [
     "Hermite(I, 4)",
     "Hermite(T)",
     "Hermite(S)",
+    "Hermite(T, reduced=True)",
+    "Walkington(S)",
+    "Walkington(S, reduced=True)",
     "Morley(T)",
     "Morley(S)",
     "BernardiRaugel(T)",
+    "BernardiRaugel(T, rotated=True)",
     "BernardiRaugel(S)",
     "MardalTaiWinther(T, 1)",
     "MardalTaiWinther(S, 1)",
@@ -442,6 +447,20 @@ elements = [
     xfail_impl("FlattenedDimensions(TensorProductElement(FlattenedDimensions(TensorProductElement(Lagrange(I, 1), Lagrange(I, 1))), Lagrange(I, 1)))"),
     xfail_impl("FlattenedDimensions(TensorProductElement(FlattenedDimensions(TensorProductElement(Lagrange(I, 2), Lagrange(I, 2))), Lagrange(I, 2)))"),
 ]
+
+
+def test_rotated_bernardi_raugel_has_linear_normal_traces():
+    """The rotated element has linear normal traces on every edge."""
+    element = BernardiRaugel(T, rotated=True)
+    vertices = T.get_vertices()
+    for edge, (v0, v1) in T.get_topology()[1].items():
+        midpoint = (np.asarray(vertices[v0]) + vertices[v1]) / 2
+        points = np.asarray([vertices[v0], midpoint, vertices[v1]])
+        values = element.tabulate(0, points)[(0, 0)][:9]
+        normal = T.compute_normal(edge)
+        normal /= np.linalg.norm(normal)
+        traces = np.einsum("bci,c->bi", values, normal)
+        assert np.allclose(traces[:, 1], (traces[:, 0] + traces[:, 2]) / 2)
 
 
 @pytest.mark.parametrize('element', elements)

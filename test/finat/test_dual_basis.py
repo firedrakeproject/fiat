@@ -8,10 +8,11 @@ import ufl
 import finat.ufl
 from finat.element_factory import create_element
 from finat.enriched import as_enriched
-from finat.point_set import UnionPointSet
+from finat.point_set import AbstractPointSet, UnionPointSet
 from finat.quadrature import QuadratureRule
 from finat.quadrature_element import QuadratureElement
 from gem.interpreter import evaluate
+from gem.unconcatenate import unconcatenate
 from FIAT import ufc_simplex
 
 
@@ -50,11 +51,28 @@ def check_nodal(element):
         table = element.basis_evaluation(0, ps)[(0,) * dim]
         return gem.ComponentTensor(gem.Indexed(table, j + zeta), zeta)
 
-    expr, point_indices, indices = element.dual_evaluation(tabulate)
-    if point_indices:
-        expr = gem.IndexSum(expr, point_indices)
-    result, = evaluate([gem.ComponentTensor(expr, indices + j)])
+    expr, _, indices = element.dual_evaluation(tabulate)
     n = element.space_dimension()
+    strides = tuple(
+        numpy.prod(tuple(index.extent for index in indices[offset + 1:]), dtype=int)
+        for offset in range(len(indices))
+    )
+    variable = gem.FlexiblyIndexed(
+        gem.Variable("A", (n,)), ((0, tuple(zip(indices, strides))),)
+    )
+    blocks = []
+    for variable, evaluation in unconcatenate([(variable, expr)]):
+        point_indices = tuple(
+            index for index in evaluation.free_indices
+            if index not in variable.free_indices and index not in j
+        )
+        blocks.append(gem.ComponentTensor(
+            gem.IndexSum(evaluation, point_indices),
+            variable.index_ordering(),
+        ))
+    i = gem.Index(extent=n)
+    evaluation = gem.Indexed(gem.Concatenate(*blocks), (i,))
+    result, = evaluate([gem.ComponentTensor(evaluation, (i,) + j)])
     assert numpy.allclose(result.arr.reshape(n, n), numpy.eye(n))
 
 
@@ -63,10 +81,8 @@ def check_dual_basis(element):
     Q, x = element.dual_basis
     assert Q.shape == element.index_shape + element.value_shape
     assert set(Q.free_indices) == set(x.indices)
-    summands = as_enriched(element)
-    if summands is not None:
-        assert len(x.points) == sum(len(e.dual_basis[1].points)
-                                    for e in summands._summands)
+    assert len(x.points) == sum(len(e.dual_basis[1].points)
+                                for e in element.summands)
 
     i = element.get_indices()
     j = element.get_indices()
@@ -98,6 +114,29 @@ def test_enriched_element_dual_basis():
 
     assert isinstance(enriched.dual_basis[1], UnionPointSet)
     check_dual_basis(enriched)
+
+
+def test_mixed_enriched_element_dual_evaluation() -> None:
+    """Dual-evaluate a mixed NCE x Q element on an extruded cell."""
+    cell = ufl.TensorProductCell(ufl.quadrilateral, ufl.interval)
+    nce = create_element(finat.ufl.FiniteElement("NCE", cell, 1))
+    q = create_element(finat.ufl.FiniteElement("Q", cell, 1))
+    mixed = finat.MixedElement([nce, q])
+
+    basis_indices = mixed.get_indices()
+    value_indices = mixed.get_value_indices()
+    dimension = mixed.cell.get_spatial_dimension()
+
+    def tabulate(points: AbstractPointSet) -> gem.Node:
+        table = mixed.basis_evaluation(0, points)[(0,) * dimension]
+        return gem.ComponentTensor(
+            gem.Indexed(table, basis_indices + value_indices),
+            value_indices,
+        )
+
+    _, point_indices, _ = mixed.dual_evaluation(tabulate)
+    assert point_indices
+    check_nodal(mixed)
 
 
 def test_quadrature_element_on_union_of_points():
