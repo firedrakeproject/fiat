@@ -69,9 +69,6 @@ class WalkingtonDualSet(DualSet):
         Q_face, phis = make_projected_bubble_moments(ref_face, degree-2)
         phi = phis[-1]
 
-        extra_entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
-        extra_nodes = []
-
         for face in sorted(top[2]):
             cur = len(nodes)
             thats = ref_el.compute_tangents(sd-1, face)
@@ -89,12 +86,6 @@ class WalkingtonDualSet(DualSet):
             nodes.extend(IntegralMomentOfDerivative(ref_el, Q, phi, nface, t) for t in thats)
             entity_ids[2][face].extend(range(cur, len(nodes)))
 
-            cur = len(extra_nodes)
-            extra_nodes.extend(IntegralMomentOfDerivative(ref_el, Q, phi, thats[i], thats[j])
-                               for i in range(2) for j in range(i, 2))
-            extra_entity_ids[2][face].extend(range(cur, len(extra_nodes)))
-
-        self.nodal_completion = DualSet(extra_nodes, ref_el, extra_entity_ids)
         super().__init__(nodes, ref_el, entity_ids)
 
 
