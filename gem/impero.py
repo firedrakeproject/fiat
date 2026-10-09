@@ -109,7 +109,8 @@ class Return(Terminal):
         self.expression = expression
 
     def loop_shape(self, free_indices):
-        return free_indices(self.variable)
+        """ Indices can be in either variable or expression """
+        return tuple(set(free_indices(self.variable) + free_indices(self.expression)))
 
 
 class ReturnAccumulate(Terminal):
