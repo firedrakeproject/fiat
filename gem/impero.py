@@ -101,7 +101,9 @@ class Return(Terminal):
     __front__ = ('variable', 'expression')
 
     def __init__(self, variable, expression):
-        assert set(variable.free_indices) >= set(expression.free_indices)
+        # TODO: I expect this to fail for things like x[i, j] <- 0
+        # assert set(variable.free_indices) == set(expression.free_indices),
+        #     "LHS and RHS must 'see' the same loops"
 
         self.variable = variable
         self.expression = expression

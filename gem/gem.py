@@ -820,7 +820,10 @@ class Indexed(AbstractIndexed):
                 new_indices.extend(i.expression.free_indices)
         self.free_indices = unique(aggregate.free_indices + tuple(new_indices))
 
-        return self
+        # if "idat_4" in repr(aggregate):
+        #     print(multiindex) # going to have 3 elements, final 2 duplicate
+        #     breakpoint()
+        return self # at final end of function
 
     def index_ordering(self):
         """Running indices in the order of indexing in this node."""
@@ -838,7 +841,7 @@ class Indexed(AbstractIndexed):
         return agg
 
     def __str__(self) -> str:
-        return f"{self.aggregate}{', '.join(map(str, self.multiindex))}"
+        return f"{self.aggregate}[{', '.join(map(str, self.multiindex))}]"
 
 
 class FlexiblyIndexed(AbstractIndexed):
