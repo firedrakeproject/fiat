@@ -36,6 +36,27 @@ def test_negative_polynomial_dimension(dim):
     assert expansions.polynomial_dimension(cell, -1) == 0
 
 
+@pytest.mark.parametrize("shape", [(), (2,), (2, 2)])
+def test_polynomial_set_recombine(shape: tuple) -> None:
+    cell = reference_element.default_simplex(2)
+    poly_set = polynomial_set.ONPolynomialSet(cell, 1, shape=shape)
+    coefficients = numpy.arange(2 * len(poly_set), dtype=float).reshape(2, len(poly_set))
+
+    recombined = poly_set.recombine(coefficients)
+    expected = numpy.tensordot(coefficients, poly_set.get_coeffs(), axes=(1, 0))
+
+    assert recombined.get_shape() == shape
+    assert numpy.array_equal(recombined.get_coeffs(), expected)
+
+
+def test_polynomial_set_recombine_requires_one_column_per_polynomial() -> None:
+    cell = reference_element.default_simplex(2)
+    poly_set = polynomial_set.ONPolynomialSet(cell, 1)
+
+    with pytest.raises(ValueError, match="one column per polynomial"):
+        poly_set.recombine(numpy.eye(len(poly_set) + 1))
+
+
 @pytest.mark.parametrize("degree", [10])
 def test_expansion_values(cell, degree):
     dim = cell.get_spatial_dimension()

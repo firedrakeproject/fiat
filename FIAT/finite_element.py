@@ -13,6 +13,7 @@ import scipy
 import warnings
 
 from FIAT.dual_set import DualSet
+from FIAT.polynomial_set import PolynomialSet
 from FIAT.quadrature_schemes import create_quadrature
 
 
@@ -161,7 +162,11 @@ class CiarletElement(FiniteElement):
             dual = dual.recombine(dual_coeffs)
         else:
             new_shp = new_coeffs_flat.shape[:1] + shp[1:]
-            poly_set = poly_set.recombine(new_coeffs_flat.reshape(new_shp))
+            poly_set = PolynomialSet(poly_set.get_reference_element(),
+                                     poly_set.get_degree(),
+                                     poly_set.get_embedded_degree(),
+                                     poly_set.get_expansion_set(),
+                                     new_coeffs_flat.reshape(new_shp))
 
         super().__init__(ref_el, dual, order, formdegree, mapping, ref_complex)
         self.poly_set = poly_set

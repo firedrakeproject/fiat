@@ -25,11 +25,12 @@ def make_projected_bubble_moments(ref_el, degree, interpolant_deg=None, quad_sch
     Q = parse_quadrature_scheme(ref_el, degree + interpolant_deg, quad_scheme)
     B = make_bubbles(ref_el, degree, codim=codim)
     bubbles = B.tabulate(Q.get_points())[(0,) * sd]
-
     if degree == 1:
         mean = numpy.dot(bubbles, Q.get_weights()) / sum(Q.get_weights())
         bubbles -= mean[:, None]
         bubbles /= numpy.sqrt(numpy.dot(bubbles**2, Q.get_weights()))[:, None]
+        if codim == sd:
+            bubbles *= numpy.sqrt(sd + 2)
         return Q, bubbles
 
     num_cells = len(ref_el.get_topology()[sd])

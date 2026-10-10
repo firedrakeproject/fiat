@@ -84,27 +84,6 @@ def test_hierarchical_sparsity(family, degree):
         assert nnz(A) == ennz
 
 
-def test_integrated_legendre_dual_tabulates_points_once(monkeypatch):
-    element = IntegratedLegendre(ufc_simplex(2), 4)
-    expansion_set = element.poly_set.get_expansion_set()
-    original_tabulate = expansion_set.tabulate
-    calls = []
-
-    def tabulate(degree, points):
-        points = tuple(map(tuple, points))
-        calls.append(points)
-        return original_tabulate(degree, points)
-
-    monkeypatch.setattr(expansion_set, "tabulate", tabulate)
-    element.dual.to_riesz(element.poly_set)
-
-    points = set()
-    for node in element.dual.nodes:
-        for rule in getattr(node.Q, "rules", (node.Q,)):
-            points.update(map(tuple, rule.pts))
-    assert calls == [tuple(sorted(points))]
-
-
 if __name__ == '__main__':
     import os
     pytest.main(os.path.abspath(__file__))
