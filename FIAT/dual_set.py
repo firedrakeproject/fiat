@@ -15,6 +15,32 @@ from FIAT.reference_element import compute_unflattening_map
 
 
 class DualSet:
+    """Represent a set of functionals and their assignment to cell entities.
+
+    Parameters
+    ----------
+    nodes : sequence of Functional
+        Functionals in the dual set, in local degree-of-freedom order.
+    ref_el : Cell
+        Reference element or simplicial complex on which the functionals are
+        defined.
+    entity_ids : dict
+        Mapping from entity dimension and entity number to the indices of the
+        functionals assigned to that entity.
+    entity_permutations : dict, optional
+        Mapping from entity dimension, entity number, and orientation to the
+        permutation of local DoFs.
+    coeffs : array_like, optional
+        Square matrix defining linear combinations of the functionals. Its
+        rows give the coefficients for the recombined functionals.
+
+    Raises
+    ------
+    ValueError
+        If ``coeffs`` is not a square matrix with one row and column per
+        functional.
+    """
+
     def __init__(self, nodes, ref_el, entity_ids, entity_permutations=None,
                  coeffs=None):
         if ref_el.get_dimension() != max(entity_ids):

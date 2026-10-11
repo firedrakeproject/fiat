@@ -127,6 +127,39 @@ class CiarletElement(FiniteElement):
 
     Elements derived from this class are nodal finite elements, with a nodal
     basis generated from polynomials encoded in a `PolynomialSet`.
+
+    The polynomial basis is recombined so that it is dual to the supplied
+    functionals. When ``recombine_dual`` is true, the functionals are
+    recombined instead, leaving the polynomial basis unchanged.
+
+    Parameters
+    ----------
+    poly_set : PolynomialSet
+        Polynomial space and expansion basis used to construct the finite
+        element.
+    dual : DualSet
+        Functionals defining the degrees of freedom.
+    order : int
+        Element order, which may differ from the polynomial degree.
+    formdegree : int or None, optional
+        Degree of the associated differential form, if any.
+    mapping : str or None, optional
+        Mapping used to transform basis functions from the reference element
+        to a physical element.
+    ref_complex : Cell or None, optional
+        Reference complex on which the polynomial set is defined. Defaults to
+        the reference element of ``poly_set``.
+    recombine_dual : bool, optional
+        If true, recombine the functionals to be dual to the supplied
+        polynomial basis. Otherwise, recombine the polynomial basis to be dual
+        to the supplied functionals.
+
+    Raises
+    ------
+    ValueError
+        If the polynomial space and dual set have different dimensions.
+    numpy.linalg.LinAlgError
+        If the generalized Vandermonde matrix is singular.
     """
 
     def __init__(self, poly_set, dual, order, formdegree=None, mapping="affine",
