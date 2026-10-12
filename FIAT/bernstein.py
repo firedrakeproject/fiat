@@ -6,7 +6,6 @@
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
-import itertools
 import math
 import numpy
 import scipy.linalg
@@ -16,7 +15,7 @@ from FIAT.expansions import ExpansionSet
 from FIAT.finite_element import CiarletElement
 from FIAT.lagrange import LagrangeDualSet
 from FIAT.polynomial_set import PolynomialSet, mis
-from FIAT.reference_element import multiindex_equal
+from FIAT.reference_element import Cell, multiindex_equal
 
 
 class BernsteinExpansionSet(ExpansionSet):
@@ -216,62 +215,50 @@ def _domain_points(ref_el, degree):
     return points
 
 
-def _default_entity_ids(ref_el, degree):
-    """Construct the default Bernstein basis entity ordering."""
-    topology = ref_el.get_topology()
-    candidates = [(key, local_points[0][1])
-                  for key, local_points in _domain_points(ref_el, degree).items()]
-    order = sorted(
-        range(len(candidates)),
-        key=lambda i: tuple(sorted(candidates[i][1], reverse=True)),
-    )
-    row_of_candidate = {
-        candidates[candidate][0]: row for row, candidate in enumerate(order)
-    }
-    entity_ids = {dim: {entity: [] for entity in topology[dim]} for dim in topology}
-    for entity_dim, entities in topology.items():
-        for entity in entities:
-            for beta in multiindex_equal(entity_dim + 1, degree, imin=1):
-                candidate = (entity_dim, entity, beta)
-                entity_ids[entity_dim][entity].append(row_of_candidate[candidate])
-    return entity_ids
-
-
-def _c0_coefficients(ref_el, degree, entity_ids=None):
-    """Construct C0 Bernstein coefficients from entity multiindices."""
-    sd = ref_el.get_spatial_dimension()
-    topology = ref_el.get_topology()
-    if degree == 0:
-        coeffs = numpy.zeros((1, len(topology[sd])))
-        coeffs[0] = 1
-        return coeffs
-    local_alphas = list(multiindex_equal(sd + 1, degree))
-    local_alpha_ids = {alpha: i for i, alpha in enumerate(local_alphas)}
-    num_cells = len(topology[sd])
-    num_local = len(local_alphas)
+def _domain_point_rows(ref_el: Cell, degree: int, domain_points: dict,
+                       entity_ids: dict | None = None) -> dict:
+    """Number domain points in the default or supplied entity ordering."""
     if entity_ids is None:
-        entity_ids = _default_entity_ids(ref_el, degree)
+        ordered = sorted(domain_points,
+                         key=lambda key: tuple(sorted(domain_points[key][0][1], reverse=True)))
+        return {key: row for row, key in enumerate(ordered)}
 
-    num_members = sum(len(ids) for entities in entity_ids.values() for ids in entities.values())
-    coeffs = numpy.zeros((num_members, num_cells * num_local))
-
-    for dim, entities in topology.items():
-        entity_alphas = list(multiindex_equal(dim + 1, degree, imin=1))
-        for entity, entity_vertices in entities.items():
+    rows = {}
+    for dim, entities in ref_el.get_topology().items():
+        betas = list(multiindex_equal(dim + 1, degree, imin=1))
+        for entity in entities:
+            keys = [(dim, entity, beta) for beta in betas
+                    if (dim, entity, beta) in domain_points]
             ids = entity_ids[dim][entity]
-            if len(ids) != len(entity_alphas):
-                raise ValueError(f"Expected {len(entity_alphas)} basis functions on entity {(dim, entity)}, "
+            if len(ids) != len(keys):
+                raise ValueError(f"Expected {len(keys)} basis functions on entity {(dim, entity)}, "
                                  f"but got {len(ids)}")
-            for row, alpha in zip(ids, entity_alphas):
-                for cell, cell_vertices in topology[sd].items():
-                    if not set(entity_vertices).issubset(cell_vertices):
-                        continue
-                    local_alpha = tuple(
-                        alpha[entity_vertices.index(vertex)] if vertex in entity_vertices else 0
-                        for vertex in cell_vertices
-                    )
-                    coeffs[row, cell * num_local + local_alpha_ids[local_alpha]] = 1
+            rows.update(zip(keys, ids))
+    return rows
+
+
+def _assemble_c0_coefficients(ref_el: Cell, degree: int, domain_points: dict,
+                              rows: dict) -> numpy.ndarray:
+    """Assemble the C0 basis from its local Bernstein supports."""
+    sd = ref_el.get_spatial_dimension()
+    local_alpha_ids = {alpha: i for i, alpha in enumerate(multiindex_equal(sd + 1, degree))}
+    num_local = len(local_alpha_ids)
+    num_cells = len(ref_el.get_topology()[sd])
+    coeffs = numpy.zeros((len(rows), num_cells * num_local))
+    for key, local_points in domain_points.items():
+        for cell, alpha in local_points:
+            coeffs[rows[key], cell * num_local + local_alpha_ids[alpha]] = 1
     return coeffs
+
+
+def _c0_coefficients(ref_el: Cell, degree: int, entity_ids: dict | None = None) -> numpy.ndarray:
+    """Construct C0 Bernstein coefficients from entity multiindices."""
+    if degree == 0:
+        sd = ref_el.get_spatial_dimension()
+        return numpy.ones((1, len(ref_el.get_topology()[sd])))
+    domain_points = _domain_points(ref_el, degree)
+    rows = _domain_point_rows(ref_el, degree, domain_points, entity_ids)
+    return _assemble_c0_coefficients(ref_el, degree, domain_points, rows)
 
 
 def _ck_coefficients(ref_el, degree, order, vorder, entity_ids=None):
@@ -331,46 +318,17 @@ def _ck_coefficients(ref_el, degree, order, vorder, entity_ids=None):
                 or in_ball_determining_set(cell, alpha))
 
     domain_points = _domain_points(ref_el, degree)
-    free = {key for key, local_points in domain_points.items()
-            if any(in_determining_set(*point) for point in local_points)}
-
-    def entity_multiindices(dim):
-        return list(multiindex_equal(dim + 1, degree, imin=1))
-
-    if entity_ids is None:
-        c0_ids = _default_entity_ids(ref_el, degree)
-        free_rows = sorted(row for dim, entities in c0_ids.items()
-                           for entity, ids in entities.items()
-                           for beta, row in zip(entity_multiindices(dim), ids)
-                           if (dim, entity, beta) in free)
-        renumbering = {row: i for i, row in enumerate(free_rows)}
-        entity_ids = {dim: {entity: [renumbering[row]
-                                     for beta, row in zip(entity_multiindices(dim), ids)
-                                     if (dim, entity, beta) in free]
-                            for entity, ids in entities.items()}
-                      for dim, entities in c0_ids.items()}
-
-    # Number the C0 functions outside the determining set after the determining set
-    num_free = sum(len(ids) for entities in entity_ids.values() for ids in entities.values())
-    dependent_rows = itertools.count(num_free)
-    c0_ids = {dim: {} for dim in topology}
-    for dim, entities in topology.items():
-        betas = entity_multiindices(dim)
-        for entity in entities:
-            ids = entity_ids[dim][entity]
-            num_dofs = sum((dim, entity, beta) in free for beta in betas)
-            if len(ids) != num_dofs:
-                raise ValueError(f"Expected {num_dofs} basis functions on entity {(dim, entity)}, "
-                                 f"but got {len(ids)}")
-            ids = iter(ids)
-            c0_ids[dim][entity] = [next(ids) if (dim, entity, beta) in free else next(dependent_rows)
-                                   for beta in betas]
-    c0_coeffs = _c0_coefficients(ref_el, degree, c0_ids)
-
-    row_of_point = {}
-    for (dim, entity, beta), local_points in domain_points.items():
-        row = c0_ids[dim][entity][entity_multiindices(dim).index(beta)]
-        row_of_point.update(dict.fromkeys(local_points, row))
+    free_points = {key: local_points for key, local_points in domain_points.items()
+                   if any(in_determining_set(*point) for point in local_points)}
+    rows = _domain_point_rows(ref_el, degree, free_points, entity_ids)
+    num_free = len(rows)
+    for key in domain_points:
+        if key not in rows:
+            rows[key] = len(rows)
+    c0_coeffs = _assemble_c0_coefficients(ref_el, degree, domain_points, rows)
+    row_of_point = {point: rows[key]
+                    for key, local_points in domain_points.items()
+                    for point in local_points}
 
     # On the ball of radius vorder around the interior vertex, the spline is a
     # polynomial of degree vorder. Its Bernstein coefficients on each cell are
