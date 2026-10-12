@@ -11,7 +11,7 @@ def dual_evaluation(element: FiniteElement,
                            poly_set.get_coeffs(), axes=([-1], [-1]))
 
 
-def test_restricted_dual_evaluation() -> None:
+def test_restricted_dual_evaluation():
     """Restricting a dual evaluation gives the same result as evaluating the restriction."""
     element = IntegratedLegendre(ufc_simplex(2), 3)
     indices = element.get_dual_set().get_indices("facet")
@@ -25,7 +25,7 @@ def test_restricted_dual_evaluation() -> None:
                                   full_evaluation[indices], atol=1e-14)
 
 
-def test_restricted_tabulate() -> None:
+def test_restricted_tabulate():
     """Restricted element tabulation selects the corresponding full basis functions."""
     element = IntegratedLegendre(ufc_simplex(2), 3)
     indices = element.get_dual_set().get_indices("facet")
@@ -38,7 +38,7 @@ def test_restricted_tabulate() -> None:
     numpy.testing.assert_allclose(restricted_values, full_values[indices], atol=1e-14)
 
 
-def test_restricted_dual_evaluation_drops_roundoff_source_functionals() -> None:
+def test_restricted_dual_evaluation_drops_roundoff_source_functionals():
     """Facet duals do not evaluate the interior basis functions."""
     element = IntegratedLegendre(ufc_simplex(1), 5)
     restricted = RestrictedElement(element, restriction_domain="facet")
