@@ -20,9 +20,9 @@ class RestrictedDualSet(DualSet):
         coeffs = dual.get_coeffs()
         if coeffs is not None:
             coeffs = coeffs[indices, :]
-            active_nodes = numpy.any(numpy.abs(coeffs) > 1E-12, axis=0)
-            coeffs = coeffs[:, active_nodes]
-            nodes = [node for node, active in zip(nodes_old, active_nodes) if active]
+            coeffs[numpy.abs(coeffs) <= 1E-12] = 0
+            # Preserve the source-node layout that the quadrature element uses for entity numbering.
+            nodes = nodes_old
         else:
             nodes = [nodes_old[i] for i in indices]
         entity_ids = {}

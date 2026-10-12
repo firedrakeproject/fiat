@@ -165,6 +165,18 @@ def test_restricted_integrated_legendre_dual_basis() -> None:
     check_dual_basis(element)
 
 
+def test_restricted_integrated_legendre_quadrature_entity_numbering() -> None:
+    cell = ufc_simplex(2)
+    element = finat.RestrictedElement(
+        finat.IntegratedLegendre(cell, 3), restriction_domain="interior")
+    _, points = element.dual_basis
+    rule = QuadratureRule(points, numpy.full(len(points.points), numpy.nan), ref_el=cell)
+    quadrature = QuadratureElement(cell, rule)
+
+    entity_dofs = quadrature.entity_dofs()
+    assert [len(entity_dofs[0][entity]) for entity in sorted(entity_dofs[0])] == [1, 1, 1]
+
+
 def test_enriched_element_dual_evaluation():
     enriched = restricted_lagrange_sum(ufc_simplex(2))
 
