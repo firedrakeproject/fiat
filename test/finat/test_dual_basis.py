@@ -8,7 +8,7 @@ import ufl
 import finat.ufl
 from finat.element_factory import create_element
 from finat.enriched import as_enriched
-from finat.point_set import UnionPointSet
+from finat.point_set import PointSet, UnionPointSet
 from finat.quadrature import QuadratureRule
 from finat.quadrature_element import QuadratureElement
 from gem.interpreter import evaluate
@@ -100,7 +100,8 @@ def test_enriched_element_dual_basis():
     check_dual_basis(enriched)
 
 
-def test_quadrature_element_on_union_of_points():
+@pytest.mark.parametrize("repeated", (False, True))
+def test_quadrature_element_on_union_of_points(repeated: bool) -> None:
     # Firedrake interpolates through a quadrature space on the points of the
     # target's dual basis, which for a direct sum is a union.  That element
     # has to evaluate on each point set of the union, just as the sum does.
@@ -108,6 +109,8 @@ def test_quadrature_element_on_union_of_points():
     enriched = restricted_lagrange_sum(cell)
 
     _, ps = enriched.dual_basis
+    if repeated:
+        ps = UnionPointSet([ps, PointSet(ps.point_sets[0].points.copy())])
     # The weights are not used, this quadrature scheme is not for integration.
     rule = QuadratureRule(ps, numpy.full(len(ps.points), numpy.nan), ref_el=cell)
     element = QuadratureElement(cell, rule)

@@ -4,8 +4,6 @@
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
-import numpy
-
 from FIAT.dual_set import DualSet
 from FIAT.finite_element import CiarletElement, FiniteElement
 
@@ -21,22 +19,7 @@ class RestrictedDualSet(DualSet):
         source = dual._dual if isinstance(dual, RestrictedDualSet) else dual
         if coeffs is not None:
             coeffs = coeffs[indices, :]
-            coeffs[numpy.abs(coeffs) <= 1E-12] = 0
-            source_indices = {node: i for i, node in enumerate(nodes_old)}
-            source_nodes = source.get_nodes()
-            active_nodes = numpy.any(coeffs != 0, axis=0)
-            # Keep the same local source indices on every entity of a dimension.
-            for entities in source.get_entity_ids().values():
-                local_indices = {j for dofs in entities.values()
-                                 for j, dof in enumerate(dofs)
-                                 if source_nodes[dof] in source_indices
-                                 and active_nodes[source_indices[source_nodes[dof]]]}
-                for dofs in entities.values():
-                    for j, dof in enumerate(dofs):
-                        if source_nodes[dof] in source_indices and j in local_indices:
-                            active_nodes[source_indices[source_nodes[dof]]] = True
-            coeffs = coeffs[:, active_nodes]
-            nodes = [node for node, active in zip(nodes_old, active_nodes) if active]
+            nodes = nodes_old
         else:
             nodes = [nodes_old[i] for i in indices]
         entity_ids = {}
