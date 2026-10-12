@@ -592,6 +592,10 @@ class Comparison(Scalar):
         self.children = a, b
         self.dtype = None  # Do not inherit dtype from children.
 
+    @property
+    def free_indices(self):
+        return unique(chain.from_iterable(c.free_indices for c in self.children))
+
 
 class LogicalNot(Scalar):
     __slots__ = ('children',)
@@ -671,7 +675,9 @@ class Index(IndexBase):
         # Set extent, check for consistency
         if self.extent is None:
             self.extent = value
-        elif self.extent != value:
+        if isinstance(self.extent, Literal):
+            value = as_gem_uint(value)
+        if self.extent != value:
             raise ValueError("Inconsistent index extents!")
 
     def __eq__(self, other):
@@ -704,6 +710,11 @@ class VariableIndex(IndexBase):
     kernel, but whose value is not known at compile time."""
 
     __slots__ = ('expression', 'count')
+
+    def __new__(cls, expression):
+        if isinstance(expression, IndexBase):
+            return expression
+        return object.__new__(cls)
 
     def __init__(self, expression):
         assert isinstance(expression, Node)
@@ -1001,7 +1012,8 @@ class ComponentTensor(Node):
             return expression
 
         # Collect shape
-        shape = tuple(index.extent for index in multiindex)
+        # allow integers here
+        shape = tuple(index.extent if isinstance(index, IndexBase) else 1 for index in multiindex)
         assert all(s >= 0 for s in shape)
 
         # Zero folding
@@ -1022,8 +1034,9 @@ class ComponentTensor(Node):
         self.shape = shape
 
         # Collect free indices
-        assert set(multiindex) <= set(expression.free_indices)
-        self.free_indices = unique(set(expression.free_indices) - set(multiindex))
+        # assert set(multiindex) <= set(expression.free_indices)
+        # self.free_indices = unique(set(expression.free_indices) - set(multiindex))
+        self.free_indices = unique(set(expression.free_indices).symmetric_difference(set(multiindex)))
 
         return self
 

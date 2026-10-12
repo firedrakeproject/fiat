@@ -119,8 +119,11 @@ class Return(Terminal):
         self.expression = expression
 
     def loop_shape(self, free_indices):
-        """ Indices can be in either variable or expression """
-        return tuple(set(free_indices(self.variable) + free_indices(self.expression)))
+        import pyop3.collections
+        indices = pyop3.collections.OrderedSet()
+        for obj in [self.variable, self.expression]:
+            indices.update(free_indices(obj))
+        return tuple(indices)
 
     def _pretty_string(self, *, indent: int) -> str:
         return f"{' '*indent}{self.variable} = {self.expression}"

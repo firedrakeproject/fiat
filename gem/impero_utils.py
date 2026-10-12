@@ -123,56 +123,62 @@ def compile_gem_new(assignments, prefix_ordering, remove_zeros=False,
         expressions.append(a.assignee)
         expressions.append(a.expression)
 
-    # Collect indices in a deterministic order
-    ideps = []
-    for node in traversal(expressions):
-        if isinstance(node, (gem.Indexed, gem.FlexiblyIndexed)):
-            io = node.index_ordering()
-            for i1, i2 in zip(io[:-1], io[1:]):
-                ideps.append((i1, i2))
-    # drop duplicates
-    ideps = list(collections.OrderedDict.fromkeys(ideps))
-
-    # gather everything
+    # # Collect indices in a deterministic order
+    # ideps = []
+    # for node in traversal(expressions):
+    #     if isinstance(node, (gem.Indexed, gem.FlexiblyIndexed)):
+    #         io = node.index_ordering()
+    #         for i1, i2 in zip(io[:-1], io[1:]):
+    #             ideps.append((i1, i2))
+    # # drop duplicates
+    # ideps = list(collections.OrderedDict.fromkeys(ideps))
+    #
+    # # gather everything
+    # indices = list(collections.OrderedDict.fromkeys(chain.from_iterable(
+    #     node.index_ordering()
+    #     for node in traversal(expressions)
+    #     if isinstance(node, (gem.Indexed, gem.FlexiblyIndexed))
+    # )))
+    #
+    # indices = order_indices(indices, ideps)
+    #
+    # # algorithm for getting *all* indices needed by an expression by looking at the dependencies
+    # def alldeps(initial):
+    #     result = []
+    #     stack = list(reversed(initial))
+    #     while stack:
+    #         item = stack.pop(0)
+    #         result.append(item)
+    #         for dependency, depender in ideps:
+    #             if depender == item:
+    #                 stack.append(dependency)
+    #
+    #     # now order them
+    #     return tuple(order_indices(result, ideps))
     indices = list(collections.OrderedDict.fromkeys(chain.from_iterable(
         node.index_ordering()
         for node in traversal(expressions)
         if isinstance(node, (gem.Indexed, gem.FlexiblyIndexed))
     )))
 
-    indices = order_indices(indices, ideps)
-
-    ideps_inv = [(b, a) for a, b in ideps]  # b depends on a
-    # algorithm for getting *all* indices needed by an expression by looking at the dependencies
-    def alldeps(initial):
-        result = []
-        stack = list(initial)
-        while stack:
-            item = stack.pop(0)
-            result.append(item)
-            for dependency, depender in ideps:
-                if depender == item:
-                    stack.append(dependency)
-        return tuple(result)
-
 
     # Build ordered index map
     index_ordering = make_prefix_ordering(indices, prefix_ordering)
     apply_ordering = make_index_orderer(index_ordering)
 
-    # this basically returns the indices in the ordering described by 'indices'
+    # this basically is a function that returns the indices in the ordering described by 'indices'
     get_indices = lambda expr: apply_ordering(expr.free_indices)
 
     # Build operation ordering
-    ops = scheduling.emit_operations_new(assignments, get_indices, alldeps, emit_return_accumulate)
+    # ops = scheduling.emit_operations_new(assignments, get_indices, alldeps, emit_return_accumulate)
+    ops = scheduling.emit_operations_new(assignments, get_indices, emit_return_accumulate)
 
     # Empty kernel
     if len(ops) == 0:
         raise NoopError()
 
     # Drop unnecessary temporaries
-    # FIXME
-    # ops = inline_temporaries(expressions, ops)
+    ops = inline_temporaries(expressions, ops)
 
     # Build Impero AST
     tree = make_loop_tree(ops, get_indices)

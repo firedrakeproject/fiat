@@ -214,8 +214,8 @@ def replace_indices_flexiblyindexed(node, self, subst):
 def filtered_replace_indices(node, self, subst):
     """Wrapper for :func:`replace_indices`.  At each call removes
     substitution rules that do not apply."""
-    if any(isinstance(k, VariableIndex) for k, _ in subst):
-        raise NotImplementedError("Can not replace VariableIndex (will need inverse)")
+    # if any(isinstance(k, VariableIndex) for k, _ in subst):
+    #     raise NotImplementedError("Can not replace VariableIndex (will need inverse)")
     filtered_subst = tuple((k, v) for k, v in subst if k in node.free_indices)
     return replace_indices(node, self, filtered_subst)
 
