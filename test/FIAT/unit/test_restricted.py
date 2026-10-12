@@ -36,3 +36,13 @@ def test_restricted_tabulate() -> None:
     restricted_values = restricted.tabulate(0, points)[(0, 0)]
 
     numpy.testing.assert_allclose(restricted_values, full_values[indices], atol=1e-14)
+
+
+def test_restricted_dual_evaluation_drops_roundoff_source_functionals() -> None:
+    """Facet duals do not evaluate the interior basis functions."""
+    element = IntegratedLegendre(ufc_simplex(1), 5)
+    restricted = RestrictedElement(element, restriction_domain="facet")
+
+    evaluation = dual_evaluation(restricted, element.get_nodal_basis())
+
+    numpy.testing.assert_array_equal(evaluation[:, 2:], 0.0)
