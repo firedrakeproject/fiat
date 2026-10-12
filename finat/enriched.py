@@ -245,31 +245,27 @@ class EnrichedElement(FiniteElementBase):
            provides physical geometry callbacks (may be None).
         :returns: an ``(evaluation, point_indices, basis_indices)`` triple, as
            :meth:`~finat.finiteelementbase.FiniteElementBase.dual_evaluation`
-           returns.  The summand point indices remain free, so the caller can
-           choose how to contract each direct-sum component.
+           returns.  The points are contracted here, so ``point_indices`` is
+           empty.
 
-        The summands do not share their points, so their evaluations stack
-        along the basis index while retaining their own point indices.
-        The free basis index carries the direct-sum blocks.  Downstream,
-        :func:`~gem.unconcatenate.unconcatenate` splits those blocks.
+        The summands do not share their points, so each one contracts on its
+        own, and the results stack along the basis index.  Concatenating over
+        a free index is what :func:`~gem.unconcatenate.unconcatenate` splits
+        downstream; a concatenation over the contracted points could not be.
         """
         if not self.is_nodal_enriched:
             raise NotImplementedError(
                 f"Dual evaluation not defined for non-nodal {type(self).__name__}"
             )
         evals = []
-        point_indices = []
         for element in self.summands:
             # Enrichments of non-nodal elements raise NotImplementedError
-            expr, element_points, indices = element.dual_evaluation(
+            expr, point_indices, indices = element.dual_evaluation(
                 fn, coordinate_mapping=coordinate_mapping)
-            evals.append(broadcast_tensor(expr, indices))
-            point_indices.extend(element_points)
+            evals.append(broadcast_tensor(gem.IndexSum(expr, point_indices), indices))
 
         beta = self.get_indices()
-        evaluation = gem.Indexed(gem.Concatenate(*evals), beta)
-        unique_point_indices = tuple(dict.fromkeys(point_indices))
-        return evaluation, unique_point_indices, beta
+        return gem.Indexed(gem.Concatenate(*evals), beta), (), beta
 
 
 def distribute_over_sum(reconstruct, summands):
