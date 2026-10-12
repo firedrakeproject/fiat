@@ -159,6 +159,12 @@ def test_integrated_legendre_dual_evaluation():
     check_nodal(element)
 
 
+def test_restricted_integrated_legendre_dual_basis() -> None:
+    element = finat.RestrictedElement(
+        finat.IntegratedLegendre(ufc_simplex(1), 5), restriction_domain="interior")
+    check_dual_basis(element)
+
+
 def test_enriched_element_dual_evaluation():
     enriched = restricted_lagrange_sum(ufc_simplex(2))
 

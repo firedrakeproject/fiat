@@ -20,25 +20,27 @@ class DualSet:
     Parameters
     ----------
     nodes : sequence of Functional
-        Functionals in the dual set, in local degree-of-freedom order.
+        Source functionals used to define the dual set. If ``coeffs`` is
+        provided, these correspond to its columns; otherwise they are the
+        functionals in local degree-of-freedom order.
     ref_el : Cell
         Reference element or simplicial complex on which the functionals are
         defined.
     entity_ids : dict
         Mapping from entity dimension and entity number to the indices of the
-        functionals assigned to that entity.
+        functionals represented by this dual set assigned to that entity.
     entity_permutations : dict, optional
         Mapping from entity dimension, entity number, and orientation to the
         permutation of local DoFs.
     coeffs : array_like, optional
-        Square matrix defining linear combinations of the functionals. Its
-        rows give the coefficients for the recombined functionals.
+        Matrix defining linear combinations of the functionals. Its rows give
+        the coefficients for the recombined functionals, and its columns
+        correspond to ``nodes``.
 
     Raises
     ------
     ValueError
-        If ``coeffs`` is not a square matrix with one row and column per
-        functional.
+        If ``coeffs`` does not have one column per functional.
     """
 
     def __init__(self, nodes, ref_el, entity_ids, entity_permutations=None,
@@ -49,8 +51,8 @@ class DualSet:
             nodes, ref_el, entity_ids, entity_permutations)
         if coeffs is not None:
             coeffs = numpy.asarray(coeffs)
-            if coeffs.shape != (len(nodes), len(nodes)):
-                raise ValueError("Dual coefficients must form a square matrix")
+            if coeffs.ndim != 2 or coeffs.shape[1] != len(nodes):
+                raise ValueError("Dual coefficients must have one column per functional")
 
         self.nodes = nodes
         self.coeffs = coeffs
@@ -77,7 +79,7 @@ class DualSet:
         return iter(self.nodes)
 
     def __len__(self):
-        return len(self.nodes)
+        return len(self.nodes) if self.coeffs is None else self.coeffs.shape[0]
 
     def get_nodes(self):
         return self.nodes
@@ -93,9 +95,8 @@ class DualSet:
         :returns: A dual set representing the recombined functionals.
         """
         coefficients = numpy.asarray(coefficients)
-        shape = (len(self.nodes), len(self.nodes))
-        if coefficients.shape != shape:
-            raise ValueError("Dual coefficients must form a square matrix")
+        if coefficients.shape[-1] != len(self):
+            raise ValueError("Recombination coefficients must have one column per dual functional")
         if self.coeffs is not None:
             coefficients = numpy.dot(coefficients, self.coeffs)
         return DualSet(self.nodes, self.ref_el, self.entity_ids,

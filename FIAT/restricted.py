@@ -4,6 +4,8 @@
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
+import numpy
+
 from FIAT.dual_set import DualSet
 from FIAT.finite_element import CiarletElement
 
@@ -15,18 +17,24 @@ class RestrictedDualSet(DualSet):
         indices = list(sorted(indices))
         ref_el = dual.get_reference_element()
         nodes_old = dual.get_nodes()
+        coeffs = dual.get_coeffs()
+        if coeffs is not None:
+            coeffs = coeffs[indices, :]
+            active_nodes = numpy.any(coeffs != 0, axis=0)
+            coeffs = coeffs[:, active_nodes]
+            nodes = [node for node, active in zip(nodes_old, active_nodes) if active]
+        else:
+            nodes = [nodes_old[i] for i in indices]
         entity_ids = {}
-        nodes = []
         for d, entities in dual.get_entity_ids().items():
             entity_ids[d] = {}
             for entity, dofs in entities.items():
                 entity_ids[d][entity] = [indices.index(dof)
                                          for dof in dofs if dof in indices]
-        nodes = [nodes_old[i] for i in indices]
         self._dual = dual
         entity_permutations = self._restrict_entity_permutations(dual, entity_ids)
 
-        super().__init__(nodes, ref_el, entity_ids, entity_permutations)
+        super().__init__(nodes, ref_el, entity_ids, entity_permutations, coeffs=coeffs)
 
     @staticmethod
     def _restrict_entity_permutations(dual, entity_ids):
@@ -86,6 +94,8 @@ class RestrictedElement(CiarletElement):
 
         if len(indices) == 0:
             raise ValueError("No point in creating empty RestrictedElement.")
+
+        indices = list(sorted(indices))
 
         self._element = element
         self._indices = indices
