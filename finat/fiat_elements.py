@@ -165,12 +165,11 @@ class FiatElement(FiniteElementBase):
         # needed because the dual_basis itself can't produce the same
         # point set over and over in case it is used multiple times
         # (in for example a tensorproductelement).
-        dual_set = self._element.get_dual_set()
         fiat_dual_basis = self._element.dual_basis()
+        dual_set = self._element.get_dual_set()
         dual_coeffs = dual_set.get_coeffs()
 
-        num_duals = len(dual_set)
-        if num_duals > self.space_dimension():
+        if len(dual_set) > self.space_dimension():
             # Throw away constrained degrees of freedom
             fiat_dual_basis = fiat_dual_basis[:self.space_dimension()]
 
