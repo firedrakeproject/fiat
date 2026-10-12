@@ -73,6 +73,11 @@ D20 = numpy.array([
 ])
 
 
+def rank(matrix: numpy.ndarray) -> int:
+    """Compute matrix rank with a tolerance suitable for tabulated values."""
+    return numpy.linalg.matrix_rank(matrix, tol=1E-12)
+
+
 @pytest.mark.parametrize("dim", (1, 2, 3))
 def test_bernstein_degree_one_matches_lagrange(dim):
     """Ensure that degree-one Bernstein basis functions are hat functions."""
@@ -125,8 +130,6 @@ def test_bernstein_c0_alfeld(dim, degree):
     )
     values = poly_set.tabulate(points)[(0,) * dim]
     c0_values = CkPolynomialSet(ref_el, degree, order=0).tabulate(points)[(0,) * dim]
-    rank = numpy.linalg.matrix_rank
-
     assert poly_set.get_num_members() == expected_dimension
     assert numpy.allclose(values.sum(axis=0), 1)
     assert rank(values) == rank(c0_values) == rank(numpy.vstack([values, c0_values]))
@@ -150,7 +153,6 @@ def test_bernstein_macro_variant(dim, variant, degree):
     points = get_lagrange_points(elem.get_dual_set())
     values = elem.tabulate(0, points)[(0,) * dim]
     c0_values = CkPolynomialSet(ref_complex, degree, order=0).tabulate(points)[(0,) * dim]
-    rank = numpy.linalg.matrix_rank
     assert rank(values) == rank(c0_values) == rank(numpy.vstack([values, c0_values]))
 
     for facet, dofs in elem.entity_closure_dofs()[dim - 1].items():
@@ -182,7 +184,6 @@ def test_bernstein_c1_alfeld(dim, degree):
     points = create_quadrature(ref_el, 2*degree).get_points()
     values = poly_set.tabulate(points)[(0,) * dim]
     c1_values = CkPolynomialSet(ref_el, degree, order=1).tabulate(points)[(0,) * dim]
-    rank = numpy.linalg.matrix_rank
     assert numpy.allclose(values.sum(axis=0), 1)
     assert rank(values) == len(values) == rank(c1_values) == rank(numpy.vstack([values, c1_values]))
 
@@ -206,7 +207,6 @@ def test_bernstein_c1_supersmooth_alfeld(dim, degree, vorder):
     points = create_quadrature(ref_el, 2*degree).get_points()
     values = poly_set.tabulate(points)[(0,) * dim]
     ck_values = CkPolynomialSet(ref_el, degree, order=1, vorder=vorder).tabulate(points)[(0,) * dim]
-    rank = numpy.linalg.matrix_rank
     assert rank(values) == len(values) == rank(ck_values) == rank(numpy.vstack([values, ck_values]))
 
 
