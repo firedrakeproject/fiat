@@ -165,13 +165,13 @@ class FiatElement(FiniteElementBase):
         # needed because the dual_basis itself can't produce the same
         # point set over and over in case it is used multiple times
         # (in for example a tensorproductelement).
-        fiat_dual_basis = self._element.dual_basis()
         dual_set = self._element.get_dual_set()
         dual_coeffs = dual_set.get_coeffs()
+        nodes = dual_set.nodes
 
         if len(dual_set) > self.space_dimension():
             # Throw away constrained degrees of freedom
-            fiat_dual_basis = fiat_dual_basis[:self.space_dimension()]
+            nodes = nodes[:self.space_dimension()]
 
         seen = dict()
         allpts = []
@@ -179,7 +179,7 @@ class FiatElement(FiniteElementBase):
         # We might be able to make this a smaller set by treating each
         # point one by one, but most of the redundancy comes from
         # multiple functionals using the same quadrature rule.
-        for dual in fiat_dual_basis:
+        for dual in nodes:
             if len(dual.deriv_dict) != 0:
                 raise NotImplementedError("FIAT dual bases with derivative nodes represented via a ``Functional.deriv_dict`` property do not currently have a FInAT dual basis")
             pts = dual.get_point_dict().keys()
@@ -216,7 +216,7 @@ class FiatElement(FiniteElementBase):
         # Higher indices (*cmp) are tensor indices of the weights when weights
         # are tensor valued.
         Q = {}
-        for i, dual in enumerate(fiat_dual_basis):
+        for i, dual in enumerate(nodes):
             point_dict = dual.get_point_dict()
             pts = tuple(sorted(point_dict.keys()))
             kstart, kend = seen[pts]
