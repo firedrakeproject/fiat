@@ -383,8 +383,12 @@ def _ck_coefficients(ref_el, degree, order, vorder, entity_ids=None):
                     condition[row_of_point[cell_a, alpha_a]] -= weight
                 conditions.append(condition)
 
+    # An MDS uniquely determines all remaining coefficients, so the constraint
+    # matrix has full column rank. Solve against all smoothness equations to
+    # retain their accuracy in the recovered coefficients.
     A = numpy.reshape(conditions, (-1, num_columns))
-    dependent, *_ = scipy.linalg.lstsq(A[:, num_free:], -A[:, :num_free], cond=None,
-                                       lapack_driver="gelsd")
+    dependent, _, rank, _ = scipy.linalg.lstsq(A[:, num_free:], -A[:, :num_free], cond=0,
+                                               lapack_driver="gelsy")
+    assert rank == num_columns - num_free
     dependent = dependent[:len(c0_coeffs) - num_free]
     return c0_coeffs[:num_free] + dependent.T @ c0_coeffs[num_free:]

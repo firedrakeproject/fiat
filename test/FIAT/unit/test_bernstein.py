@@ -221,11 +221,15 @@ def test_bernstein_c0_supersmooth_alfeld(degree, vorder):
     assert poly_set.get_num_members() == expected_dimension
 
 
-@pytest.mark.parametrize("dim, degree", [(2, 14), (3, 8)])
-def test_bernstein_supersmooth_small_coefficients(dim, degree):
+@pytest.mark.parametrize("dim, degree", [(2, 1), (2, 3), (2, 8), (2, 14), (3, 8)])
+def test_bernstein_supersmooth_stable_coefficients(dim: int, degree: int) -> None:
     ref_el = AlfeldSplit(ufc_simplex(dim))
     poly_set = BernsteinPolynomialSet(ref_el, degree, order=1, vorder=degree-1)
-    assert abs(poly_set.get_coeffs()).max() < 30
+    coeffs = poly_set.get_coeffs()
+    assert abs(coeffs).max() < 30
+    # Constant reproduction allows for cancellation among signed coefficients.
+    assert numpy.all(abs(coeffs.sum(axis=0) - 1)
+                     <= 16 * numpy.finfo(float).eps * abs(coeffs).sum(axis=0))
 
 
 @pytest.mark.parametrize("degree", (3, 5, 8))
