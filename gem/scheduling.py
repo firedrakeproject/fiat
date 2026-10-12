@@ -198,7 +198,7 @@ def emit_operations(assignments, get_indices, emit_return_accumulate=True):
     return ops
 
 
-def emit_operations_new(assignments, get_indices, emit_return_accumulate=True):
+def emit_operations_new(assignments, get_indices, alldeps, emit_return_accumulate=True):
     """Makes an ordering of operations to evaluate a multi-root
     expression DAG.
 
@@ -230,11 +230,11 @@ def emit_operations_new(assignments, get_indices, emit_return_accumulate=True):
             staging.append(impero.Return(variable, expression))
 
     # Prepare data structures
-    def push_node(node):
+    def push_node(node):  # handle gem nodes
         queue.insert(get_indices(node), node)
 
-    def push_op(op):
-        queue.insert(op.loop_shape(get_indices), op)
+    def push_op(op):  # handle impero nodes
+        queue.insert(alldeps(op.loop_shape(get_indices)), op)
 
     ops = []
 

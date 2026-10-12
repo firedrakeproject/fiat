@@ -124,20 +124,47 @@ def compile_gem_new(assignments, prefix_ordering, remove_zeros=False,
         expressions.append(a.expression)
 
     # Collect indices in a deterministic order
+    ideps = []
+    for node in traversal(expressions):
+        if isinstance(node, (gem.Indexed, gem.FlexiblyIndexed)):
+            io = node.index_ordering()
+            for i1, i2 in zip(io[:-1], io[1:]):
+                ideps.append((i1, i2))
+    # drop duplicates
+    ideps = list(collections.OrderedDict.fromkeys(ideps))
+
+    # gather everything
     indices = list(collections.OrderedDict.fromkeys(chain.from_iterable(
         node.index_ordering()
         for node in traversal(expressions)
         if isinstance(node, (gem.Indexed, gem.FlexiblyIndexed))
     )))
 
+    indices = order_indices(indices, ideps)
+
+    ideps_inv = [(b, a) for a, b in ideps]  # b depends on a
+    # algorithm for getting *all* indices needed by an expression by looking at the dependencies
+    def alldeps(initial):
+        result = []
+        stack = list(initial)
+        while stack:
+            item = stack.pop(0)
+            result.append(item)
+            for dependency, depender in ideps:
+                if depender == item:
+                    stack.append(dependency)
+        return tuple(result)
+
+
     # Build ordered index map
     index_ordering = make_prefix_ordering(indices, prefix_ordering)
     apply_ordering = make_index_orderer(index_ordering)
 
+    # this basically returns the indices in the ordering described by 'indices'
     get_indices = lambda expr: apply_ordering(expr.free_indices)
 
     # Build operation ordering
-    ops = scheduling.emit_operations_new(assignments, get_indices, emit_return_accumulate)
+    ops = scheduling.emit_operations_new(assignments, get_indices, alldeps, emit_return_accumulate)
 
     # Empty kernel
     if len(ops) == 0:
@@ -158,6 +185,55 @@ def compile_gem_new(assignments, prefix_ordering, remove_zeros=False,
 
     # Prepare ImperoC (Impero AST + other data for code generation)
     return ImperoC(tree, temporaries, declare, indices)
+
+
+# This was lifted from an LLM. It should be possible to use existing queue and refcount
+# code but I haven't figured out how yet.
+def order_indices(nodes, edges):
+    """
+    Perform a topological sort using Kahn's algorithm.
+
+    Parameters:
+        nodes: iterable of hashable items
+            The items to order.
+        edges: iterable of (a, b)
+            Constraints meaning 'a must come before b'.
+
+    Returns:
+        A list containing one valid topological ordering.
+
+    Raises:
+        ValueError: If the graph contains a cycle.
+    """
+    # Build adjacency list and in-degree count
+    graph = collections.defaultdict(list)
+    in_degree = {node: 0 for node in nodes}
+
+    for a, b in edges:
+        graph[a].append(b)
+        in_degree[b] = in_degree.get(b, 0) + 1
+        if a not in in_degree:
+            in_degree[a] = in_degree.get(a, 0)
+
+    # Start with all nodes that have no incoming edges
+    queue = collections.deque([node for node in in_degree if in_degree[node] == 0])
+
+    order = []
+
+    while queue:
+        node = queue.popleft()
+        order.append(node)
+
+        for neighbour in graph[node]:
+            in_degree[neighbour] -= 1
+            if in_degree[neighbour] == 0:
+                queue.append(neighbour)
+
+    # If we didn't process every node, there is a cycle
+    if len(order) != len(in_degree):
+        raise ValueError("Graph contains a cycle; no valid topological ordering exists.")
+
+    return order
 
 
 def make_prefix_ordering(indices, prefix_ordering):

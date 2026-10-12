@@ -21,6 +21,13 @@ class Node(NodeBase):
 
     __slots__ = ()
 
+    def __str__(self) -> str:
+        return self._pretty_string(indent=0)
+
+    @abstractmethod
+    def _pretty_string(self, *, indent: int) -> str:
+        raise NotImplementedError(f"cant print {type(self).__name__}")
+
 
 class Terminal(Node, metaclass=ABCMeta):
     """Abstract class for terminal Impero nodes"""
@@ -51,6 +58,9 @@ class Evaluate(Terminal):
 
     def loop_shape(self, free_indices):
         return free_indices(self.expression)
+
+    def _pretty_string(self, *, indent: int) -> str:
+        return f"{' ' * indent}evaluate({self.expression})"
 
 
 class Initialise(Terminal):
@@ -112,6 +122,9 @@ class Return(Terminal):
         """ Indices can be in either variable or expression """
         return tuple(set(free_indices(self.variable) + free_indices(self.expression)))
 
+    def _pretty_string(self, *, indent: int) -> str:
+        return f"{' '*indent}{self.variable} = {self.expression}"
+
 
 class ReturnAccumulate(Terminal):
     """Accumulate an :class:`gem.IndexSum` directly into a return
@@ -129,6 +142,9 @@ class ReturnAccumulate(Terminal):
     def loop_shape(self, free_indices):
         return free_indices(self.indexsum.children[0])
 
+    def _pretty_string(self, *, indent: int) -> str:
+        return f"{' '*indent}{self.variable} += {self.index_sum}"
+
 
 class Block(Node):
     """An ordered set of Impero expressions.  Corresponds to a curly
@@ -138,6 +154,9 @@ class Block(Node):
 
     def __init__(self, statements):
         self.children = tuple(statements)
+
+    def _pretty_string(self, *, indent: int) -> str:
+        return "\n".join(c._pretty_string(indent=indent) for c in self.children)
 
 
 class For(Node):
@@ -162,6 +181,16 @@ class For(Node):
         self.index = index
         self.children = (statement,)
 
+    @property
+    def statement(self) -> Node:
+        return self.children[0]
+
+    def _pretty_string(self, *, indent: int) -> str:
+        prefix = f"{' '*indent}for ({self.index}) {{"
+        body = self.statement._pretty_string(indent=indent+2)
+        suffix = f"{' '*indent}}}"
+        return "\n".join((prefix, body, suffix))
+
 
 class Assignment(Node):
     __slots__ = ("assignee", "expression", "mode")
@@ -176,6 +205,6 @@ class Assignment(Node):
     def __repr__(self):
         return f"{type(self).__name__}({self.assignee!r}, {self.expression!r}, {self.mode!r})"
 
-    def __strr__(self):
+    def __str__(self):
         # TODO: handle mode
         return f"{self.assignee} <- {self.expression}"

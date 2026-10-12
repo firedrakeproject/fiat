@@ -553,6 +553,9 @@ class MathFunction(Scalar):
     def free_indices(self):
         return unique(chain.from_iterable(c.free_indices for c in self.children))
 
+    def __str__(self) -> str:
+        return f"{self.name}({', '.join(map(str, self.children))})"
+
 
 class MinValue(Scalar):
     __slots__ = ('children',)
