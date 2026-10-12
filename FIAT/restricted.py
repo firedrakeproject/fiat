@@ -7,7 +7,7 @@
 import numpy
 
 from FIAT.dual_set import DualSet
-from FIAT.finite_element import CiarletElement
+from FIAT.finite_element import CiarletElement, FiniteElement
 
 
 class RestrictedDualSet(DualSet):
@@ -18,11 +18,25 @@ class RestrictedDualSet(DualSet):
         ref_el = dual.get_reference_element()
         nodes_old = dual.get_nodes()
         coeffs = dual.get_coeffs()
+        source = dual._dual if isinstance(dual, RestrictedDualSet) else dual
         if coeffs is not None:
             coeffs = coeffs[indices, :]
             coeffs[numpy.abs(coeffs) <= 1E-12] = 0
-            # Preserve the source-node layout that the quadrature element uses for entity numbering.
-            nodes = nodes_old
+            source_indices = {node: i for i, node in enumerate(nodes_old)}
+            source_nodes = source.get_nodes()
+            active_nodes = numpy.any(coeffs != 0, axis=0)
+            # Keep the same local source indices on every entity of a dimension.
+            for entities in source.get_entity_ids().values():
+                local_indices = {j for dofs in entities.values()
+                                 for j, dof in enumerate(dofs)
+                                 if source_nodes[dof] in source_indices
+                                 and active_nodes[source_indices[source_nodes[dof]]]}
+                for dofs in entities.values():
+                    for j, dof in enumerate(dofs):
+                        if source_nodes[dof] in source_indices and j in local_indices:
+                            active_nodes[source_indices[source_nodes[dof]]] = True
+            coeffs = coeffs[:, active_nodes]
+            nodes = [node for node, active in zip(nodes_old, active_nodes) if active]
         else:
             nodes = [nodes_old[i] for i in indices]
         entity_ids = {}
@@ -31,7 +45,7 @@ class RestrictedDualSet(DualSet):
             for entity, dofs in entities.items():
                 entity_ids[d][entity] = [indices.index(dof)
                                          for dof in dofs if dof in indices]
-        self._dual = dual
+        self._dual = source
         entity_permutations = self._restrict_entity_permutations(dual, entity_ids)
 
         super().__init__(nodes, ref_el, entity_ids, entity_permutations, coeffs=coeffs)
@@ -111,5 +125,7 @@ class RestrictedElement(CiarletElement):
         mapping_new = [mapping_old[dof] for dof in indices]
         assert all(e_mapping == mapping_new[0] for e_mapping in mapping_new)
 
-        # Call constructor of CiarletElement
-        super().__init__(poly_set, dual, element.degree(), element.get_formdegree(), mapping_new[0])
+        # Restricting matching primal and dual indices preserves nodality.
+        FiniteElement.__init__(self, dual.get_reference_element(), dual, element.get_order(),
+                               element.get_formdegree(), mapping_new[0], element.get_reference_complex())
+        self.poly_set = poly_set
