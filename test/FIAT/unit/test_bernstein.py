@@ -24,6 +24,7 @@ import pytest
 
 from FIAT.reference_element import ufc_simplex
 from FIAT.bernstein import Bernstein, BernsteinPolynomialSet
+from FIAT.barycentric_interpolation import get_lagrange_points
 from FIAT.finite_element import CiarletElement
 from FIAT.hct import HCTDualSet, HsiehCloughTocher
 from FIAT.lagrange import Lagrange
@@ -146,7 +147,7 @@ def test_bernstein_macro_variant(dim, variant, degree):
     assert elem.is_macroelement()
     assert numpy.allclose(dualmat @ poly_set.get_coeffs().T, numpy.eye(elem.space_dimension()))
 
-    points = create_quadrature(ref_complex, 2*degree).get_points()
+    points = get_lagrange_points(elem.get_dual_set())
     values = elem.tabulate(0, points)[(0,) * dim]
     c0_values = CkPolynomialSet(ref_complex, degree, order=0).tabulate(points)[(0,) * dim]
     rank = numpy.linalg.matrix_rank
