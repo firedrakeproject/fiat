@@ -28,7 +28,7 @@ from FIAT.barycentric_interpolation import get_lagrange_points
 from FIAT.finite_element import CiarletElement
 from FIAT.hct import HCTDualSet, HsiehCloughTocher
 from FIAT.lagrange import Lagrange
-from FIAT.macro import AlfeldSplit, CkPolynomialSet
+from FIAT.macro import AlfeldSplit, CkPolynomialSet, PowellSabinSplit, WorseyFarinSplit
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.walkington import Walkington, WalkingtonDualSet
 
@@ -302,3 +302,53 @@ def test_bernstein_c1_entity_ids():
     coeffs = BernsteinPolynomialSet(ref_el, degree, order=1, entity_ids=entity_ids).get_coeffs()
     permuted_coeffs = BernsteinPolynomialSet(ref_el, degree, order=1, entity_ids=permuted_ids).get_coeffs()
     assert numpy.allclose(permuted_coeffs[perm], coeffs)
+
+
+def assert_same_span(poly_set, ck_poly_set):
+    ref_el = poly_set.get_reference_element()
+    dim = ref_el.get_spatial_dimension()
+    points = create_quadrature(ref_el, 2*poly_set.get_degree()).get_points()
+    values = poly_set.tabulate(points)[(0,) * dim]
+    ck_values = ck_poly_set.tabulate(points)[(0,) * dim]
+    assert numpy.allclose(values.sum(axis=0), 1)
+    assert rank(values) == len(values) == rank(ck_values) == rank(numpy.vstack([values, ck_values]))
+
+
+@pytest.mark.parametrize("split, dim, degree, order, vorder",
+                         [(AlfeldSplit, 2, 4, 2, None),
+                          (AlfeldSplit, 2, 7, 3, None),
+                          # Lai and Schumaker (2007), Theorem 8.5
+                          (AlfeldSplit, 2, 5, 2, 3),
+                          (AlfeldSplit, 2, 9, 3, 7),
+                          (PowellSabinSplit, 2, 2, 1, None),
+                          (PowellSabinSplit, 2, 3, 1, None),
+                          # No free supersmoothness: the interior vertex lies on three lines
+                          (PowellSabinSplit, 2, 5, 1, 2),
+                          (WorseyFarinSplit, 3, 3, 1, None)])
+def test_bernstein_ck_macro(split, dim, degree, order, vorder):
+    ref_el = split(ufc_simplex(dim))
+    poly_set = BernsteinPolynomialSet(ref_el, degree, order=order, vorder=vorder)
+    if vorder is not None:
+        assert_vertex_supersmoothness(poly_set, vorder)
+    ck_poly_set = CkPolynomialSet(ref_el, degree, order=order, vorder=vorder)
+    assert_same_span(poly_set, ck_poly_set)
+
+
+@pytest.mark.parametrize("degree", (3, 5))
+def test_bernstein_boundary_vertex_order(degree):
+    ref_el = AlfeldSplit(ufc_simplex(2))
+    order = {1: dict.fromkeys(ref_el.get_interior_facets(1), 1), 0: {0: 2}}
+    poly_set = BernsteinPolynomialSet(ref_el, degree, order=order)
+    vertex = ref_el.get_vertices()[0:1]
+    jumps = poly_set.get_expansion_set().tabulate_jumps(degree, vertex, order=2)
+    for r in range(3):
+        assert numpy.allclose(poly_set.get_coeffs() @ jumps[r], 0)
+    # C2 at a boundary vertex shared by two cells adds one condition.
+    assert poly_set.get_num_members() == BernsteinPolynomialSet(ref_el, degree, order=1).get_num_members() - 1
+    assert_same_span(poly_set, CkPolynomialSet(ref_el, degree, order=order))
+
+
+def test_bernstein_degree_zero_dict():
+    ref_el = AlfeldSplit(ufc_simplex(2))
+    order = {1: dict.fromkeys(ref_el.get_interior_facets(1), 1)}
+    assert BernsteinPolynomialSet(ref_el, 0, order=order).get_num_members() == 1

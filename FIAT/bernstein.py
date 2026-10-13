@@ -68,9 +68,10 @@ class BernsteinPolynomialSet(PolynomialSet):
     :arg ref_el: The simplex or macrocell.
     :arg degree: The polynomial degree.
     :kwarg order: The order of continuity across the interior facets of a
-        macrocell.
-    :kwarg vorder: The order of super-smoothness at the interior vertex of a
-        macrocell.
+        macrocell, or a dict mapping the dimension (facets or vertices) and
+        the entity id to the order of smoothness at that entity.
+    :kwarg vorder: The order of super-smoothness at the interior vertices of a
+        macrocell.  Only allowed when ``order`` is an integer.
     :kwarg entity_ids: An optional entity-to-basis-index map defining the
         ordering of the basis. Each entity carries the basis functions
         associated with the Bernstein coefficients on that entity that lie in
@@ -85,7 +86,7 @@ class BernsteinPolynomialSet(PolynomialSet):
 
 
 class Bernstein(CiarletElement):
-    """A finite element with Bernstein polynomials as basis functions.
+    """A C0 finite element with Bernstein polynomials as basis functions.
 
     The nodes are linear combinations of Lagrange point evaluations.
 
@@ -195,6 +196,7 @@ def _entity_support_mis(ref_el, degree):
     topology = ref_el.get_topology()
     sd = ref_el.get_spatial_dimension()
     connectivity = ref_el.get_connectivity()
+
     betas = {dim: tuple(multiindex_equal(dim + 1, degree, imin=1))
              for dim in topology}
     entity_support_mis = {}
@@ -203,32 +205,41 @@ def _entity_support_mis(ref_el, degree):
             for entity_id in connectivity[(sd, entity_dim)][cell]:
                 entity_vertices = entities[entity_id]
                 for beta in betas[entity_dim]:
+                    # A C0 Bernstein function is identified by its entity and
+                    # its Bernstein multiindex on that entity.  Record every
+                    # cell-local multiindex that contributes to that function.
                     alpha = [0] * (sd + 1)
                     for vertex, exponent in zip(entity_vertices, beta):
                         alpha[cell_vertices.index(vertex)] = exponent
-                    key = (entity_dim, entity_id, beta)
-                    entity_support_mis.setdefault(key, []).append((cell, tuple(alpha)))
+                    entity_support = (entity_dim, entity_id, beta)
+                    entity_support_mis.setdefault(entity_support, []).append(
+                        (cell, tuple(alpha)))
     return entity_support_mis
 
 
 def _entity_support_rows(ref_el, degree, entity_support_mis, entity_ids=None):
     """Number entity-associated Bernstein functions in entity order."""
+    # The row number is the global C0 Bernstein-function number.  Preserve the
+    # caller's macroelement ordering when it is supplied; otherwise use the
+    # usual entity/multiindex ordering.
     if entity_ids is None:
         ordered = sorted(entity_support_mis,
-                         key=lambda key: tuple(sorted(entity_support_mis[key][0][1], reverse=True)))
-        return {key: row for row, key in enumerate(ordered)}
+                         key=lambda entity_support: tuple(
+                             sorted(entity_support_mis[entity_support][0][1], reverse=True)))
+        return {entity_support: row for row, entity_support in enumerate(ordered)}
 
     rows = {}
     for dim, entities in ref_el.get_topology().items():
         betas = list(multiindex_equal(dim + 1, degree, imin=1))
         for entity in entities:
-            keys = [(dim, entity, beta) for beta in betas
-                    if (dim, entity, beta) in entity_support_mis]
+            entity_supports = [(dim, entity, beta) for beta in betas
+                               if (dim, entity, beta) in entity_support_mis]
             ids = entity_ids[dim][entity]
-            if len(ids) != len(keys):
-                raise ValueError(f"Expected {len(keys)} basis functions on entity {(dim, entity)}, "
+            if len(ids) != len(entity_supports):
+                raise ValueError(f"Expected {len(entity_supports)} basis functions on entity "
+                                 f"{(dim, entity)}, "
                                  f"but got {len(ids)}")
-            rows.update(zip(keys, ids))
+            rows.update(zip(entity_supports, ids))
     return rows
 
 
@@ -239,151 +250,172 @@ def _assemble_c0_coefficients(ref_el, degree, entity_support_mis, rows):
     num_local = len(local_alpha_ids)
     num_cells = len(ref_el.get_topology()[sd])
     coeffs = numpy.zeros((len(rows), num_cells * num_local))
-    for key, local_support in entity_support_mis.items():
+    # Rows are global C0 functions and columns are cell-local Bernstein
+    # coefficients.  A function is the sum of its local supports, so each
+    # support contributes a single one in its corresponding column.
+    for entity_support, local_support in entity_support_mis.items():
         for cell, alpha in local_support:
-            coeffs[rows[key], cell * num_local + local_alpha_ids[alpha]] = 1
+            coeffs[rows[entity_support], cell * num_local + local_alpha_ids[alpha]] = 1
     return coeffs
+
+
+def _smoothness_relations(ref_el, degree, order):
+    """Collect the Bernstein smoothness relations implied by the orders.
+
+    :returns: A set of ``(facet, m, beta)`` triples.  Each triple is the
+        relation matching the coefficient at normal distance ``m`` from the
+        interior ``facet`` and facet multiindex ``beta`` with the ``m``-th de
+        Casteljau step of the coefficients on the other side.
+    """
+    sd = ref_el.get_spatial_dimension()
+    facets = ref_el.get_topology()[sd - 1]
+    interior_facets = set(ref_el.get_interior_facets(sd - 1))
+    relations = set()
+    # C^r across a facet matches the first r normal layers.
+    for facet, forder in order.get(sd - 1, {}).items():
+        for m in range(1, min(forder, degree) + 1):
+            relations.update((facet, m, beta) for beta in multiindex_equal(sd, degree - m))
+    # C^rho at a vertex v matches the coefficients in the disk D_rho(v) across
+    # every interior facet attached to v (Lai and Schumaker, Lemma 5.10).
+    for vertex, vorder in order.get(0, {}).items():
+        for facet in ref_el.connectivity[(0, sd - 1)][vertex]:
+            if facet not in interior_facets:
+                continue
+            local = facets[facet].index(vertex)
+            for m in range(1, min(vorder, degree) + 1):
+                relations.update((facet, m, beta) for beta in multiindex_equal(sd, degree - m)
+                                 if degree - beta[local] <= vorder)
+    return relations
+
+
+def _independent_columns(A, classes, tol=1e-8):
+    """Select a column basis of ``A``, one priority class at a time.
+
+    :arg A: The matrix.
+    :arg classes: A list of lists of column indices, in decreasing priority.
+    :kwarg tol: The relative residual below which a column is considered to
+        be in the span of the columns already selected.
+    :returns: The indices of the selected columns.
+
+    Within each class, the column with the largest residual relative to its
+    norm is selected first (column pivoting), so that the selected columns are
+    well conditioned.  The class is exhausted when every remaining column lies
+    in the span of the columns selected so far.
+    """
+    norms = numpy.linalg.norm(A, axis=0)
+    R = A.astype(float).copy()
+    selected = []
+    for columns in classes:
+        columns = [j for j in columns if norms[j] > 0]
+        while columns:
+            ratios = numpy.linalg.norm(R[:, columns], axis=0) / norms[columns]
+            k = numpy.argmax(ratios)
+            if ratios[k] <= tol:
+                break
+            j = columns.pop(k)
+            q = R[:, j] / numpy.linalg.norm(R[:, j])
+            # Two passes of Gram-Schmidt keep the residuals orthogonal.
+            for _ in range(2):
+                R -= numpy.outer(q, q @ R)
+            selected.append(j)
+    return selected
 
 
 def _ck_coefficients(ref_el, degree, order, vorder, entity_ids=None):
     """Construct smooth Bernstein coefficients from a minimal determining set.
 
-    The spline space consists of the C0 piecewise polynomials that are
-    C^order across the interior facets and C^vorder at the interior vertex of
-    a simplex split around a single interior vertex. Following Lai and
-    Schumaker (2007), Theorems 8.5 and 18.6, the minimal determining set
-    consists of the Bernstein coefficients
-
-    - on the boundary of the parent simplex,
-    - at distance at least ``order`` from the interior facets and at least
-      ``vorder`` from the interior vertex, and
-    - in the ball of radius ``vorder - 1`` around the interior vertex, those
-      at distance ``vorder - k (c + 1)`` from the interior vertex and greater
-      than ``k`` from the interior facets not containing them, where ``c`` is
-      the codimension of the smallest face of the split containing them.
-
-    On the ball of radius ``vorder`` the spline is a polynomial of degree
-    ``vorder``, which we write as the sum of ``b^k q_k`` over ``k``, where
-    ``b`` is the product of the barycentric coordinates of the parent simplex.
-    The coefficients of the third kind with a given ``k`` are multiples of the
-    Bernstein coefficients of ``q_k`` on the boundary of the parent simplex,
-    plus contributions from ``q_j`` with ``j < k``.
-
-    The remaining coefficients are the unique solution of the smoothness
-    conditions.
+    The spline space consists of C0 piecewise polynomials with the requested
+    smoothness on the specified facets and vertices.  The smoothness relations
+    on the C0 Bernstein coefficients form a matrix ``A``, whose null space is
+    the spline space.  A minimal determining set (MDS) is selected from that
+    null space, and the remaining coefficients are solved for.
     """
-    vorder = order if vorder is None else max(order, vorder)
-    if degree == 0 and order == 0 and vorder == 0:
-        sd = ref_el.get_spatial_dimension()
-        return numpy.ones((1, len(ref_el.get_topology()[sd])))
+    sd = ref_el.get_spatial_dimension()
+    topology = ref_el.get_topology()
+    if degree == 0:
+        return numpy.ones((1, len(topology[sd])))
+
+    # Convert the scalar API to the entity-wise representation used below:
+    # one scalar order applies to every interior facet and interior vertex.
+    if not isinstance(order, dict):
+        vorder = order if vorder is None else max(order, vorder)
+        order = {
+            sd - 1: dict.fromkeys(ref_el.get_interior_facets(sd - 1), order),
+            0: dict.fromkeys(ref_el.get_interior_facets(0), vorder),
+        }
+    elif vorder is not None:
+        raise ValueError("vorder cannot be specified with entity-specific orders")
+
+    if not set(order).issubset({0, sd - 1}):
+        raise NotImplementedError("Only facet and vertex constraints have been implemented")
+    if not set(order.get(sd - 1, {})).issubset(topology[sd - 1]):
+        raise ValueError("Facet orders must be specified on facets of the reference element")
+    if not set(order.get(0, {})).issubset(topology[0]):
+        raise ValueError("Vertex orders must be specified on vertices of the reference element")
 
     entity_support_mis = _entity_support_mis(ref_el, degree)
-    if order == 0 and vorder == 0:
-        support_mis = entity_support_mis
-    else:
-        sd = ref_el.get_spatial_dimension()
-        topology = ref_el.get_topology()
-        interior_vertices = ref_el.get_interior_facets(0)
-        if len(interior_vertices) > 1 or len(topology[0]) != sd + 1 + len(interior_vertices):
-            raise NotImplementedError("Smooth Bernstein polynomial sets are only implemented "
-                                      "on simplices split around a single interior vertex")
+    relations = _smoothness_relations(ref_el, degree, order)
+    if not relations:
+        rows = _entity_support_rows(ref_el, degree, entity_support_mis, entity_ids)
+        return _assemble_c0_coefficients(ref_el, degree, entity_support_mis, rows)
 
-        def distance_to_interior_vertex(cell, alpha):
-            return degree - sum(exponent for vertex, exponent in zip(topology[sd][cell], alpha)
-                                if vertex in interior_vertices)
+    supports = list(entity_support_mis)
+    column = {support: j for j, entity_support in enumerate(supports)
+              for support in entity_support_mis[entity_support]}
 
-        def distance_to_interior_facets(cell, alpha):
-            return min(exponent for vertex, exponent in zip(topology[sd][cell], alpha)
-                       if vertex not in interior_vertices)
-
-        def in_ball_determining_set(cell, alpha):
-            exponents = [exponent for vertex, exponent in zip(topology[sd][cell], alpha)
-                         if vertex not in interior_vertices]
-            codim = exponents.count(0)
-            k, remainder = divmod(vorder - distance_to_interior_vertex(cell, alpha), codim + 1)
-            return k > 0 and remainder == 0 and all(exponent > k for exponent in exponents if exponent)
-
-        def in_determining_set(cell, alpha):
-            distance = distance_to_interior_vertex(cell, alpha)
-            return (distance == degree
-                    or (distance >= vorder and distance_to_interior_facets(cell, alpha) >= order)
-                    or in_ball_determining_set(cell, alpha))
-
-        support_mis = {key: local_support for key, local_support in entity_support_mis.items()
-                       if any(in_determining_set(*support) for support in local_support)}
-
-    rows = _entity_support_rows(ref_el, degree, support_mis, entity_ids)
-    num_free = len(rows)
-    for key in entity_support_mis:
-        if key not in rows:
-            rows[key] = len(rows)
-    c0_coeffs = _assemble_c0_coefficients(ref_el, degree, entity_support_mis, rows)
-    if order == 0 and vorder == 0:
-        return c0_coeffs
-
-    row_of_support = {support: rows[key]
-                      for key, local_support in entity_support_mis.items()
-                      for support in local_support}
-
-    # On the ball of radius vorder around the interior vertex, the spline is a
-    # polynomial of degree vorder. Its Bernstein coefficients on each cell are
-    # convex combinations of its Bernstein coefficients on the parent simplex,
-    # which enter the conditions as auxiliary unknowns.
-    parent_vertices = [vertex for vertex in topology[0] if vertex not in interior_vertices]
-    parent_alphas = {alpha: i for i, alpha in enumerate(multiindex_equal(sd + 1, vorder))}
-    B2R = numpy.vstack([numpy.transpose(ref_el.get_vertices_of_subcomplex(parent_vertices)),
-                        numpy.ones(sd + 1)])
-    num_columns = len(c0_coeffs) + len(interior_vertices) * len(parent_alphas)
-
-    conditions = []
-    for interior_vertex in ref_el.get_vertices_of_subcomplex(interior_vertices):
-        bary = numpy.linalg.solve(B2R, [*interior_vertex, 1])[None, :]
-        for m in range(vorder + 1):
-            gammas = list(multiindex_equal(sd + 1, vorder - m))
-            weights = [bernstein_db(bary, gamma)[0] for gamma in gammas]
-            for local_support in entity_support_mis.values():
-                cell, alpha = local_support[0]
-                if distance_to_interior_vertex(cell, alpha) != m:
-                    continue
-                exponents = dict(zip(topology[sd][cell], alpha))
-                condition = numpy.zeros(num_columns)
-                condition[row_of_support[cell, alpha]] += 1
-                for gamma, weight in zip(gammas, weights):
-                    parent_alpha = tuple(exponents.get(vertex, 0) + g
-                                         for vertex, g in zip(parent_vertices, gamma))
-                    condition[len(c0_coeffs) + parent_alphas[parent_alpha]] -= weight
-                conditions.append(condition)
-
-    # The C^m condition across the facet shared by cells a and b equates the
-    # coefficients in cell b at distance m from the facet to the m-th
-    # de Casteljau step in cell a towards the vertex of cell b opposite to the facet.
-    for facet in ref_el.get_interior_facets(sd - 1):
+    # Bernstein relations keep the smoothness constraints algebraic and local.
+    # For a coefficient on cell_b at normal distance m from the shared facet,
+    # the matching coefficient on cell_a is the m-th de Casteljau step toward
+    # cell_b's opposite vertex.
+    A = numpy.zeros((len(relations), len(supports)))
+    for i, (facet, m, beta) in enumerate(sorted(relations)):
         facet_vertices = topology[sd - 1][facet]
         cell_a, cell_b = ref_el.connectivity[(sd - 1, sd)][facet]
         vertex_b, = set(topology[sd][cell_b]) - set(facet_vertices)
         bary = ref_el.compute_barycentric_coordinates(
             ref_el.get_vertices_of_subcomplex((vertex_b,)), entity=(sd, cell_a))
-        for m in range(1, order + 1):
-            gammas = list(multiindex_equal(sd + 1, m))
-            weights = [bernstein_db(bary, gamma)[0] for gamma in gammas]
-            for beta in multiindex_equal(sd, degree - m):
-                exponents = dict(zip(facet_vertices, beta))
-                alpha_b = tuple(m if vertex == vertex_b else exponents.get(vertex, 0)
-                                for vertex in topology[sd][cell_b])
-                condition = numpy.zeros(num_columns)
-                condition[row_of_support[cell_b, alpha_b]] += 1
-                for gamma, weight in zip(gammas, weights):
-                    alpha_a = tuple(exponents.get(vertex, 0) + g
-                                    for vertex, g in zip(topology[sd][cell_a], gamma))
-                    condition[row_of_support[cell_a, alpha_a]] -= weight
-                conditions.append(condition)
+        exponents = dict(zip(facet_vertices, beta))
+        alpha_b = tuple(m if vertex == vertex_b else exponents.get(vertex, 0)
+                        for vertex in topology[sd][cell_b])
+        A[i, column[cell_b, alpha_b]] += 1
+        for gamma in multiindex_equal(sd + 1, m):
+            alpha_a = tuple(exponents.get(vertex, 0) + g
+                            for vertex, g in zip(topology[sd][cell_a], gamma))
+            A[i, column[cell_a, alpha_a]] -= bernstein_db(bary, gamma)[0]
+    A /= abs(A).max(axis=1, keepdims=True)
 
-    # An MDS uniquely determines all remaining coefficients, so the constraint
-    # matrix has full column rank. Solve against all smoothness equations to
-    # retain their accuracy in the recovered coefficients.
-    A = numpy.reshape(conditions, (-1, num_columns))
-    dependent, _, rank, _ = scipy.linalg.lstsq(A[:, num_free:], -A[:, :num_free], cond=0,
-                                               lapack_driver="gelsy")
-    assert rank == num_columns - num_free
-    dependent = dependent[:len(c0_coeffs) - num_free]
-    return c0_coeffs[:num_free] + dependent.T @ c0_coeffs[num_free:]
+    # The smooth splines are the null space of A.  A set M of coefficients is
+    # determining if and only if the null space basis N restricted to M is
+    # invertible (Lai and Schumaker, Section 5.6).  Select M by column
+    # pivoting on N.T so that the dependent coefficients, N[D] @ inv(N[M]),
+    # stay bounded.  Boundary coefficients are selected first, and then
+    # interior coefficients from the highest to the lowest entity dimension.
+    _, sigma, Vt = numpy.linalg.svd(A)
+    rank = numpy.count_nonzero(sigma > 1e-10 * sigma[0])
+    interior_entities = {dim: set(ref_el.get_interior_facets(dim)) for dim in topology}
+    classes = {}
+    for j, (dim, entity, _) in enumerate(supports):
+        classes.setdefault((entity not in interior_entities[dim], dim), []).append(j)
+    free = _independent_columns(Vt[rank:], [classes[c] for c in sorted(classes, reverse=True)])
+    if len(free) != len(supports) - rank:
+        raise ValueError("Smoothness constraints do not determine all coefficients")
+
+    rows = _entity_support_rows(
+        ref_el, degree, {supports[j]: entity_support_mis[supports[j]] for j in free}, entity_ids)
+    num_determining = len(rows)
+    # Keep determining rows first and append all dependent C0 supports.
+    for entity_support in supports:
+        rows.setdefault(entity_support, len(rows))
+    c0_coeffs = _assemble_c0_coefficients(ref_el, degree, entity_support_mis, rows)
+
+    # Solve the smoothness relations for the dependent coefficients.
+    A = A[:, numpy.argsort([rows[entity_support] for entity_support in supports])]
+    A_free, A_dependent = A[:, :num_determining], A[:, num_determining:]
+    X, *_ = scipy.linalg.lstsq(A_dependent, -A_free, lapack_driver="gelsy")
+    if not numpy.allclose(A_free + A_dependent @ X, 0, atol=1e-10):
+        raise ValueError("Smoothness constraints are inconsistent with the determining set")
+    coeffs = c0_coeffs[:num_determining] + X.T @ c0_coeffs[num_determining:]
+    # The Bernstein coefficients of constants are all one, so the basis
+    # functions sum to one exactly.
+    coeffs[-1] = 1 - coeffs[:-1].sum(axis=0)
+    return coeffs
