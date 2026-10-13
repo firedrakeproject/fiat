@@ -44,24 +44,6 @@ def split_axis_mappings(mapping, rank):
     return kinds
 
 
-def as_gem(v):
-    """Converts a number to a GEM constant, preserving structural zeros."""
-    if v == 0:
-        return zero
-    if v == 1:
-        return one
-    return gem.Literal(v)
-
-
-def as_gem_array(A):
-    """Converts a numeric array to an object array of GEM constants."""
-    A = numpy.asarray(A)
-    out = numpy.full(A.shape, zero, dtype=object)
-    for index in numpy.ndindex(A.shape):
-        out[index] = as_gem(float(A[index]))
-    return out
-
-
 def support_entity(ref_el, points, tol=1e-12):
     """The smallest entity whose closure contains all the points.
 
@@ -210,7 +192,7 @@ class PhysicalEntityFrame:
         for k, (n, u, _, frame) in enumerate(self.normals):
             scale = reduce(mul, dens[:k] + dens[k+1:], one)
             for f in frame:
-                terms.append(((u @ as_gem_array(f)) * scale, numpy.outer(f, n)))
+                terms.append(((u @ f) * scale, numpy.outer(f, n)))
         return DirectionPullback(P, terms, reduce(mul, dens))
 
     def contravariant_pullback(self):
@@ -234,7 +216,7 @@ class PhysicalEntityFrame:
         P = numpy.outer(nu, nu) / nn
         terms = [(Knu @ Knu, numpy.eye(sd) - P)]
         for tau in self.facet_tangents:
-            terms.append((KtKnu @ as_gem_array(-tau), numpy.outer(nu, tau)))
+            terms.append((KtKnu @ -tau, numpy.outer(nu, tau)))
         return DirectionPullback(P, terms, detJ * nn)
 
     def measure(self):
