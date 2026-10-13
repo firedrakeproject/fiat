@@ -68,7 +68,7 @@ class BernsteinPolynomialSet(PolynomialSet):
     :arg ref_el: The simplex or macrocell.
     :arg degree: The polynomial degree.
     :kwarg order: The order of continuity across the interior facets of a
-        macrocell, either 0 or 1.
+        macrocell.
     :kwarg vorder: The order of super-smoothness at the interior vertex of a
         macrocell.
     :kwarg entity_ids: An optional entity-to-basis-index map defining the
@@ -77,12 +77,10 @@ class BernsteinPolynomialSet(PolynomialSet):
         the minimal determining set.
     """
     def __init__(self, ref_el, degree, order=0, vorder=None, entity_ids=None):
-        expansion_set = BernsteinExpansionSet(ref_el)
         if degree < 0:
             raise ValueError("Bernstein polynomial sets require a nonnegative degree")
-        if order not in {0, 1}:
-            raise NotImplementedError("Only C0 and C1 Bernstein polynomial sets are implemented")
         coeffs = _ck_coefficients(ref_el, degree, order, vorder, entity_ids)
+        expansion_set = BernsteinExpansionSet(ref_el)
         super().__init__(ref_el, degree, degree, expansion_set, coeffs)
 
 
@@ -190,25 +188,26 @@ def _entity_support_mis(ref_el, degree):
     """Collect the local Bernstein multiindices supporting each C0 function.
 
     :returns: A dict mapping the C0 Bernstein function associated with an
-        entity and restricted multiindex, keyed as ``(entity_dim, entity,
+        entity and restricted multiindex, keyed as ``(entity_dim, entity_id,
         beta)``, to the list of ``(cell_id, alpha)`` pairs locating its local
         Bernstein multiindices.
     """
     topology = ref_el.get_topology()
     sd = ref_el.get_spatial_dimension()
-    inverse = {
-        vertices: (entity_dim, entity)
-        for entity_dim, entities in topology.items()
-        for entity, vertices in entities.items()
-    }
+    connectivity = ref_el.get_connectivity()
+    betas = {dim: tuple(multiindex_equal(dim + 1, degree, imin=1))
+             for dim in topology}
     entity_support_mis = {}
     for cell, cell_vertices in topology[sd].items():
-        for alpha in multiindex_equal(sd + 1, degree):
-            support = tuple(vertex for vertex, exponent in zip(cell_vertices, alpha) if exponent)
-            entity_dim, entity = inverse[support]
-            entity_vertices = topology[entity_dim][entity]
-            beta = tuple(alpha[cell_vertices.index(vertex)] for vertex in entity_vertices)
-            entity_support_mis.setdefault((entity_dim, entity, beta), []).append((cell, alpha))
+        for entity_dim, entities in topology.items():
+            for entity_id in connectivity[(sd, entity_dim)][cell]:
+                entity_vertices = entities[entity_id]
+                for beta in betas[entity_dim]:
+                    alpha = [0] * (sd + 1)
+                    for vertex, exponent in zip(entity_vertices, beta):
+                        alpha[cell_vertices.index(vertex)] = exponent
+                    key = (entity_dim, entity_id, beta)
+                    entity_support_mis.setdefault(key, []).append((cell, tuple(alpha)))
     return entity_support_mis
 
 
@@ -274,50 +273,54 @@ def _ck_coefficients(ref_el, degree, order, vorder, entity_ids=None):
     conditions.
     """
     vorder = order if vorder is None else max(order, vorder)
-    if order == 0 and vorder == 0:
-        if degree == 0:
-            sd = ref_el.get_spatial_dimension()
-            return numpy.ones((1, len(ref_el.get_topology()[sd])))
-        entity_support_mis = _entity_support_mis(ref_el, degree)
-        rows = _entity_support_rows(ref_el, degree, entity_support_mis, entity_ids)
-        return _assemble_c0_coefficients(ref_el, degree, entity_support_mis, rows)
-    sd = ref_el.get_spatial_dimension()
-    topology = ref_el.get_topology()
-    interior_vertices = ref_el.get_interior_facets(0)
-    if len(interior_vertices) > 1 or len(topology[0]) != sd + 1 + len(interior_vertices):
-        raise NotImplementedError("Smooth Bernstein polynomial sets are only implemented "
-                                  "on simplices split around a single interior vertex")
-
-    def distance_to_interior_vertex(cell, alpha):
-        return degree - sum(exponent for vertex, exponent in zip(topology[sd][cell], alpha)
-                            if vertex in interior_vertices)
-
-    def distance_to_interior_facets(cell, alpha):
-        return min(exponent for vertex, exponent in zip(topology[sd][cell], alpha)
-                   if vertex not in interior_vertices)
-
-    def in_ball_determining_set(cell, alpha):
-        exponents = [exponent for vertex, exponent in zip(topology[sd][cell], alpha)
-                     if vertex not in interior_vertices]
-        codim = exponents.count(0)
-        k, remainder = divmod(vorder - distance_to_interior_vertex(cell, alpha), codim + 1)
-        return k > 0 and remainder == 0 and all(exponent > k for exponent in exponents if exponent)
-
-    def in_determining_set(cell, alpha):
-        distance = distance_to_interior_vertex(cell, alpha)
-        return (distance == degree
-                or (distance >= vorder and distance_to_interior_facets(cell, alpha) >= order)
-                or in_ball_determining_set(cell, alpha))
+    if degree == 0 and order == 0 and vorder == 0:
+        sd = ref_el.get_spatial_dimension()
+        return numpy.ones((1, len(ref_el.get_topology()[sd])))
 
     entity_support_mis = _entity_support_mis(ref_el, degree)
-    free_support_mis = {key: local_support for key, local_support in entity_support_mis.items()
-                        if any(in_determining_set(*support) for support in local_support)}
-    rows = _entity_support_rows(ref_el, degree, free_support_mis, entity_ids)
+    if order == 0 and vorder == 0:
+        support_mis = entity_support_mis
+    else:
+        sd = ref_el.get_spatial_dimension()
+        topology = ref_el.get_topology()
+        interior_vertices = ref_el.get_interior_facets(0)
+        if len(interior_vertices) > 1 or len(topology[0]) != sd + 1 + len(interior_vertices):
+            raise NotImplementedError("Smooth Bernstein polynomial sets are only implemented "
+                                      "on simplices split around a single interior vertex")
+
+        def distance_to_interior_vertex(cell, alpha):
+            return degree - sum(exponent for vertex, exponent in zip(topology[sd][cell], alpha)
+                                if vertex in interior_vertices)
+
+        def distance_to_interior_facets(cell, alpha):
+            return min(exponent for vertex, exponent in zip(topology[sd][cell], alpha)
+                       if vertex not in interior_vertices)
+
+        def in_ball_determining_set(cell, alpha):
+            exponents = [exponent for vertex, exponent in zip(topology[sd][cell], alpha)
+                         if vertex not in interior_vertices]
+            codim = exponents.count(0)
+            k, remainder = divmod(vorder - distance_to_interior_vertex(cell, alpha), codim + 1)
+            return k > 0 and remainder == 0 and all(exponent > k for exponent in exponents if exponent)
+
+        def in_determining_set(cell, alpha):
+            distance = distance_to_interior_vertex(cell, alpha)
+            return (distance == degree
+                    or (distance >= vorder and distance_to_interior_facets(cell, alpha) >= order)
+                    or in_ball_determining_set(cell, alpha))
+
+        support_mis = {key: local_support for key, local_support in entity_support_mis.items()
+                       if any(in_determining_set(*support) for support in local_support)}
+
+    rows = _entity_support_rows(ref_el, degree, support_mis, entity_ids)
     num_free = len(rows)
     for key in entity_support_mis:
         if key not in rows:
             rows[key] = len(rows)
     c0_coeffs = _assemble_c0_coefficients(ref_el, degree, entity_support_mis, rows)
+    if order == 0 and vorder == 0:
+        return c0_coeffs
+
     row_of_support = {support: rows[key]
                       for key, local_support in entity_support_mis.items()
                       for support in local_support}
