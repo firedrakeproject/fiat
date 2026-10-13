@@ -160,10 +160,14 @@ class QuadratureElement(FiniteElementBase):
 
         rule_ps = self._rule.point_set
         blocks = rule_ps.point_sets
-        matches = [k for k, block in enumerate(blocks) if block.almost_equal(ps)]
+        # Distinct summands can use identical points. Identify the block by
+        # object identity to preserve its offset in the coefficient vector.
+        matches = [k for k, block in enumerate(blocks) if block is ps]
+        if not matches:
+            matches = [k for k, block in enumerate(blocks) if block.almost_equal(ps)]
         if not matches:
             raise ValueError("Mismatch of quadrature points!")
-        k, = matches
+        k = matches[0]
 
         if len(blocks) > 1:
             # `ps` is one point set of the union: tabulate onto the rows of the
