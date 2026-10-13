@@ -88,7 +88,7 @@ class C2DualSet(dual_set.DualSet):
 class BrambleZlamalC2(finite_element.CiarletElement):
     """The Bramble-Zlamal C2 element."""
     def __init__(self, ref_el, degree=9, reduced=False, quad_scheme=None):
-        poly_set = BernsteinPolynomialSet(ref_el, degree, ordering="topological")
+        poly_set = BernsteinPolynomialSet(ref_el, degree)
         dual = C2DualSet(ref_el, degree, reduced=reduced, quad_scheme=quad_scheme)
         super().__init__(poly_set, dual, degree, formdegree=0)
 
