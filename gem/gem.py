@@ -806,17 +806,16 @@ class FlexiblyIndexed(Scalar):
                     idxs_.append((index, stride))
                     # last += (unknown_extent - 1) * stride
                 elif isinstance(index, int):
-                    # TODO: Attach dtype to each Node.
-                    # Here, we should simply be able to do:
-                    # >>> offset_ += index * stride
-                    # but "+" and "*" are not currently correctly overloaded
-                    # for indices (integers); they assume floats.
                     if not isinstance(offset, Integral):
                         raise NotImplementedError(f"Found non-Integral offset : {offset}")
-                    if isinstance(stride, Constant):
-                        offset_ += index * stride.value
+                    step = stride.value if isinstance(stride, Constant) else stride
+                    if isinstance(step, Node) or isinstance(offset_, Node):
+                        # The overloaded "+" and "*" convert numbers with
+                        # as_gem, which makes float literals; an offset is an
+                        # array index, so it must stay an unsigned integer.
+                        offset_ = as_gem_uint(offset_) + as_gem_uint(index) * as_gem_uint(step)
                     else:
-                        offset_ += index * stride
+                        offset_ += index * step
                 else:
                     raise ValueError("Unexpected index type for flexible indexing")
                 if isinstance(stride, Node):
