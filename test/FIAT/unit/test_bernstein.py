@@ -135,11 +135,21 @@ def test_bernstein_c0_alfeld(dim, degree):
     assert rank(values) == rank(c0_values) == rank(numpy.vstack([values, c0_values]))
 
 
+@pytest.mark.parametrize("dim", (1, 2, 3))
+def test_bernstein_c0_degree_zero(dim):
+    ref_el = AlfeldSplit(ufc_simplex(dim))
+    default = BernsteinPolynomialSet(ref_el, 0)
+    explicit = BernsteinPolynomialSet(ref_el, 0, order=0, vorder=0)
+
+    assert explicit.get_num_members() == 1
+    assert numpy.array_equal(explicit.get_coeffs(), default.get_coeffs())
+
+
 @pytest.mark.parametrize("dim, variant, degree",
                          [(dim, variant, degree)
                           for dim in (1, 2, 3)
                           for variant in ("alfeld", "iso", "powell-sabin", "worsey-farin")
-                          for degree in range(1, 2*dim + 1)
+                          for degree in range(1, 6)
                           if (dim, variant) != (1, "worsey-farin")])
 def test_bernstein_macro_variant(dim, variant, degree):
     ref_el = ufc_simplex(dim)
@@ -198,7 +208,7 @@ def assert_vertex_supersmoothness(poly_set, vorder):
 
 @pytest.mark.parametrize("dim, degree, vorder",
                          [(dim, degree, vorder) for dim in (2, 3) for degree in range(dim + 1, 2*dim)
-                          for vorder in range(dim + 1, degree + 1)])
+                          for vorder in range(degree + 1)])
 def test_bernstein_c1_supersmooth_alfeld(dim, degree, vorder):
     ref_el = AlfeldSplit(ufc_simplex(dim))
     poly_set = BernsteinPolynomialSet(ref_el, degree, order=1, vorder=vorder)

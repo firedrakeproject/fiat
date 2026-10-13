@@ -15,7 +15,7 @@ from FIAT.expansions import ExpansionSet
 from FIAT.finite_element import CiarletElement
 from FIAT.lagrange import LagrangeDualSet
 from FIAT.polynomial_set import PolynomialSet, mis
-from FIAT.reference_element import Cell, multiindex_equal
+from FIAT.reference_element import multiindex_equal
 
 
 class BernsteinExpansionSet(ExpansionSet):
@@ -82,10 +82,7 @@ class BernsteinPolynomialSet(PolynomialSet):
             raise ValueError("Bernstein polynomial sets require a nonnegative degree")
         if order not in {0, 1}:
             raise NotImplementedError("Only C0 and C1 Bernstein polynomial sets are implemented")
-        if order == 0 and vorder is None:
-            coeffs = _c0_coefficients(ref_el, degree, entity_ids)
-        else:
-            coeffs = _ck_coefficients(ref_el, degree, order, vorder, entity_ids)
+        coeffs = _ck_coefficients(ref_el, degree, order, vorder, entity_ids)
         super().__init__(ref_el, degree, degree, expansion_set, coeffs)
 
 
@@ -189,13 +186,13 @@ def bernstein_Dx(points, ks, order, R2B):
     return result
 
 
-def _domain_points(ref_el, degree):
-    """Collect the local Bernstein multiindices of each C0 Bernstein function.
+def _entity_support_mis(ref_el, degree):
+    """Collect the local Bernstein multiindices supporting each C0 function.
 
-    :returns: A dict mapping the C0 Bernstein function supported on an entity
-        with a restricted multiindex, keyed as ``(entity_dim, entity, beta)``,
-        to the list of ``(cell, alpha)`` local multiindices on the cells
-        containing that entity.
+    :returns: A dict mapping the C0 Bernstein function associated with an
+        entity and restricted multiindex, keyed as ``(entity_dim, entity,
+        beta)``, to the list of ``(cell_id, alpha)`` pairs locating its local
+        Bernstein multiindices.
     """
     topology = ref_el.get_topology()
     sd = ref_el.get_spatial_dimension()
@@ -204,23 +201,22 @@ def _domain_points(ref_el, degree):
         for entity_dim, entities in topology.items()
         for entity, vertices in entities.items()
     }
-    points = {}
+    entity_support_mis = {}
     for cell, cell_vertices in topology[sd].items():
         for alpha in multiindex_equal(sd + 1, degree):
             support = tuple(vertex for vertex, exponent in zip(cell_vertices, alpha) if exponent)
             entity_dim, entity = inverse[support]
             entity_vertices = topology[entity_dim][entity]
             beta = tuple(alpha[cell_vertices.index(vertex)] for vertex in entity_vertices)
-            points.setdefault((entity_dim, entity, beta), []).append((cell, alpha))
-    return points
+            entity_support_mis.setdefault((entity_dim, entity, beta), []).append((cell, alpha))
+    return entity_support_mis
 
 
-def _domain_point_rows(ref_el: Cell, degree: int, domain_points: dict,
-                       entity_ids: dict | None = None) -> dict:
-    """Number domain points in the default or supplied entity ordering."""
+def _entity_support_rows(ref_el, degree, entity_support_mis, entity_ids=None):
+    """Number entity-associated Bernstein functions in entity order."""
     if entity_ids is None:
-        ordered = sorted(domain_points,
-                         key=lambda key: tuple(sorted(domain_points[key][0][1], reverse=True)))
+        ordered = sorted(entity_support_mis,
+                         key=lambda key: tuple(sorted(entity_support_mis[key][0][1], reverse=True)))
         return {key: row for row, key in enumerate(ordered)}
 
     rows = {}
@@ -228,7 +224,7 @@ def _domain_point_rows(ref_el: Cell, degree: int, domain_points: dict,
         betas = list(multiindex_equal(dim + 1, degree, imin=1))
         for entity in entities:
             keys = [(dim, entity, beta) for beta in betas
-                    if (dim, entity, beta) in domain_points]
+                    if (dim, entity, beta) in entity_support_mis]
             ids = entity_ids[dim][entity]
             if len(ids) != len(keys):
                 raise ValueError(f"Expected {len(keys)} basis functions on entity {(dim, entity)}, "
@@ -237,28 +233,17 @@ def _domain_point_rows(ref_el: Cell, degree: int, domain_points: dict,
     return rows
 
 
-def _assemble_c0_coefficients(ref_el: Cell, degree: int, domain_points: dict,
-                              rows: dict) -> numpy.ndarray:
+def _assemble_c0_coefficients(ref_el, degree, entity_support_mis, rows):
     """Assemble the C0 basis from its local Bernstein supports."""
     sd = ref_el.get_spatial_dimension()
     local_alpha_ids = {alpha: i for i, alpha in enumerate(multiindex_equal(sd + 1, degree))}
     num_local = len(local_alpha_ids)
     num_cells = len(ref_el.get_topology()[sd])
     coeffs = numpy.zeros((len(rows), num_cells * num_local))
-    for key, local_points in domain_points.items():
-        for cell, alpha in local_points:
+    for key, local_support in entity_support_mis.items():
+        for cell, alpha in local_support:
             coeffs[rows[key], cell * num_local + local_alpha_ids[alpha]] = 1
     return coeffs
-
-
-def _c0_coefficients(ref_el: Cell, degree: int, entity_ids: dict | None = None) -> numpy.ndarray:
-    """Construct C0 Bernstein coefficients from entity multiindices."""
-    if degree == 0:
-        sd = ref_el.get_spatial_dimension()
-        return numpy.ones((1, len(ref_el.get_topology()[sd])))
-    domain_points = _domain_points(ref_el, degree)
-    rows = _domain_point_rows(ref_el, degree, domain_points, entity_ids)
-    return _assemble_c0_coefficients(ref_el, degree, domain_points, rows)
 
 
 def _ck_coefficients(ref_el, degree, order, vorder, entity_ids=None):
@@ -288,13 +273,20 @@ def _ck_coefficients(ref_el, degree, order, vorder, entity_ids=None):
     The remaining coefficients are the unique solution of the smoothness
     conditions.
     """
+    vorder = order if vorder is None else max(order, vorder)
+    if order == 0 and vorder == 0:
+        if degree == 0:
+            sd = ref_el.get_spatial_dimension()
+            return numpy.ones((1, len(ref_el.get_topology()[sd])))
+        entity_support_mis = _entity_support_mis(ref_el, degree)
+        rows = _entity_support_rows(ref_el, degree, entity_support_mis, entity_ids)
+        return _assemble_c0_coefficients(ref_el, degree, entity_support_mis, rows)
     sd = ref_el.get_spatial_dimension()
     topology = ref_el.get_topology()
     interior_vertices = ref_el.get_interior_facets(0)
     if len(interior_vertices) > 1 or len(topology[0]) != sd + 1 + len(interior_vertices):
         raise NotImplementedError("Smooth Bernstein polynomial sets are only implemented "
                                   "on simplices split around a single interior vertex")
-    vorder = order if vorder is None else max(order, vorder)
 
     def distance_to_interior_vertex(cell, alpha):
         return degree - sum(exponent for vertex, exponent in zip(topology[sd][cell], alpha)
@@ -317,18 +309,18 @@ def _ck_coefficients(ref_el, degree, order, vorder, entity_ids=None):
                 or (distance >= vorder and distance_to_interior_facets(cell, alpha) >= order)
                 or in_ball_determining_set(cell, alpha))
 
-    domain_points = _domain_points(ref_el, degree)
-    free_points = {key: local_points for key, local_points in domain_points.items()
-                   if any(in_determining_set(*point) for point in local_points)}
-    rows = _domain_point_rows(ref_el, degree, free_points, entity_ids)
+    entity_support_mis = _entity_support_mis(ref_el, degree)
+    free_support_mis = {key: local_support for key, local_support in entity_support_mis.items()
+                        if any(in_determining_set(*support) for support in local_support)}
+    rows = _entity_support_rows(ref_el, degree, free_support_mis, entity_ids)
     num_free = len(rows)
-    for key in domain_points:
+    for key in entity_support_mis:
         if key not in rows:
             rows[key] = len(rows)
-    c0_coeffs = _assemble_c0_coefficients(ref_el, degree, domain_points, rows)
-    row_of_point = {point: rows[key]
-                    for key, local_points in domain_points.items()
-                    for point in local_points}
+    c0_coeffs = _assemble_c0_coefficients(ref_el, degree, entity_support_mis, rows)
+    row_of_support = {support: rows[key]
+                      for key, local_support in entity_support_mis.items()
+                      for support in local_support}
 
     # On the ball of radius vorder around the interior vertex, the spline is a
     # polynomial of degree vorder. Its Bernstein coefficients on each cell are
@@ -346,13 +338,13 @@ def _ck_coefficients(ref_el, degree, order, vorder, entity_ids=None):
         for m in range(vorder + 1):
             gammas = list(multiindex_equal(sd + 1, vorder - m))
             weights = [bernstein_db(bary, gamma)[0] for gamma in gammas]
-            for local_points in domain_points.values():
-                cell, alpha = local_points[0]
+            for local_support in entity_support_mis.values():
+                cell, alpha = local_support[0]
                 if distance_to_interior_vertex(cell, alpha) != m:
                     continue
                 exponents = dict(zip(topology[sd][cell], alpha))
                 condition = numpy.zeros(num_columns)
-                condition[row_of_point[cell, alpha]] += 1
+                condition[row_of_support[cell, alpha]] += 1
                 for gamma, weight in zip(gammas, weights):
                     parent_alpha = tuple(exponents.get(vertex, 0) + g
                                          for vertex, g in zip(parent_vertices, gamma))
@@ -376,11 +368,11 @@ def _ck_coefficients(ref_el, degree, order, vorder, entity_ids=None):
                 alpha_b = tuple(m if vertex == vertex_b else exponents.get(vertex, 0)
                                 for vertex in topology[sd][cell_b])
                 condition = numpy.zeros(num_columns)
-                condition[row_of_point[cell_b, alpha_b]] += 1
+                condition[row_of_support[cell_b, alpha_b]] += 1
                 for gamma, weight in zip(gammas, weights):
                     alpha_a = tuple(exponents.get(vertex, 0) + g
                                     for vertex, g in zip(topology[sd][cell_a], gamma))
-                    condition[row_of_point[cell_a, alpha_a]] -= weight
+                    condition[row_of_support[cell_a, alpha_a]] -= weight
                 conditions.append(condition)
 
     # An MDS uniquely determines all remaining coefficients, so the constraint
