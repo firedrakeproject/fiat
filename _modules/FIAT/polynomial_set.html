@@ -170,6 +170,31 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">coeffs</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span></div>
 
 
+<div class="viewcode-block" id="PolynomialSet.recombine">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.polynomial_set.PolynomialSet.recombine">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">recombine</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">coefficients</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"PolynomialSet"</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Return a polynomial set formed from linear combinations.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        coefficients : numpy.ndarray</span>
+<span class="sd">            A matrix whose rows contain the coefficients of the new</span>
+<span class="sd">            polynomials in the current polynomial basis.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        PolynomialSet</span>
+<span class="sd">            A polynomial set with the same reference element, degree,</span>
+<span class="sd">            expansion set, and value shape as this set.</span>
+<span class="sd">        """</span>
+        <span class="n">coefficients</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">coefficients</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">coefficients</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">2</span> <span class="ow">or</span> <span class="n">coefficients</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Polynomial recombination must have one column per polynomial"</span><span class="p">)</span>
+        <span class="n">new_coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">coefficients</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">coeffs</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">PolynomialSet</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">degree</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">embedded_degree</span><span class="p">,</span>
+                             <span class="bp">self</span><span class="o">.</span><span class="n">expansion_set</span><span class="p">,</span> <span class="n">new_coeffs</span><span class="p">)</span></div>
+
+
 <div class="viewcode-block" id="PolynomialSet.take">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.polynomial_set.PolynomialSet.take">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">take</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">items</span><span class="p">):</span>

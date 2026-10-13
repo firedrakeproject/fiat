@@ -57,7 +57,7 @@
 
 <div class="viewcode-block" id="FiniteElement">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.FiniteElement">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">FiniteElement</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">FiniteElement</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Class implementing a basic abstraction template for general</span>
 <span class="sd">    finite element families. Finite elements which inherit from</span>
 <span class="sd">    this class are non-nodal unless they are CiarletElement subclasses.</span>
@@ -215,13 +215,45 @@
 
 <span class="sd">    Elements derived from this class are nodal finite elements, with a nodal</span>
 <span class="sd">    basis generated from polynomials encoded in a `PolynomialSet`.</span>
+
+<span class="sd">    The polynomial basis is recombined so that it is dual to the supplied</span>
+<span class="sd">    functionals. When ``recombine_dual`` is true, the functionals are</span>
+<span class="sd">    recombined instead, leaving the polynomial basis unchanged.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    poly_set : PolynomialSet</span>
+<span class="sd">        Polynomial space and expansion basis used to construct the finite</span>
+<span class="sd">        element.</span>
+<span class="sd">    dual : DualSet</span>
+<span class="sd">        Functionals defining the degrees of freedom.</span>
+<span class="sd">    order : int</span>
+<span class="sd">        Element order, which may differ from the polynomial degree.</span>
+<span class="sd">    formdegree : int or None, optional</span>
+<span class="sd">        Degree of the associated differential form, if any.</span>
+<span class="sd">    mapping : str or None, optional</span>
+<span class="sd">        Mapping used to transform basis functions from the reference element</span>
+<span class="sd">        to a physical element.</span>
+<span class="sd">    ref_complex : Cell or None, optional</span>
+<span class="sd">        Reference complex on which the polynomial set is defined. Defaults to</span>
+<span class="sd">        the reference element of ``poly_set``.</span>
+<span class="sd">    recombine_dual : bool, optional</span>
+<span class="sd">        If true, recombine the functionals to be dual to the supplied</span>
+<span class="sd">        polynomial basis. Otherwise, recombine the polynomial basis to be dual</span>
+<span class="sd">        to the supplied functionals.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    ValueError</span>
+<span class="sd">        If the polynomial space and dual set have different dimensions.</span>
+<span class="sd">    numpy.linalg.LinAlgError</span>
+<span class="sd">        If the generalized Vandermonde matrix is singular.</span>
 <span class="sd">    """</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">formdegree</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="s2">"affine"</span><span class="p">,</span> <span class="n">ref_complex</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">formdegree</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="s2">"affine"</span><span class="p">,</span>
+                 <span class="n">ref_complex</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">recombine_dual</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
         <span class="n">ref_el</span> <span class="o">=</span> <span class="n">dual</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span>
         <span class="n">ref_complex</span> <span class="o">=</span> <span class="n">ref_complex</span> <span class="ow">or</span> <span class="n">poly_set</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">formdegree</span><span class="p">,</span> <span class="n">mapping</span><span class="p">,</span> <span class="n">ref_complex</span><span class="p">)</span>
-
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">poly_set</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">dual</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Dimension of function space is </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">poly_set</span><span class="p">)</span><span class="si">}</span><span class="s2">, but got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">dual</span><span class="p">)</span><span class="si">}</span><span class="s2"> nodes."</span><span class="p">)</span>
 
@@ -235,22 +267,30 @@
         <span class="n">V</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">B</span><span class="p">))</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">V</span> <span class="o">=</span> <span class="n">V</span>
 
-        <span class="c1"># new_coeffs_flat = numpy.linalg.solve(V.T, B)</span>
+        <span class="c1"># Either recombine the nodes by V^{-1} to make them dual to the</span>
+        <span class="c1"># prescribed basis, or recombine the basis by V^{-T} to make it nodal.</span>
         <span class="k">with</span> <span class="n">warnings</span><span class="o">.</span><span class="n">catch_warnings</span><span class="p">():</span>
             <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">"error"</span><span class="p">)</span>
             <span class="k">try</span><span class="p">:</span>
-                <span class="n">new_coeffs_flat</span> <span class="o">=</span> <span class="n">scipy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">V</span><span class="p">,</span> <span class="n">B</span><span class="p">,</span> <span class="n">transposed</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">recombine_dual</span><span class="p">:</span>
+                    <span class="n">dual_coeffs</span> <span class="o">=</span> <span class="n">scipy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">V</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">V</span><span class="p">)))</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">new_coeffs_flat</span> <span class="o">=</span> <span class="n">scipy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">V</span><span class="p">,</span> <span class="n">B</span><span class="p">,</span> <span class="n">transposed</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
             <span class="k">except</span> <span class="p">(</span><span class="n">scipy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">LinAlgWarning</span><span class="p">,</span> <span class="n">scipy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">LinAlgError</span><span class="p">):</span>
                 <span class="k">raise</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">LinAlgError</span><span class="p">(</span><span class="s2">"Singular Vandermonde matrix"</span><span class="p">)</span>
 
-        <span class="n">new_shp</span> <span class="o">=</span> <span class="n">new_coeffs_flat</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">shp</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
-        <span class="n">new_coeffs</span> <span class="o">=</span> <span class="n">new_coeffs_flat</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">new_shp</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">recombine_dual</span><span class="p">:</span>
+            <span class="n">dual</span> <span class="o">=</span> <span class="n">dual</span><span class="o">.</span><span class="n">recombine</span><span class="p">(</span><span class="n">dual_coeffs</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">new_shp</span> <span class="o">=</span> <span class="n">new_coeffs_flat</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">shp</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+            <span class="n">poly_set</span> <span class="o">=</span> <span class="n">PolynomialSet</span><span class="p">(</span><span class="n">poly_set</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">(),</span>
+                                     <span class="n">poly_set</span><span class="o">.</span><span class="n">get_degree</span><span class="p">(),</span>
+                                     <span class="n">poly_set</span><span class="o">.</span><span class="n">get_embedded_degree</span><span class="p">(),</span>
+                                     <span class="n">poly_set</span><span class="o">.</span><span class="n">get_expansion_set</span><span class="p">(),</span>
+                                     <span class="n">new_coeffs_flat</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">new_shp</span><span class="p">))</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">poly_set</span> <span class="o">=</span> <span class="n">PolynomialSet</span><span class="p">(</span><span class="n">poly_set</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">(),</span>
-                                      <span class="n">poly_set</span><span class="o">.</span><span class="n">get_degree</span><span class="p">(),</span>
-                                      <span class="n">poly_set</span><span class="o">.</span><span class="n">get_embedded_degree</span><span class="p">(),</span>
-                                      <span class="n">poly_set</span><span class="o">.</span><span class="n">get_expansion_set</span><span class="p">(),</span>
-                                      <span class="n">new_coeffs</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">formdegree</span><span class="p">,</span> <span class="n">mapping</span><span class="p">,</span> <span class="n">ref_complex</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">poly_set</span> <span class="o">=</span> <span class="n">poly_set</span>
 
 <div class="viewcode-block" id="CiarletElement.degree">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.CiarletElement.degree">[docs]</a>

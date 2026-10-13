@@ -211,10 +211,14 @@
 
         <span class="n">rule_ps</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rule</span><span class="o">.</span><span class="n">point_set</span>
         <span class="n">blocks</span> <span class="o">=</span> <span class="n">rule_ps</span><span class="o">.</span><span class="n">point_sets</span>
-        <span class="n">matches</span> <span class="o">=</span> <span class="p">[</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">block</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">blocks</span><span class="p">)</span> <span class="k">if</span> <span class="n">block</span><span class="o">.</span><span class="n">almost_equal</span><span class="p">(</span><span class="n">ps</span><span class="p">)]</span>
+        <span class="c1"># Distinct summands can use identical points. Identify the block by</span>
+        <span class="c1"># object identity to preserve its offset in the coefficient vector.</span>
+        <span class="n">matches</span> <span class="o">=</span> <span class="p">[</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">block</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">blocks</span><span class="p">)</span> <span class="k">if</span> <span class="n">block</span> <span class="ow">is</span> <span class="n">ps</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">matches</span><span class="p">:</span>
+            <span class="n">matches</span> <span class="o">=</span> <span class="p">[</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">block</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">blocks</span><span class="p">)</span> <span class="k">if</span> <span class="n">block</span><span class="o">.</span><span class="n">almost_equal</span><span class="p">(</span><span class="n">ps</span><span class="p">)]</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">matches</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Mismatch of quadrature points!"</span><span class="p">)</span>
-        <span class="n">k</span><span class="p">,</span> <span class="o">=</span> <span class="n">matches</span>
+        <span class="n">k</span> <span class="o">=</span> <span class="n">matches</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">blocks</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
             <span class="c1"># `ps` is one point set of the union: tabulate onto the rows of the</span>

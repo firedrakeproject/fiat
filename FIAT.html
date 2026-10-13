@@ -672,47 +672,54 @@ DG_{k-1}. This pair is inf-sup stable, but only weakly divergence-free.</p>
 <span id="fiat-bernstein-module"></span><h2>FIAT.bernstein module<a class="headerlink" href="#module-FIAT.bernstein" title="Link to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.bernstein.Bernstein">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.bernstein.</span></span><span class="sig-name descname"><span class="pre">Bernstein</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/bernstein.html#Bernstein"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.bernstein.Bernstein" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#FIAT.finite_element.FiniteElement" title="FIAT.finite_element.FiniteElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">FiniteElement</span></code></a></p>
-<p>A finite element with Bernstein polynomials as basis functions.</p>
-<dl class="py method">
-<dt class="sig sig-object py" id="FIAT.bernstein.Bernstein.degree">
-<span class="sig-name descname"><span class="pre">degree</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/bernstein.html#Bernstein.degree"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.bernstein.Bernstein.degree" title="Link to this definition">¶</a></dt>
-<dd><p>The degree of the polynomial space.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="FIAT.bernstein.Bernstein.tabulate">
-<span class="sig-name descname"><span class="pre">tabulate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">points</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/bernstein.html#Bernstein.tabulate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.bernstein.Bernstein.tabulate" title="Link to this definition">¶</a></dt>
-<dd><p>Return tabulated values of derivatives up to given order of
-basis functions at given points.</p>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.bernstein.</span></span><span class="sig-name descname"><span class="pre">Bernstein</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'gll'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/bernstein.html#Bernstein"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.bernstein.Bernstein" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#FIAT.finite_element.CiarletElement" title="FIAT.finite_element.CiarletElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">CiarletElement</span></code></a></p>
+<p>A C0 finite element with Bernstein polynomials as basis functions.</p>
+<p>The nodes are linear combinations of Lagrange point evaluations.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>order</strong> – The maximum order of derivative.</p></li>
-<li><p><strong>points</strong> – An iterable of points.</p></li>
-<li><p><strong>entity</strong> – Optional (dimension, entity number) pair
-indicating which topological entity of the
-reference element to tabulate on.  If <code class="docutils literal notranslate"><span class="pre">None</span></code>,
-default cell-wise tabulation is performed.</p></li>
+<li><p><strong>ref_el</strong> – The reference simplex.</p></li>
+<li><p><strong>degree</strong> – The polynomial degree.</p></li>
+<li><p><strong>variant</strong> – A comma-separated string that may specify the type of
+point distribution and the splitting strategy if a macro element is
+desired, as in <a class="reference internal" href="#FIAT.lagrange.Lagrange" title="FIAT.lagrange.Lagrange"><code class="xref py py-class docutils literal notranslate"><span class="pre">FIAT.lagrange.Lagrange</span></code></a>.
+Example: variant=’alfeld’ gives C0 piecewise Bernstein polynomials
+on the barycentric refinement.</p></li>
 </ul>
 </dd>
 </dl>
 </dd></dl>
 
-<dl class="py method">
-<dt class="sig sig-object py" id="FIAT.bernstein.Bernstein.value_shape">
-<span class="sig-name descname"><span class="pre">value_shape</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/bernstein.html#Bernstein.value_shape"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.bernstein.Bernstein.value_shape" title="Link to this definition">¶</a></dt>
-<dd><p>The value shape of the finite element functions.</p>
-</dd></dl>
-
+<dl class="py class">
+<dt class="sig sig-object py" id="FIAT.bernstein.BernsteinExpansionSet">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.bernstein.</span></span><span class="sig-name descname"><span class="pre">BernsteinExpansionSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/bernstein.html#BernsteinExpansionSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.bernstein.BernsteinExpansionSet" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#FIAT.expansions.ExpansionSet" title="FIAT.expansions.ExpansionSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">ExpansionSet</span></code></a></p>
+<p>Bernstein polynomial expansion set on a simplex.</p>
 </dd></dl>
 
 <dl class="py class">
-<dt class="sig sig-object py" id="FIAT.bernstein.BernsteinDualSet">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.bernstein.</span></span><span class="sig-name descname"><span class="pre">BernsteinDualSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/bernstein.html#BernsteinDualSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.bernstein.BernsteinDualSet" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#FIAT.dual_set.DualSet" title="FIAT.dual_set.DualSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">DualSet</span></code></a></p>
-<p>The dual basis for Bernstein elements.</p>
+<dt class="sig sig-object py" id="FIAT.bernstein.BernsteinPolynomialSet">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.bernstein.</span></span><span class="sig-name descname"><span class="pre">BernsteinPolynomialSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vorder</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity_ids</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/bernstein.html#BernsteinPolynomialSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.bernstein.BernsteinPolynomialSet" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#FIAT.polynomial_set.PolynomialSet" title="FIAT.polynomial_set.PolynomialSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">PolynomialSet</span></code></a></p>
+<p>The Bernstein polynomials of a given degree on a simplex or macrocell.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ref_el</strong> – The simplex or macrocell.</p></li>
+<li><p><strong>degree</strong> – The polynomial degree.</p></li>
+<li><p><strong>order</strong> – The order of continuity across the interior facets of a
+macrocell, or a dict mapping the dimension (facets or vertices) and
+the entity id to the order of smoothness at that entity.</p></li>
+<li><p><strong>vorder</strong> – The order of super-smoothness at the interior vertices of a
+macrocell.  Only allowed when <code class="docutils literal notranslate"><span class="pre">order</span></code> is an integer.</p></li>
+<li><p><strong>entity_ids</strong> – An optional entity-to-basis-index map defining the
+ordering of the basis. Each entity carries the basis functions
+associated with the Bernstein coefficients on that entity that lie in
+the minimal determining set.</p></li>
+</ul>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py function">
@@ -1314,8 +1321,43 @@ at the midpoint.</p>
 <span id="fiat-dual-set-module"></span><h2>FIAT.dual_set module<a class="headerlink" href="#module-FIAT.dual_set" title="Link to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.dual_set.DualSet">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.dual_set.</span></span><span class="sig-name descname"><span class="pre">DualSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nodes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity_permutations</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/dual_set.html#DualSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.dual_set.DualSet" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.dual_set.</span></span><span class="sig-name descname"><span class="pre">DualSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nodes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity_permutations</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coeffs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/dual_set.html#DualSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.dual_set.DualSet" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/functions.html#object" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Represent a set of functionals and their assignment to cell entities.</p>
+<section id="id1">
+<h3>Parameters<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>nodes<span class="classifier">sequence of Functional</span></dt><dd><p>Source functionals used to define the dual set. If <code class="docutils literal notranslate"><span class="pre">coeffs</span></code> is
+provided, these correspond to its columns; otherwise they are the
+functionals in local degree-of-freedom order.</p>
+</dd>
+<dt>ref_el<span class="classifier">Cell</span></dt><dd><p>Reference element or simplicial complex on which the functionals are
+defined.</p>
+</dd>
+<dt>entity_ids<span class="classifier">dict</span></dt><dd><p>Mapping from entity dimension and entity number to the indices of the
+functionals represented by this dual set assigned to that entity.</p>
+</dd>
+<dt>entity_permutations<span class="classifier">dict, optional</span></dt><dd><p>Mapping from entity dimension, entity number, and orientation to the
+permutation of local DoFs.</p>
+</dd>
+<dt>coeffs<span class="classifier">array_like, optional</span></dt><dd><p>Matrix defining linear combinations of the functionals. Its rows give
+the coefficients for the recombined functionals, and its columns
+correspond to <code class="docutils literal notranslate"><span class="pre">nodes</span></code>.</p>
+</dd>
+</dl>
+</section>
+<section id="raises">
+<h3>Raises<a class="headerlink" href="#raises" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>ValueError</dt><dd><p>If <code class="docutils literal notranslate"><span class="pre">coeffs</span></code> does not have one column per functional.</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="FIAT.dual_set.DualSet.get_coeffs">
+<span class="sig-name descname"><span class="pre">get_coeffs</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/dual_set.html#DualSet.get_coeffs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.dual_set.DualSet.get_coeffs" title="Link to this definition">¶</a></dt>
+<dd><p>Return the recombination coefficients of the dual set.</p>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="FIAT.dual_set.DualSet.get_entity_closure_ids">
 <span class="sig-name descname"><span class="pre">get_entity_closure_ids</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/dual_set.html#DualSet.get_entity_closure_ids"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.dual_set.DualSet.get_entity_closure_ids" title="Link to this definition">¶</a></dt>
@@ -1375,6 +1417,20 @@ intervals.</p>
 <dd></dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="FIAT.dual_set.DualSet.recombine">
+<span class="sig-name descname"><span class="pre">recombine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">coefficients</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/dual_set.html#DualSet.recombine"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.dual_set.DualSet.recombine" title="Link to this definition">¶</a></dt>
+<dd><p>Return a dual set with an additional node recombination.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>coefficients</strong> – Matrix multiplying the current dual set.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A dual set representing the recombined functionals.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="FIAT.dual_set.DualSet.to_riesz">
 <span class="sig-name descname"><span class="pre">to_riesz</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">poly_set</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/dual_set.html#DualSet.to_riesz"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.dual_set.DualSet.to_riesz" title="Link to this definition">¶</a></dt>
 <dd><p>This method gives the action of the entire dual set
@@ -1392,6 +1448,7 @@ of functions it takes, and the number of members of the
 expansion set.</p>
 </dd></dl>
 
+</section>
 </dd></dl>
 
 <dl class="py function">
@@ -1409,6 +1466,8 @@ expansion set.</p>
 <dt class="sig sig-object py" id="FIAT.dual_set.merge_entities">
 <span class="sig-prename descclassname"><span class="pre">FIAT.dual_set.</span></span><span class="sig-name descname"><span class="pre">merge_entities</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nodes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity_permutations</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/dual_set.html#merge_entities"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.dual_set.merge_entities" title="Link to this definition">¶</a></dt>
 <dd><p>Collect DOFs from simplicial complex onto facets of parent cell.</p>
+<p>Also returns the entity ids on the simplicial complex, numbered by the
+merged node ordering.</p>
 </dd></dl>
 
 <dl class="py function">
@@ -1515,7 +1574,7 @@ to allow users to get coordinates that they want.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.expansions.ExpansionSet">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.expansions.</span></span><span class="sig-name descname"><span class="pre">ExpansionSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/expansions.html#ExpansionSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.expansions.ExpansionSet" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/functions.html#object" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <dl class="py method">
 <dt class="sig sig-object py" id="FIAT.expansions.ExpansionSet.get_cell_node_map">
 <span class="sig-name descname"><span class="pre">get_cell_node_map</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/expansions.html#ExpansionSet.get_cell_node_map"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.expansions.ExpansionSet.get_cell_node_map" title="Link to this definition">¶</a></dt>
@@ -1672,10 +1731,10 @@ working precision (see <cite>FIAT.precision.calibrate_tolerance</cite>).</p></li
 
 <dl class="py function">
 <dt class="sig sig-object py" id="FIAT.expansions.dubiner_recurrence">
-<span class="sig-prename descclassname"><span class="pre">FIAT.expansions.</span></span><span class="sig-name descname"><span class="pre">dubiner_recurrence</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dim</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref_pts</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.5)"><span class="pre">ndarray</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">Jinv</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.5)"><span class="pre">ndarray</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.5)"><span class="pre">ndarray</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/FIAT/expansions.html#dubiner_recurrence"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.expansions.dubiner_recurrence" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">FIAT.expansions.</span></span><span class="sig-name descname"><span class="pre">dubiner_recurrence</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dim</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref_pts</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.5)"><span class="pre">ndarray</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">Jinv</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.5)"><span class="pre">ndarray</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.15)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.5)"><span class="pre">ndarray</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/FIAT/expansions.html#dubiner_recurrence"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.expansions.dubiner_recurrence" title="Link to this definition">¶</a></dt>
 <dd><p>Tabulate a Dubiner expansion set using the recurrence from (Kirby 2010).</p>
-<section id="id1">
-<h3>Parameters<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h3>
+<section id="id2">
+<h3>Parameters<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>dim<span class="classifier">int</span></dt><dd><p>The spatial dimension of the simplex.</p>
 </dd>
@@ -1695,8 +1754,8 @@ or ‘dual’ for the L2-duals of the integrated Jacobi polynomials.</p>
 </dd>
 </dl>
 </section>
-<section id="id2">
-<h3>Returns<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h3>
+<section id="id3">
+<h3>Returns<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>list[numpy.ndarray]</dt><dd><p>A list of numpy arrays with tabulations of the expansion set and its derivatives.</p>
 </dd>
@@ -1874,12 +1933,47 @@ greater than n on the reference complex.</p>
 <span id="fiat-finite-element-module"></span><h2>FIAT.finite_element module<a class="headerlink" href="#module-FIAT.finite_element" title="Link to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.finite_element.CiarletElement">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.finite_element.</span></span><span class="sig-name descname"><span class="pre">CiarletElement</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">poly_set</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dual</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">formdegree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mapping</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'affine'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref_complex</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/finite_element.html#CiarletElement"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.finite_element.CiarletElement" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.finite_element.</span></span><span class="sig-name descname"><span class="pre">CiarletElement</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">poly_set</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dual</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">formdegree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mapping</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'affine'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref_complex</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">recombine_dual</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/finite_element.html#CiarletElement"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.finite_element.CiarletElement" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.finite_element.FiniteElement" title="FIAT.finite_element.FiniteElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">FiniteElement</span></code></a></p>
 <p>Class implementing Ciarlet’s abstraction of a finite element
 being a domain, function space, and set of nodes.</p>
 <p>Elements derived from this class are nodal finite elements, with a nodal
 basis generated from polynomials encoded in a <cite>PolynomialSet</cite>.</p>
+<p>The polynomial basis is recombined so that it is dual to the supplied
+functionals. When <code class="docutils literal notranslate"><span class="pre">recombine_dual</span></code> is true, the functionals are
+recombined instead, leaving the polynomial basis unchanged.</p>
+<section id="id4">
+<h3>Parameters<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>poly_set<span class="classifier">PolynomialSet</span></dt><dd><p>Polynomial space and expansion basis used to construct the finite
+element.</p>
+</dd>
+<dt>dual<span class="classifier">DualSet</span></dt><dd><p>Functionals defining the degrees of freedom.</p>
+</dd>
+<dt>order<span class="classifier">int</span></dt><dd><p>Element order, which may differ from the polynomial degree.</p>
+</dd>
+<dt>formdegree<span class="classifier">int or None, optional</span></dt><dd><p>Degree of the associated differential form, if any.</p>
+</dd>
+<dt>mapping<span class="classifier">str or None, optional</span></dt><dd><p>Mapping used to transform basis functions from the reference element
+to a physical element.</p>
+</dd>
+<dt>ref_complex<span class="classifier">Cell or None, optional</span></dt><dd><p>Reference complex on which the polynomial set is defined. Defaults to
+the reference element of <code class="docutils literal notranslate"><span class="pre">poly_set</span></code>.</p>
+</dd>
+<dt>recombine_dual<span class="classifier">bool, optional</span></dt><dd><p>If true, recombine the functionals to be dual to the supplied
+polynomial basis. Otherwise, recombine the polynomial basis to be dual
+to the supplied functionals.</p>
+</dd>
+</dl>
+</section>
+<section id="id5">
+<h3>Raises<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>ValueError</dt><dd><p>If the polynomial space and dual set have different dimensions.</p>
+</dd>
+<dt>numpy.linalg.LinAlgError</dt><dd><p>If the generalized Vandermonde matrix is singular.</p>
+</dd>
+</dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="FIAT.finite_element.CiarletElement.degree">
 <span class="sig-name descname"><span class="pre">degree</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/finite_element.html#CiarletElement.degree"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.finite_element.CiarletElement.degree" title="Link to this definition">¶</a></dt>
@@ -1946,12 +2040,13 @@ default cell-wise tabulation is performed.</p></li>
 <dd><p>Return the value shape of the finite element functions.</p>
 </dd></dl>
 
+</section>
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.finite_element.FiniteElement">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.finite_element.</span></span><span class="sig-name descname"><span class="pre">FiniteElement</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dual</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">formdegree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mapping</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'affine'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref_complex</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/finite_element.html#FiniteElement"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.finite_element.FiniteElement" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/functions.html#object" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <p>Class implementing a basic abstraction template for general
 finite element families. Finite elements which inherit from
 this class are non-nodal unless they are CiarletElement subclasses.</p>
@@ -2125,7 +2220,7 @@ of a vector/tensor function at a particular point x.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.functional.Functional">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.functional.</span></span><span class="sig-name descname"><span class="pre">Functional</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_shape</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pt_dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">deriv_dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">functional_type</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/functional.html#Functional"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.functional.Functional" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/functions.html#object" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <p>Abstract class representing a linear functional.
 All FIAT functionals are discrete in the sense that
 they are written as a weighted sum of (derivatives of components of) their
@@ -2831,7 +2926,7 @@ of derivative evaluations, are not mathematically well-defined.</p>
 <dl class="py exception">
 <dt class="sig sig-object py" id="FIAT.hdiv_trace.TraceError">
 <span class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.hdiv_trace.</span></span><span class="sig-name descname"><span class="pre">TraceError</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/hdiv_trace.html#TraceError"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.hdiv_trace.TraceError" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#Exception" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Exception</span></code></a></p>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#Exception" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Exception</span></code></a></p>
 <p>Exception caused by tabulating a trace element on the interior of a cell,
 or the gradient of a trace element.</p>
 </dd></dl>
@@ -2998,14 +3093,8 @@ and point evaluations at the barycenters of the 2D entities.</p>
 </dd></dl>
 
 <dl class="py function">
-<dt class="sig sig-object py" id="FIAT.hierarchical.make_dual_bubbles">
-<span class="sig-prename descclassname"><span class="pre">FIAT.hierarchical.</span></span><span class="sig-name descname"><span class="pre">make_dual_bubbles</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">codim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interpolant_deg</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'orthonormal'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/hierarchical.html#make_dual_bubbles"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.hierarchical.make_dual_bubbles" title="Link to this definition">¶</a></dt>
-<dd><p>Tabulate the L2-duals of the hierarchical C0 basis.</p>
-</dd></dl>
-
-<dl class="py function">
 <dt class="sig sig-object py" id="FIAT.hierarchical.make_projected_bubble_moments">
-<span class="sig-prename descclassname"><span class="pre">FIAT.hierarchical.</span></span><span class="sig-name descname"><span class="pre">make_projected_bubble_moments</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interpolant_deg</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/hierarchical.html#make_projected_bubble_moments"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.hierarchical.make_projected_bubble_moments" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">FIAT.hierarchical.</span></span><span class="sig-name descname"><span class="pre">make_projected_bubble_moments</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interpolant_deg</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">codim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/hierarchical.html#make_projected_bubble_moments"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.hierarchical.make_projected_bubble_moments" title="Link to this definition">¶</a></dt>
 <dd><p>Tabulate moments against projected bubbles of the given degree.</p>
 </dd></dl>
 
@@ -3834,7 +3923,7 @@ their dual bases are mutually linearly independent.</p></li>
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.orientation_utils.Orientation">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.orientation_utils.</span></span><span class="sig-name descname"><span class="pre">Orientation</span></span><a class="reference internal" href="_modules/FIAT/orientation_utils.html#Orientation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.orientation_utils.Orientation" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/functions.html#object" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <p>Base class representing unsigned integer orientations.</p>
 <p>Orientations represented by this class are to be consistent with those used in
 <cite>make_entity_permutations_simplex</cite> and <cite>make_entity_permutations_tensorproduct</cite>.</p>
@@ -4039,7 +4128,7 @@ by Gene Golub, SIAM Review Vol 15, No. 2, April 1973, pp.318–334</p>
 logarithmic weight function w(t)=t^a log(1/t) on [0,1] relative to
 shifted Legendre polynomials.</p>
 <dl class="simple">
-<dt>REFERENCE:  Walter Gautschi,``On the preceding paper <a href="#id5"><span class="problematic" id="id6">`</span></a>A Legendre</dt><dd><p>polynomial integral’ by James L. Blue’’,
+<dt>REFERENCE:  Walter Gautschi,``On the preceding paper <a href="#id8"><span class="problematic" id="id9">`</span></a>A Legendre</dt><dd><p>polynomial integral’ by James L. Blue’’,
 Math. Comp. 33 (1979), 742-743.</p>
 </dd>
 </dl>
@@ -4054,8 +4143,8 @@ Math. Comp. 33 (1979), 742-743.</p>
 which are are orthogonal with respect to a weight function which is
 represented in terms of its modifed moments which are obtained by
 integrating the monic polynomials against the weight function.</p>
-<section id="id7">
-<h3>References<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h3>
+<section id="id10">
+<h3>References<a class="headerlink" href="#id10" title="Link to this heading">¶</a></h3>
 <p>John C. Wheeler, “Modified moments and Gaussian quadratures”
 Rocky Mountain Journal of Mathematics, Vol. 4, Num. 2 (1974), 287–296</p>
 <p>Walter Gautschi, “Orthogonal Polynomials (in Matlab)
@@ -4177,7 +4266,7 @@ polynomials on a reference element.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.polynomial_set.PolynomialSet">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.polynomial_set.</span></span><span class="sig-name descname"><span class="pre">PolynomialSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">embedded_degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">expansion_set</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coeffs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/polynomial_set.html#PolynomialSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.polynomial_set.PolynomialSet" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/functions.html#object" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <p>Implements a set of polynomials as linear combinations of an
 expansion set over a reference element.
 ref_el: the reference element
@@ -4234,6 +4323,28 @@ function.</p>
 <span class="sig-name descname"><span class="pre">get_shape</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/polynomial_set.html#PolynomialSet.get_shape"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.polynomial_set.PolynomialSet.get_shape" title="Link to this definition">¶</a></dt>
 <dd><p>Returns the shape of phi(x), where () corresponds to
 scalar (2,) a vector of length 2, etc</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="FIAT.polynomial_set.PolynomialSet.recombine">
+<span class="sig-name descname"><span class="pre">recombine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">coefficients</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.5)"><span class="pre">ndarray</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#FIAT.polynomial_set.PolynomialSet" title="FIAT.polynomial_set.PolynomialSet"><span class="pre">PolynomialSet</span></a></span></span><a class="reference internal" href="_modules/FIAT/polynomial_set.html#PolynomialSet.recombine"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.polynomial_set.PolynomialSet.recombine" title="Link to this definition">¶</a></dt>
+<dd><p>Return a polynomial set formed from linear combinations.</p>
+<section id="id11">
+<h3>Parameters<a class="headerlink" href="#id11" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>coefficients<span class="classifier">numpy.ndarray</span></dt><dd><p>A matrix whose rows contain the coefficients of the new
+polynomials in the current polynomial basis.</p>
+</dd>
+</dl>
+</section>
+<section id="id12">
+<h3>Returns<a class="headerlink" href="#id12" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>PolynomialSet</dt><dd><p>A polynomial set with the same reference element, degree,
+expansion set, and value shape as this set.</p>
+</dd>
+</dl>
+</section>
 </dd></dl>
 
 <dl class="py method">
@@ -4356,7 +4467,7 @@ on the 6-way Powell-Sabin split of a triangle.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="FIAT.precision.calibrate_tolerance">
-<span class="sig-prename descclassname"><span class="pre">FIAT.precision.</span></span><span class="sig-name descname"><span class="pre">calibrate_tolerance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">dtype('float64')</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span></span><a class="reference internal" href="_modules/FIAT/precision.html#calibrate_tolerance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.precision.calibrate_tolerance" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">FIAT.precision.</span></span><span class="sig-name descname"><span class="pre">calibrate_tolerance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">dtype('float64')</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a></span></span><a class="reference internal" href="_modules/FIAT/precision.html#calibrate_tolerance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.precision.calibrate_tolerance" title="Link to this definition">¶</a></dt>
 <dd><p>Relax <cite>tol</cite> to <code class="docutils literal notranslate"><span class="pre">sqrt(tol)</span></code> if <cite>dtype</cite> is single-precision,
 since float32’s unit roundoff (~1.2e-7) is much larger than
 float64’s (~2.2e-16). Otherwise <cite>tol</cite> is returned unchanged.</p>
@@ -4450,15 +4561,15 @@ using m roots of m:th order Jacobi polynomial.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.quadrature.QuadratureRule">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.quadrature.</span></span><span class="sig-name descname"><span class="pre">QuadratureRule</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wts</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/quadrature.html#QuadratureRule"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.quadrature.QuadratureRule" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/functions.html#object" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <p>General class that models integration over a reference element
 as the weighted sum of a function evaluated at a set of points.</p>
 <dl class="py property">
 <dt class="sig sig-object py" id="FIAT.quadrature.QuadratureRule.extrinsic_orientation_permutation_map">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">extrinsic_orientation_permutation_map</span></span><a class="headerlink" href="#FIAT.quadrature.QuadratureRule.extrinsic_orientation_permutation_map" title="Link to this definition">¶</a></dt>
 <dd><p>A map from extrinsic orientations to corresponding axis permutation matrices.</p>
-<section id="id8">
-<h3>Notes<a class="headerlink" href="#id8" title="Link to this heading">¶</a></h3>
+<section id="id13">
+<h3>Notes<a class="headerlink" href="#id13" title="Link to this heading">¶</a></h3>
 <p>result[eo] gives the physical axis-reference axis permutation matrix corresponding to
 eo (extrinsic orientation).</p>
 </section>
@@ -4483,8 +4594,8 @@ eo (extrinsic orientation).</p>
 <dt class="sig sig-object py" id="FIAT.quadrature.QuadratureRule.intrinsic_orientation_permutation_map_tuple">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">intrinsic_orientation_permutation_map_tuple</span></span><a class="headerlink" href="#FIAT.quadrature.QuadratureRule.intrinsic_orientation_permutation_map_tuple" title="Link to this definition">¶</a></dt>
 <dd><p>A tuple of maps from intrinsic orientations to corresponding point permutations for each reference cell axis.</p>
-<section id="id9">
-<h3>Notes<a class="headerlink" href="#id9" title="Link to this heading">¶</a></h3>
+<section id="id14">
+<h3>Notes<a class="headerlink" href="#id14" title="Link to this heading">¶</a></h3>
 <p>result[axis][io] gives the physical point-reference point permutation array corresponding to
 io (intrinsic orientation) on <code class="docutils literal notranslate"><span class="pre">axis</span></code>.</p>
 </section>
@@ -4680,7 +4791,7 @@ and orderings of entities have a single point of entry.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.reference_element.Cell">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.reference_element.</span></span><span class="sig-name descname"><span class="pre">Cell</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shape</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vertices</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">topology</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#Cell"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.Cell" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/functions.html#object" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <p>Abstract class for a reference cell.  Provides accessors for
 geometry (vertex coordinates) as well as topology (orderings of
 vertices that make up edges, faces, etc.</p>
@@ -4718,15 +4829,15 @@ specified by subelement dimension.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.Cell.extract_extrinsic_orientation">
 <span class="sig-name descname"><span class="pre">extract_extrinsic_orientation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">o</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#Cell.extract_extrinsic_orientation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.Cell.extract_extrinsic_orientation" title="Link to this definition">¶</a></dt>
 <dd><p>Extract extrinsic orientation.</p>
-<section id="id10">
-<h3>Parameters<a class="headerlink" href="#id10" title="Link to this heading">¶</a></h3>
+<section id="id15">
+<h3>Parameters<a class="headerlink" href="#id15" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>o<span class="classifier">Orientation</span></dt><dd><p>Total orientation.</p>
 </dd>
 </dl>
 </section>
-<section id="id11">
-<h3>Returns<a class="headerlink" href="#id11" title="Link to this heading">¶</a></h3>
+<section id="id16">
+<h3>Returns<a class="headerlink" href="#id16" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>Orientation</dt><dd><p>Extrinsic orientation.</p>
 </dd>
@@ -4738,8 +4849,8 @@ specified by subelement dimension.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.Cell.extract_intrinsic_orientation">
 <span class="sig-name descname"><span class="pre">extract_intrinsic_orientation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">axis</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#Cell.extract_intrinsic_orientation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.Cell.extract_intrinsic_orientation" title="Link to this definition">¶</a></dt>
 <dd><p>Extract intrinsic orientation.</p>
-<section id="id12">
-<h3>Parameters<a class="headerlink" href="#id12" title="Link to this heading">¶</a></h3>
+<section id="id17">
+<h3>Parameters<a class="headerlink" href="#id17" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>o<span class="classifier">Orientation</span></dt><dd><p>Total orientation.</p>
 </dd>
@@ -4747,8 +4858,8 @@ specified by subelement dimension.</p>
 </dd>
 </dl>
 </section>
-<section id="id13">
-<h3>Returns<a class="headerlink" href="#id13" title="Link to this heading">¶</a></h3>
+<section id="id18">
+<h3>Returns<a class="headerlink" href="#id18" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>Orientation</dt><dd><p>Intrinsic orientation.</p>
 </dd>
@@ -4760,8 +4871,8 @@ specified by subelement dimension.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.Cell.extrinsic_orientation_permutation_map">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">extrinsic_orientation_permutation_map</span></span><a class="headerlink" href="#FIAT.reference_element.Cell.extrinsic_orientation_permutation_map" title="Link to this definition">¶</a></dt>
 <dd><p>A map from extrinsic orientations to corresponding axis permutation matrices.</p>
-<section id="id14">
-<h3>Notes<a class="headerlink" href="#id14" title="Link to this heading">¶</a></h3>
+<section id="id19">
+<h3>Notes<a class="headerlink" href="#id19" title="Link to this heading">¶</a></h3>
 <p>result[eo] gives the physical axis-reference axis permutation matrix corresponding to
 eo (extrinsic orientation).</p>
 </section>
@@ -4959,8 +5070,8 @@ specified by subelement dimension.</p>
 <dd><p>Checks if reference cell contains given point
 (with numerical tolerance as given by the L1 distance (aka ‘manhattan’,
 ‘taxicab’ or rectilinear distance) to the cell.</p>
-<section id="id15">
-<h3>Parameters<a class="headerlink" href="#id15" title="Link to this heading">¶</a></h3>
+<section id="id20">
+<h3>Parameters<a class="headerlink" href="#id20" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>point<span class="classifier">numpy.ndarray, list or symbolic expression</span></dt><dd><p>The coordinates of the point.</p>
 </dd>
@@ -4968,8 +5079,8 @@ specified by subelement dimension.</p>
 </dd>
 </dl>
 </section>
-<section id="id16">
-<h3>Returns<a class="headerlink" href="#id16" title="Link to this heading">¶</a></h3>
+<section id="id21">
+<h3>Returns<a class="headerlink" href="#id21" title="Link to this heading">¶</a></h3>
 <p>bool : True if the point is inside the cell, False otherwise.</p>
 </section>
 </dd></dl>
@@ -5223,8 +5334,8 @@ These tangents are <em>NOT</em> normalized to have unit length.</p>
 <dd><p>Checks if reference cell contains given point
 (with numerical tolerance as given by the L1 distance (aka ‘manhatten’,
 ‘taxicab’ or rectilinear distance) to the cell.</p>
-<section id="id17">
-<h3>Parameters<a class="headerlink" href="#id17" title="Link to this heading">¶</a></h3>
+<section id="id22">
+<h3>Parameters<a class="headerlink" href="#id22" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>point<span class="classifier">numpy.ndarray, list or symbolic expression</span></dt><dd><p>The coordinates of the point.</p>
 </dd>
@@ -5234,8 +5345,8 @@ These tangents are <em>NOT</em> normalized to have unit length.</p>
 </dd>
 </dl>
 </section>
-<section id="id18">
-<h3>Returns<a class="headerlink" href="#id18" title="Link to this heading">¶</a></h3>
+<section id="id23">
+<h3>Returns<a class="headerlink" href="#id23" title="Link to this heading">¶</a></h3>
 <p>bool : True if the point is inside the cell, False otherwise.</p>
 </section>
 </dd></dl>
@@ -5245,8 +5356,8 @@ These tangents are <em>NOT</em> normalized to have unit length.</p>
 <span class="sig-name descname"><span class="pre">distance_to_point_l1</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">points</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rescale</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#SimplicialComplex.distance_to_point_l1"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.SimplicialComplex.distance_to_point_l1" title="Link to this definition">¶</a></dt>
 <dd><p>Get the L1 distance (aka ‘manhatten’, ‘taxicab’ or rectilinear
 distance) from an entity to a point with 0.0 if the point is inside the entity.</p>
-<section id="id19">
-<h3>Parameters<a class="headerlink" href="#id19" title="Link to this heading">¶</a></h3>
+<section id="id24">
+<h3>Parameters<a class="headerlink" href="#id24" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>points<span class="classifier">numpy.ndarray or list</span></dt><dd><p>The coordinates of the points.</p>
 </dd>
@@ -5258,8 +5369,8 @@ for points opposite to a single facet.</p>
 </dd>
 </dl>
 </section>
-<section id="id20">
-<h3>Returns<a class="headerlink" href="#id20" title="Link to this heading">¶</a></h3>
+<section id="id25">
+<h3>Returns<a class="headerlink" href="#id25" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>numpy.float64 or numpy.ndarray</dt><dd><p>The L1 distance, also known as taxicab, manhatten or rectilinear
 distance, of the cell to the point. If 0.0 the point is inside the
@@ -5267,8 +5378,8 @@ cell.</p>
 </dd>
 </dl>
 </section>
-<section id="id21">
-<h3>Notes<a class="headerlink" href="#id21" title="Link to this heading">¶</a></h3>
+<section id="id26">
+<h3>Notes<a class="headerlink" href="#id26" title="Link to this heading">¶</a></h3>
 <p>This is done with the help of barycentric coordinates where the general
 algorithm is to compute the most negative (i.e. minimum) barycentric
 coordinate then return its negative. For implementation reasons we
@@ -5318,7 +5429,7 @@ sphinx):</p>
 </pre></div>
 </div>
 <dl>
-<dt><a href="#id22"><span class="problematic" id="id23">``</span></a><a href="#id24"><span class="problematic" id="id25">`</span></a></dt><dd><blockquote>
+<dt><a href="#id27"><span class="problematic" id="id28">``</span></a><a href="#id29"><span class="problematic" id="id30">`</span></a></dt><dd><blockquote>
 <div><p>y-axis
 |
 |</p>
@@ -5354,7 +5465,7 @@ sphinx):</p>
 <p>(0,0) |         (1,0)</p>
 </dd>
 </dl>
-<p><a href="#id26"><span class="problematic" id="id27">``</span></a><a href="#id28"><span class="problematic" id="id29">`</span></a></p>
+<p><a href="#id31"><span class="problematic" id="id32">``</span></a><a href="#id33"><span class="problematic" id="id34">`</span></a></p>
 <dl class="simple">
 <dt>Barycentric coordinates are defined as</dt><dd><p><cite>X = alpha * P0 + beta * P1 + gamma * P2</cite> where
 <cite>alpha + beta + gamma = 1.0</cite>.</p>
@@ -5404,15 +5515,15 @@ actual distance to the tetrahedron.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.SimplicialComplex.extract_extrinsic_orientation">
 <span class="sig-name descname"><span class="pre">extract_extrinsic_orientation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">o</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#SimplicialComplex.extract_extrinsic_orientation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.SimplicialComplex.extract_extrinsic_orientation" title="Link to this definition">¶</a></dt>
 <dd><p>Extract extrinsic orientation.</p>
-<section id="id30">
-<h3>Parameters<a class="headerlink" href="#id30" title="Link to this heading">¶</a></h3>
+<section id="id35">
+<h3>Parameters<a class="headerlink" href="#id35" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>o<span class="classifier">Orientation</span></dt><dd><p>Total orientation.</p>
 </dd>
 </dl>
 </section>
-<section id="id31">
-<h3>Returns<a class="headerlink" href="#id31" title="Link to this heading">¶</a></h3>
+<section id="id36">
+<h3>Returns<a class="headerlink" href="#id36" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>Orientation</dt><dd><p>Extrinsic orientation.</p>
 </dd>
@@ -5424,8 +5535,8 @@ actual distance to the tetrahedron.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.SimplicialComplex.extract_intrinsic_orientation">
 <span class="sig-name descname"><span class="pre">extract_intrinsic_orientation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">axis</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#SimplicialComplex.extract_intrinsic_orientation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.SimplicialComplex.extract_intrinsic_orientation" title="Link to this definition">¶</a></dt>
 <dd><p>Extract intrinsic orientation.</p>
-<section id="id32">
-<h3>Parameters<a class="headerlink" href="#id32" title="Link to this heading">¶</a></h3>
+<section id="id37">
+<h3>Parameters<a class="headerlink" href="#id37" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>o<span class="classifier">Orientation</span></dt><dd><p>Total orientation.</p>
 </dd>
@@ -5433,8 +5544,8 @@ actual distance to the tetrahedron.</p>
 </dd>
 </dl>
 </section>
-<section id="id33">
-<h3>Returns<a class="headerlink" href="#id33" title="Link to this heading">¶</a></h3>
+<section id="id38">
+<h3>Returns<a class="headerlink" href="#id38" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>Orientation</dt><dd><p>Intrinsic orientation.</p>
 </dd>
@@ -5446,8 +5557,8 @@ actual distance to the tetrahedron.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.SimplicialComplex.extrinsic_orientation_permutation_map">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">extrinsic_orientation_permutation_map</span></span><a class="headerlink" href="#FIAT.reference_element.SimplicialComplex.extrinsic_orientation_permutation_map" title="Link to this definition">¶</a></dt>
 <dd><p>A map from extrinsic orientations to corresponding axis permutation matrices.</p>
-<section id="id34">
-<h3>Notes<a class="headerlink" href="#id34" title="Link to this heading">¶</a></h3>
+<section id="id39">
+<h3>Notes<a class="headerlink" href="#id39" title="Link to this heading">¶</a></h3>
 <p>result[eo] gives the physical axis-reference axis permutation matrix corresponding to
 eo (extrinsic orientation).</p>
 </section>
@@ -5576,8 +5687,8 @@ specified by subelement dimension.</p>
 <dd><p>Checks if reference cell contains given point
 (with numerical tolerance as given by the L1 distance (aka ‘manhattan’,
 ‘taxicab’ or rectilinear distance) to the cell.</p>
-<section id="id35">
-<h3>Parameters<a class="headerlink" href="#id35" title="Link to this heading">¶</a></h3>
+<section id="id40">
+<h3>Parameters<a class="headerlink" href="#id40" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>point<span class="classifier">numpy.ndarray, list or symbolic expression</span></dt><dd><p>The coordinates of the point.</p>
 </dd>
@@ -5585,8 +5696,8 @@ specified by subelement dimension.</p>
 </dd>
 </dl>
 </section>
-<section id="id36">
-<h3>Returns<a class="headerlink" href="#id36" title="Link to this heading">¶</a></h3>
+<section id="id41">
+<h3>Returns<a class="headerlink" href="#id41" title="Link to this heading">¶</a></h3>
 <p>bool : True if the point is inside the cell, False otherwise.</p>
 </section>
 </dd></dl>
@@ -5603,22 +5714,22 @@ distance) to a point with 0.0 if the point is inside the cell.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.TensorProductCell.extract_extrinsic_orientation">
 <span class="sig-name descname"><span class="pre">extract_extrinsic_orientation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">o</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#TensorProductCell.extract_extrinsic_orientation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.TensorProductCell.extract_extrinsic_orientation" title="Link to this definition">¶</a></dt>
 <dd><p>Extract extrinsic orientation.</p>
-<section id="id37">
-<h3>Parameters<a class="headerlink" href="#id37" title="Link to this heading">¶</a></h3>
+<section id="id42">
+<h3>Parameters<a class="headerlink" href="#id42" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>o<span class="classifier">Orientation</span></dt><dd><p>Total orientation.</p>
 </dd>
 </dl>
 </section>
-<section id="id38">
-<h3>Returns<a class="headerlink" href="#id38" title="Link to this heading">¶</a></h3>
+<section id="id43">
+<h3>Returns<a class="headerlink" href="#id43" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>Orientation</dt><dd><p>Extrinsic orientation.</p>
 </dd>
 </dl>
 </section>
-<section id="id39">
-<h3>Notes<a class="headerlink" href="#id39" title="Link to this heading">¶</a></h3>
+<section id="id44">
+<h3>Notes<a class="headerlink" href="#id44" title="Link to this heading">¶</a></h3>
 <p>The difinition of orientations used here must be consistent with
 that used in make_entity_permutations_tensorproduct.</p>
 </section>
@@ -5628,8 +5739,8 @@ that used in make_entity_permutations_tensorproduct.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.TensorProductCell.extract_intrinsic_orientation">
 <span class="sig-name descname"><span class="pre">extract_intrinsic_orientation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">axis</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#TensorProductCell.extract_intrinsic_orientation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.TensorProductCell.extract_intrinsic_orientation" title="Link to this definition">¶</a></dt>
 <dd><p>Extract intrinsic orientation.</p>
-<section id="id40">
-<h3>Parameters<a class="headerlink" href="#id40" title="Link to this heading">¶</a></h3>
+<section id="id45">
+<h3>Parameters<a class="headerlink" href="#id45" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>o<span class="classifier">Orientation</span></dt><dd><p>Total orientation. <code class="docutils literal notranslate"><span class="pre">//</span></code> and <code class="docutils literal notranslate"><span class="pre">%</span></code> must be overloaded in type(o).</p>
 </dd>
@@ -5637,15 +5748,15 @@ that used in make_entity_permutations_tensorproduct.</p>
 </dd>
 </dl>
 </section>
-<section id="id41">
-<h3>Returns<a class="headerlink" href="#id41" title="Link to this heading">¶</a></h3>
+<section id="id46">
+<h3>Returns<a class="headerlink" href="#id46" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>Orientation</dt><dd><p>Intrinsic orientation.</p>
 </dd>
 </dl>
 </section>
-<section id="id42">
-<h3>Notes<a class="headerlink" href="#id42" title="Link to this heading">¶</a></h3>
+<section id="id47">
+<h3>Notes<a class="headerlink" href="#id47" title="Link to this heading">¶</a></h3>
 <p>Must be consistent with make_entity_permutations_tensorproduct.</p>
 </section>
 </dd></dl>
@@ -5654,8 +5765,8 @@ that used in make_entity_permutations_tensorproduct.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.TensorProductCell.extrinsic_orientation_permutation_map">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">extrinsic_orientation_permutation_map</span></span><a class="headerlink" href="#FIAT.reference_element.TensorProductCell.extrinsic_orientation_permutation_map" title="Link to this definition">¶</a></dt>
 <dd><p>A map from extrinsic orientations to corresponding axis permutation matrices.</p>
-<section id="id43">
-<h3>Notes<a class="headerlink" href="#id43" title="Link to this heading">¶</a></h3>
+<section id="id48">
+<h3>Notes<a class="headerlink" href="#id48" title="Link to this heading">¶</a></h3>
 <p>result[eo] gives the physical axis-reference axis permutation matrix corresponding to
 eo (extrinsic orientation).</p>
 </section>
@@ -6473,13 +6584,9 @@ Simplices in one, two, and three dimensions are supported.</p>
 </ul>
 </li>
 <li><a class="reference internal" href="#module-FIAT.bernstein">FIAT.bernstein module</a><ul>
-<li><a class="reference internal" href="#FIAT.bernstein.Bernstein"><code class="docutils literal notranslate"><span class="pre">Bernstein</span></code></a><ul>
-<li><a class="reference internal" href="#FIAT.bernstein.Bernstein.degree"><code class="docutils literal notranslate"><span class="pre">Bernstein.degree()</span></code></a></li>
-<li><a class="reference internal" href="#FIAT.bernstein.Bernstein.tabulate"><code class="docutils literal notranslate"><span class="pre">Bernstein.tabulate()</span></code></a></li>
-<li><a class="reference internal" href="#FIAT.bernstein.Bernstein.value_shape"><code class="docutils literal notranslate"><span class="pre">Bernstein.value_shape()</span></code></a></li>
-</ul>
-</li>
-<li><a class="reference internal" href="#FIAT.bernstein.BernsteinDualSet"><code class="docutils literal notranslate"><span class="pre">BernsteinDualSet</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.bernstein.Bernstein"><code class="docutils literal notranslate"><span class="pre">Bernstein</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.bernstein.BernsteinExpansionSet"><code class="docutils literal notranslate"><span class="pre">BernsteinExpansionSet</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.bernstein.BernsteinPolynomialSet"><code class="docutils literal notranslate"><span class="pre">BernsteinPolynomialSet</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.bernstein.bernstein_Dx"><code class="docutils literal notranslate"><span class="pre">bernstein_Dx()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.bernstein.bernstein_db"><code class="docutils literal notranslate"><span class="pre">bernstein_db()</span></code></a></li>
 </ul>
@@ -6580,12 +6687,14 @@ Simplices in one, two, and three dimensions are supported.</p>
 </li>
 <li><a class="reference internal" href="#module-FIAT.dual_set">FIAT.dual_set module</a><ul>
 <li><a class="reference internal" href="#FIAT.dual_set.DualSet"><code class="docutils literal notranslate"><span class="pre">DualSet</span></code></a><ul>
+<li><a class="reference internal" href="#FIAT.dual_set.DualSet.get_coeffs"><code class="docutils literal notranslate"><span class="pre">DualSet.get_coeffs()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.dual_set.DualSet.get_entity_closure_ids"><code class="docutils literal notranslate"><span class="pre">DualSet.get_entity_closure_ids()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.dual_set.DualSet.get_entity_ids"><code class="docutils literal notranslate"><span class="pre">DualSet.get_entity_ids()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.dual_set.DualSet.get_entity_permutations"><code class="docutils literal notranslate"><span class="pre">DualSet.get_entity_permutations()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.dual_set.DualSet.get_indices"><code class="docutils literal notranslate"><span class="pre">DualSet.get_indices()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.dual_set.DualSet.get_nodes"><code class="docutils literal notranslate"><span class="pre">DualSet.get_nodes()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.dual_set.DualSet.get_reference_element"><code class="docutils literal notranslate"><span class="pre">DualSet.get_reference_element()</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.dual_set.DualSet.recombine"><code class="docutils literal notranslate"><span class="pre">DualSet.recombine()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.dual_set.DualSet.to_riesz"><code class="docutils literal notranslate"><span class="pre">DualSet.to_riesz()</span></code></a></li>
 </ul>
 </li>
@@ -6831,7 +6940,6 @@ Simplices in one, two, and three dimensions are supported.</p>
 <li><a class="reference internal" href="#FIAT.hierarchical.IntegratedLegendreDual"><code class="docutils literal notranslate"><span class="pre">IntegratedLegendreDual</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.hierarchical.Legendre"><code class="docutils literal notranslate"><span class="pre">Legendre</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.hierarchical.LegendreDual"><code class="docutils literal notranslate"><span class="pre">LegendreDual</span></code></a></li>
-<li><a class="reference internal" href="#FIAT.hierarchical.make_dual_bubbles"><code class="docutils literal notranslate"><span class="pre">make_dual_bubbles()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.hierarchical.make_projected_bubble_moments"><code class="docutils literal notranslate"><span class="pre">make_projected_bubble_moments()</span></code></a></li>
 </ul>
 </li>
@@ -6993,6 +7101,7 @@ Simplices in one, two, and three dimensions are supported.</p>
 <li><a class="reference internal" href="#FIAT.polynomial_set.PolynomialSet.get_num_members"><code class="docutils literal notranslate"><span class="pre">PolynomialSet.get_num_members()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.polynomial_set.PolynomialSet.get_reference_element"><code class="docutils literal notranslate"><span class="pre">PolynomialSet.get_reference_element()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.polynomial_set.PolynomialSet.get_shape"><code class="docutils literal notranslate"><span class="pre">PolynomialSet.get_shape()</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.polynomial_set.PolynomialSet.recombine"><code class="docutils literal notranslate"><span class="pre">PolynomialSet.recombine()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.polynomial_set.PolynomialSet.tabulate"><code class="docutils literal notranslate"><span class="pre">PolynomialSet.tabulate()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.polynomial_set.PolynomialSet.tabulate_new"><code class="docutils literal notranslate"><span class="pre">PolynomialSet.tabulate_new()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.polynomial_set.PolynomialSet.take"><code class="docutils literal notranslate"><span class="pre">PolynomialSet.take()</span></code></a></li>

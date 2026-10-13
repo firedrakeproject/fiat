@@ -54,14 +54,52 @@
 
 <div class="viewcode-block" id="DualSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.dual_set.DualSet">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">DualSet</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">,</span> <span class="n">entity_permutations</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">DualSet</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Represent a set of functionals and their assignment to cell entities.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    nodes : sequence of Functional</span>
+<span class="sd">        Source functionals used to define the dual set. If ``coeffs`` is</span>
+<span class="sd">        provided, these correspond to its columns; otherwise they are the</span>
+<span class="sd">        functionals in local degree-of-freedom order.</span>
+<span class="sd">    ref_el : Cell</span>
+<span class="sd">        Reference element or simplicial complex on which the functionals are</span>
+<span class="sd">        defined.</span>
+<span class="sd">    entity_ids : dict</span>
+<span class="sd">        Mapping from entity dimension and entity number to the indices of the</span>
+<span class="sd">        functionals represented by this dual set assigned to that entity.</span>
+<span class="sd">    entity_permutations : dict, optional</span>
+<span class="sd">        Mapping from entity dimension, entity number, and orientation to the</span>
+<span class="sd">        permutation of local DoFs.</span>
+<span class="sd">    coeffs : array_like, optional</span>
+<span class="sd">        Matrix defining linear combinations of the functionals. Its rows give</span>
+<span class="sd">        the coefficients for the recombined functionals, and its columns</span>
+<span class="sd">        correspond to ``nodes``.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    ValueError</span>
+<span class="sd">        If ``coeffs`` does not have one column per functional.</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">,</span> <span class="n">entity_permutations</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                 <span class="n">coeffs</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">()</span> <span class="o">!=</span> <span class="nb">max</span><span class="p">(</span><span class="n">entity_ids</span><span class="p">):</span>
             <span class="n">entity_ids</span> <span class="o">=</span> <span class="n">unflatten_entity_ids</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">)</span>
-        <span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">,</span> <span class="n">entity_permutations</span> <span class="o">=</span> <span class="n">merge_entities</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">,</span> <span class="n">entity_permutations</span><span class="p">)</span>
+        <span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">,</span> <span class="n">entity_permutations</span><span class="p">,</span> <span class="n">macro_entity_ids</span> <span class="o">=</span> <span class="n">merge_entities</span><span class="p">(</span>
+            <span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">,</span> <span class="n">entity_permutations</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">coeffs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">coeffs</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">coeffs</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">2</span> <span class="ow">or</span> <span class="n">coeffs</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Dual coefficients must have one column per functional"</span><span class="p">)</span>
+
         <span class="bp">self</span><span class="o">.</span><span class="n">nodes</span> <span class="o">=</span> <span class="n">nodes</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">coeffs</span> <span class="o">=</span> <span class="n">coeffs</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span> <span class="o">=</span> <span class="n">ref_el</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">entity_ids</span> <span class="o">=</span> <span class="n">entity_ids</span>
+        <span class="c1"># The entity ids on the simplicial complex, numbered by the merged node ordering</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_macro_entity_ids</span> <span class="o">=</span> <span class="n">macro_entity_ids</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">entity_permutations</span> <span class="o">=</span> <span class="n">entity_permutations</span>
 
         <span class="c1"># Compute the nodes on the closure of each sub_entity.</span>
@@ -81,12 +119,36 @@
         <span class="k">return</span> <span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">coeffs</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">coeffs</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 
 <div class="viewcode-block" id="DualSet.get_nodes">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.dual_set.DualSet.get_nodes">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_nodes</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">nodes</span></div>
+
+
+<div class="viewcode-block" id="DualSet.get_coeffs">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.dual_set.DualSet.get_coeffs">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_coeffs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Return the recombination coefficients of the dual set."""</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">coeffs</span></div>
+
+
+<div class="viewcode-block" id="DualSet.recombine">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.dual_set.DualSet.recombine">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">recombine</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">coefficients</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Return a dual set with an additional node recombination.</span>
+
+<span class="sd">        :arg coefficients: Matrix multiplying the current dual set.</span>
+<span class="sd">        :returns: A dual set representing the recombined functionals.</span>
+<span class="sd">        """</span>
+        <span class="n">coefficients</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">coefficients</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">coefficients</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Recombination coefficients must have one column per dual functional"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">coeffs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">coefficients</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">coefficients</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">coeffs</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">DualSet</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity_ids</span><span class="p">,</span>
+                       <span class="bp">self</span><span class="o">.</span><span class="n">entity_permutations</span><span class="p">,</span> <span class="n">coeffs</span><span class="o">=</span><span class="n">coefficients</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="DualSet.get_entity_closure_ids">
@@ -260,6 +322,9 @@
                     <span class="n">wts</span> <span class="o">=</span> <span class="n">dwts</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span>
                     <span class="n">expansion_values</span> <span class="o">=</span> <span class="n">dexpansion_values</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span><span class="o">.</span><span class="n">T</span>
                     <span class="n">mat</span><span class="p">[</span><span class="n">ells</span><span class="p">]</span> <span class="o">+=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">wts</span><span class="p">,</span> <span class="n">expansion_values</span><span class="p">[</span><span class="n">indices</span><span class="p">])</span>
+        <span class="n">coeffs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_coeffs</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">coeffs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">mat</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">coeffs</span><span class="p">,</span> <span class="n">mat</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
         <span class="k">return</span> <span class="n">mat</span></div>
 
 
@@ -379,10 +444,14 @@
 <div class="viewcode-block" id="merge_entities">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.dual_set.merge_entities">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">merge_entities</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">,</span> <span class="n">entity_permutations</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Collect DOFs from simplicial complex onto facets of parent cell."""</span>
+<span class="w">    </span><span class="sd">"""Collect DOFs from simplicial complex onto facets of parent cell.</span>
+
+<span class="sd">    Also returns the entity ids on the simplicial complex, numbered by the</span>
+<span class="sd">    merged node ordering.</span>
+<span class="sd">    """</span>
     <span class="n">parent_cell</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_parent</span><span class="p">()</span>
     <span class="k">if</span> <span class="n">parent_cell</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">,</span> <span class="n">entity_permutations</span>
+        <span class="k">return</span> <span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">,</span> <span class="n">entity_permutations</span><span class="p">,</span> <span class="n">entity_ids</span>
     <span class="n">parent_ids</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="n">parent_permutations</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="n">parent_to_children</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_parent_to_children</span><span class="p">()</span>
@@ -390,17 +459,21 @@
     <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">functional</span><span class="o">.</span><span class="n">PointEvaluation</span><span class="p">)</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">nodes</span><span class="p">):</span>
         <span class="c1"># Merge Lagrange dual with lexicographical reordering</span>
         <span class="n">parent_nodes</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">child_ids</span> <span class="o">=</span> <span class="p">{</span><span class="n">dim</span><span class="p">:</span> <span class="p">{}</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">entity_ids</span><span class="p">}</span>
         <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">parent_to_children</span><span class="p">):</span>
             <span class="n">parent_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
             <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">parent_to_children</span><span class="p">[</span><span class="n">dim</span><span class="p">]):</span>
                 <span class="n">cur</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">parent_nodes</span><span class="p">)</span>
                 <span class="k">for</span> <span class="n">child_dim</span><span class="p">,</span> <span class="n">child_entity</span> <span class="ow">in</span> <span class="n">parent_to_children</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]:</span>
+                    <span class="n">start</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">parent_nodes</span><span class="p">)</span>
                     <span class="n">parent_nodes</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">nodes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">entity_ids</span><span class="p">[</span><span class="n">child_dim</span><span class="p">][</span><span class="n">child_entity</span><span class="p">])</span>
+                    <span class="n">child_ids</span><span class="p">[</span><span class="n">child_dim</span><span class="p">][</span><span class="n">child_entity</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">parent_nodes</span><span class="p">)))</span>
                 <span class="n">ids</span> <span class="o">=</span> <span class="n">lexsort_nodes</span><span class="p">(</span><span class="n">parent_cell</span><span class="p">,</span> <span class="n">parent_nodes</span><span class="p">[</span><span class="n">cur</span><span class="p">:],</span> <span class="n">entity</span><span class="o">=</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">entity</span><span class="p">),</span> <span class="n">offset</span><span class="o">=</span><span class="n">cur</span><span class="p">)</span>
                 <span class="n">parent_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span> <span class="o">=</span> <span class="n">ids</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="c1"># Merge everything else with the same node ordering</span>
         <span class="n">parent_nodes</span> <span class="o">=</span> <span class="n">nodes</span>
+        <span class="n">child_ids</span> <span class="o">=</span> <span class="n">entity_ids</span>
         <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">parent_to_children</span><span class="p">):</span>
             <span class="n">parent_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
             <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">parent_to_children</span><span class="p">[</span><span class="n">dim</span><span class="p">]):</span>
@@ -408,7 +481,7 @@
                 <span class="k">for</span> <span class="n">child_dim</span><span class="p">,</span> <span class="n">child_entity</span> <span class="ow">in</span> <span class="n">parent_to_children</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]:</span>
                     <span class="n">parent_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">entity_ids</span><span class="p">[</span><span class="n">child_dim</span><span class="p">][</span><span class="n">child_entity</span><span class="p">])</span>
 
-    <span class="k">return</span> <span class="n">parent_nodes</span><span class="p">,</span> <span class="n">parent_cell</span><span class="p">,</span> <span class="n">parent_ids</span><span class="p">,</span> <span class="n">parent_permutations</span></div>
+    <span class="k">return</span> <span class="n">parent_nodes</span><span class="p">,</span> <span class="n">parent_cell</span><span class="p">,</span> <span class="n">parent_ids</span><span class="p">,</span> <span class="n">parent_permutations</span><span class="p">,</span> <span class="n">child_ids</span></div>
 
 </pre></div>
 

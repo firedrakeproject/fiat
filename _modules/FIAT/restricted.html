@@ -43,7 +43,7 @@
 <span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.dual_set</span><span class="w"> </span><span class="kn">import</span> <span class="n">DualSet</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.finite_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">CiarletElement</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.finite_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">CiarletElement</span><span class="p">,</span> <span class="n">FiniteElement</span>
 
 
 <div class="viewcode-block" id="RestrictedDualSet">
@@ -55,18 +55,23 @@
         <span class="n">indices</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">indices</span><span class="p">))</span>
         <span class="n">ref_el</span> <span class="o">=</span> <span class="n">dual</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span>
         <span class="n">nodes_old</span> <span class="o">=</span> <span class="n">dual</span><span class="o">.</span><span class="n">get_nodes</span><span class="p">()</span>
+        <span class="n">coeffs</span> <span class="o">=</span> <span class="n">dual</span><span class="o">.</span><span class="n">get_coeffs</span><span class="p">()</span>
+        <span class="n">source</span> <span class="o">=</span> <span class="n">dual</span><span class="o">.</span><span class="n">_dual</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dual</span><span class="p">,</span> <span class="n">RestrictedDualSet</span><span class="p">)</span> <span class="k">else</span> <span class="n">dual</span>
+        <span class="k">if</span> <span class="n">coeffs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">coeffs</span> <span class="o">=</span> <span class="n">coeffs</span><span class="p">[</span><span class="n">indices</span><span class="p">,</span> <span class="p">:]</span>
+            <span class="n">nodes</span> <span class="o">=</span> <span class="n">nodes_old</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">nodes</span> <span class="o">=</span> <span class="p">[</span><span class="n">nodes_old</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">indices</span><span class="p">]</span>
         <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="n">nodes</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">d</span><span class="p">,</span> <span class="n">entities</span> <span class="ow">in</span> <span class="n">dual</span><span class="o">.</span><span class="n">get_entity_ids</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
             <span class="n">entity_ids</span><span class="p">[</span><span class="n">d</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
             <span class="k">for</span> <span class="n">entity</span><span class="p">,</span> <span class="n">dofs</span> <span class="ow">in</span> <span class="n">entities</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
                 <span class="n">entity_ids</span><span class="p">[</span><span class="n">d</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">indices</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">dof</span><span class="p">)</span>
                                          <span class="k">for</span> <span class="n">dof</span> <span class="ow">in</span> <span class="n">dofs</span> <span class="k">if</span> <span class="n">dof</span> <span class="ow">in</span> <span class="n">indices</span><span class="p">]</span>
-        <span class="n">nodes</span> <span class="o">=</span> <span class="p">[</span><span class="n">nodes_old</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">indices</span><span class="p">]</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_dual</span> <span class="o">=</span> <span class="n">dual</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_dual</span> <span class="o">=</span> <span class="n">source</span>
         <span class="n">entity_permutations</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_restrict_entity_permutations</span><span class="p">(</span><span class="n">dual</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">)</span>
 
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">,</span> <span class="n">entity_permutations</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">,</span> <span class="n">entity_permutations</span><span class="p">,</span> <span class="n">coeffs</span><span class="o">=</span><span class="n">coeffs</span><span class="p">)</span>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_restrict_entity_permutations</span><span class="p">(</span><span class="n">dual</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">):</span>
@@ -133,6 +138,8 @@
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">indices</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"No point in creating empty RestrictedElement."</span><span class="p">)</span>
 
+        <span class="n">indices</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">indices</span><span class="p">))</span>
+
         <span class="bp">self</span><span class="o">.</span><span class="n">_element</span> <span class="o">=</span> <span class="n">element</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_indices</span> <span class="o">=</span> <span class="n">indices</span>
 
@@ -147,8 +154,10 @@
         <span class="n">mapping_new</span> <span class="o">=</span> <span class="p">[</span><span class="n">mapping_old</span><span class="p">[</span><span class="n">dof</span><span class="p">]</span> <span class="k">for</span> <span class="n">dof</span> <span class="ow">in</span> <span class="n">indices</span><span class="p">]</span>
         <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="n">e_mapping</span> <span class="o">==</span> <span class="n">mapping_new</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">e_mapping</span> <span class="ow">in</span> <span class="n">mapping_new</span><span class="p">)</span>
 
-        <span class="c1"># Call constructor of CiarletElement</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">element</span><span class="o">.</span><span class="n">degree</span><span class="p">(),</span> <span class="n">element</span><span class="o">.</span><span class="n">get_formdegree</span><span class="p">(),</span> <span class="n">mapping_new</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span></div>
+        <span class="c1"># Restricting matching primal and dual indices preserves nodality.</span>
+        <span class="n">FiniteElement</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dual</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">(),</span> <span class="n">dual</span><span class="p">,</span> <span class="n">element</span><span class="o">.</span><span class="n">get_order</span><span class="p">(),</span>
+                               <span class="n">element</span><span class="o">.</span><span class="n">get_formdegree</span><span class="p">(),</span> <span class="n">mapping_new</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">element</span><span class="o">.</span><span class="n">get_reference_complex</span><span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">poly_set</span> <span class="o">=</span> <span class="n">poly_set</span></div>
 
 </pre></div>
 

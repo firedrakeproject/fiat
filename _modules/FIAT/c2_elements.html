@@ -47,6 +47,7 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.functional</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">PointEvaluation</span><span class="p">,</span> <span class="n">PointDerivative</span><span class="p">,</span>
                              <span class="n">IntegralMoment</span><span class="p">,</span> <span class="n">IntegralMomentOfDerivative</span><span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">finite_element</span><span class="p">,</span> <span class="n">dual_set</span><span class="p">,</span> <span class="n">macro</span><span class="p">,</span> <span class="n">polynomial_set</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.bernstein</span><span class="w"> </span><span class="kn">import</span> <span class="n">BernsteinPolynomialSet</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.polynomial_set</span><span class="w"> </span><span class="kn">import</span> <span class="n">mis</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.check_format_variant</span><span class="w"> </span><span class="kn">import</span> <span class="n">parse_quadrature_scheme</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.reference_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">TRIANGLE</span><span class="p">,</span> <span class="n">ufc_simplex</span>
@@ -148,7 +149,7 @@
     <span class="c1"># C4 at minor split barycenters, C3 at major split barycenter</span>
     <span class="n">order</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">ref_complex</span><span class="o">.</span><span class="n">get_interior_facets</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">degree</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
     <span class="n">order</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">degree</span><span class="o">-</span><span class="mi">2</span>
-    <span class="k">return</span> <span class="n">macro</span><span class="o">.</span><span class="n">CkPolynomialSet</span><span class="p">(</span><span class="n">ref_complex</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">"bubble"</span><span class="p">)</span></div>
+    <span class="k">return</span> <span class="n">BernsteinPolynomialSet</span><span class="p">(</span><span class="n">ref_complex</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">)</span></div>
 
 
 
