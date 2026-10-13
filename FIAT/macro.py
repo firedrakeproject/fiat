@@ -481,15 +481,16 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
                 num_wt = 1 if sd == 1 else expansions.polynomial_dimension(facet_el, degree-r)
                 rows.append(numpy.tensordot(weights[:num_wt], jumps[r], axes=(-1, -1)))
 
-        # Impose C^vorder super-smoothness at interior vertices
-        # C^forder automatically gives C^{forder+dim-1} at the interior vertex
+        # Impose C^vorder super-smoothness at vertices.  The jumps at a vertex
+        # are taken across the interior facets attached to it, so C^forder on
+        # those facets already makes the jumps of order up to forder vanish.
         verts = numpy.asarray(ref_el.get_vertices())
+        interior_facets = set(ref_el.get_interior_facets(sd-1))
         has_vertex_constraints = False
         for vorder in set(order[0].values()):
             vids = [i for i in order[0] if order[0][i] == vorder]
             facets = chain.from_iterable(ref_el.connectivity[(0, sd-1)][v] for v in vids)
-            forder = min(order[sd-1][f] for f in facets)
-            sorder = forder + sd - 1
+            sorder = min((order[sd-1].get(f, 0) for f in facets if f in interior_facets), default=0)
             if vorder > sorder:
                 has_vertex_constraints = True
                 jumps = expansion_set.tabulate_jumps(degree, verts[vids], order=vorder)
