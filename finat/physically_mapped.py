@@ -8,14 +8,13 @@ where :math:`B_{ij} = n_i(\mathcal{P}\hat\psi_j)` and :math:`M = B^{-T}`
 
 from abc import ABCMeta, abstractmethod
 from collections.abc import Mapping
-from functools import cached_property, reduce
-from operator import add
+from functools import cached_property
 
 import gem
 import numpy
 
 from finat.citations import cite
-from finat.functional import (DERIVATIVE, DIVERGENCE, Functional, PhysicalEntityFrame,
+from finat.functional import (DERIVATIVE, Functional, PhysicalEntityFrame,
                               cartesian_pullback, identity_pullback, to_riesz, one, zero)
 
 
@@ -81,8 +80,8 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
 
     :meth:`basis_transformation` derives the transformation from the
     FIAT dual basis by the duality formulation of the module docstring.
-    Elements override :attr:`avg` and :meth:`dof_scale` to record the
-    normalization conventions of their physical nodes.
+    :attr:`avg` records the normalization of physical facet moments;
+    :meth:`~finat.functional.Functional.dof_scale` infers their conditioning scales.
     """
 
     #: Relative tolerance below which entries of the numeric reference
@@ -204,88 +203,14 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         return to_riesz(self.functionals, self._element)
 
     def dof_scales(self, coordinate_mapping):
-        r"""The rescaling of the physical degrees of freedom by powers of the cell size.
+        """Return the conditioning scales inferred from the physical nodes.
 
-        Each dof is rescaled by :meth:`dof_scale` evaluated with the cell
-        size averaged over the vertices of the dof's entity.  This is
-        the FInAT convention keeping the mass matrix well-conditioned; it
-        is consistent across cells because the scaling only depends on
-        shared entities.  The columns of :math:`V` are multiplied by the
-        scaling, and the rows of :math:`B` are divided by it.
-
-        :arg coordinate_mapping: Object providing the physical geometry as
-            GEM expressions.
-        :returns: A list with the GEM scaling factor of each dof of the
-            FIAT element, or ``None`` for no rescaling.
+        :arg coordinate_mapping: Object providing the cell size at each vertex.
+        :returns: A scale per FIAT dof, or None for no rescaling.
         """
-        # cell_size may be a GEM expression or a numpy array of numbers
         h = coordinate_mapping.cell_size()
-        fiat_element = self._element
-        top = fiat_element.get_reference_element().get_topology()
-        functionals = self.functionals
-        entity_ids = fiat_element.entity_dofs()
-        scales = [None] * len(functionals)
-        for dim in entity_ids:
-            for entity in entity_ids[dim]:
-                verts = top[dim][entity]
-                havg = reduce(add, (h[v] for v in verts)) / len(verts)
-                for i in entity_ids[dim][entity]:
-                    if functionals[i] is not None:
-                        scales[i] = self.dof_scale(functionals[i], havg)
-        return scales
-
-    def dof_scale(self, functional, havg):
-        r"""Return the conditioning rescaling factor of one physical dof.
-
-        The physical node of a pulled back reference basis function
-        dilates as :math:`h^{-p}`, and the dof is rescaled by :math:`h^{-p}`
-        to make it dimensionless.  The exponent :math:`p` is inferred from
-        the axes of the node:
-
-        * a derivative axis carries :math:`J^{-T}`, of exponent :math:`1`;
-        * a covariant component axis carries :math:`J^{-T}`, of exponent
-          :math:`1`, a contravariant component axis carries
-          :math:`J/\det J`, of exponent :math:`d-1`, and a divergence axis
-          carries :math:`1/\det J`, of exponent :math:`d`, where :math:`d`
-          is the spatial dimension.  These Piola weights only affect nodes
-          that are Cartesian components;
-        * a node in the physical frame of a facet absorbs the Piola
-          weights of its components, since its normals and tangents are
-          the images of the reference ones, except that the tangential
-          components of a contravariant axis have exponent :math:`2-d`;
-        * a node that is the push-forward of a reference node has exponent
-          zero.
-
-        Unless :attr:`avg` is set, a node that integrates over its entity
-        of dimension :math:`k` is a plain integral rather than an average,
-        which contributes the entity measure :math:`h^k`.
-
-        :arg functional: The :class:`~finat.functional.Functional` of the dof.
-        :arg havg: GEM scalar for the cell size averaged over the vertices
-            of the dof's entity.
-        :returns: The GEM scaling factor, or ``None`` for no rescaling.
-        """
-        sd = functional.ref_el.get_spatial_dimension()
-        weights = {DERIVATIVE: 1}
-        if functional.transformation == "cartesian":
-            weights.update({"covariant piola": 1, "contravariant piola": sd - 1, DIVERGENCE: sd})
-        elif functional.transformation == "invariant":
-            weights = {}
-        exponent = sum(weights.get(mapping, 0) for mapping in functional.mappings)
-        if functional.transformation == "frame":
-            # The normal component of a contravariant axis is invariant, and
-            # the tangential components pull back with degree sd - 2.
-            nu = functional.ref_el.compute_scaled_normal(functional.entity[1])
-            normal = numpy.outer(nu, nu) / (nu @ nu)
-            W = functional.coefficients
-            for k, mapping in enumerate(functional.mappings):
-                if mapping == "contravariant piola":
-                    R = numpy.tensordot(W, numpy.eye(sd) - normal, axes=(1 + k, 1))
-                    if numpy.abs(R).max() > self.tol * numpy.abs(W).max():
-                        exponent += 2 - sd
-            if not self.avg and len(functional.points) > 1:
-                exponent -= functional.entity[0]
-        return havg**-exponent if exponent else None
+        return [node.dof_scale(h, avg=self.avg, tol=self.tol) if node is not None else None
+                for node in self.functionals]
 
 
 class DirectlyDefinedElement(NeedsCoordinateMappingElement):
@@ -420,6 +345,38 @@ def adjugate(A):
     return C
 
 
+def pseudoinverse(A):
+    """Returns the Moore-Penrose pseudoinverse of a full-column-rank matrix.
+
+    :arg A: An object array of GEM scalars with at least as many rows as
+        columns.
+    :returns: The Moore-Penrose pseudoinverse, formed as
+        ``solve(A.T @ A, A.T)``.
+    """
+    m, n = A.shape
+    if m < n:
+        raise ValueError("A must have at least as many rows as columns.")
+    return solve(A.T @ A, A.T)
+
+
+def adjugate_and_determinant(J):
+    r"""Return the determinant-scaled inverse and volume factor of a Jacobian.
+
+    Square matrices use the signed determinant and adjugate.  For a
+    rectangular matrix the volume factor is :math:`\sqrt{\det(J^T J)}`
+    and the scaled inverse is :math:`\det J\,J^+`.
+
+    :arg J: Full-column-rank Jacobian as an object array of GEM scalars.
+    :returns: The scaled inverse (numerator) and volume factor (denominator).
+        The transpose of the scaled inverse is the cofactor matrix.
+    """
+    gdim, tdim = J.shape
+    if gdim == tdim:
+        return adjugate(J), determinant(J)
+    detJ = determinant(J.T @ J)**0.5
+    return pseudoinverse(J) * detJ, detJ
+
+
 def connected_components(A):
     """Returns the connected components of the sparsity pattern of A.
 
@@ -474,20 +431,6 @@ def solve(A, B, cache=None):
             adj, det = cache[key] = adjugate_and_determinant(Aii)
         X[ids] = (adj @ B[ids]) / det
     return X
-
-
-def pseudoinverse(A):
-    """Returns the Moore-Penrose pseudoinverse of a full-column-rank matrix.
-
-    :arg A: An object array of GEM scalars with at least as many rows as
-        columns.
-    :returns: The Moore-Penrose pseudoinverse, formed as
-        ``solve(A.T @ A, A.T)``.
-    """
-    m, n = A.shape
-    if m < n:
-        raise ValueError("A must have at least as many rows as columns.")
-    return solve(A.T @ A, A.T)
 
 
 class PhysicalVandermondeMatrix:
@@ -621,21 +564,3 @@ class PhysicalVandermondeMatrix:
                             rhs[k] = rhs[k] - V[j] * numerator[j]
                 V[block] = solve(Bee, rhs, cache)
         return V
-
-
-def adjugate_and_determinant(J):
-    r"""Return the determinant-scaled inverse and volume factor of a Jacobian.
-
-    Square matrices use the signed determinant and adjugate.  For a
-    rectangular matrix the volume factor is :math:`\sqrt{\det(J^T J)}`
-    and the scaled inverse is :math:`\det J\,J^+`.
-
-    :arg J: Full-column-rank Jacobian as an object array of GEM scalars.
-    :returns: The scaled inverse (numerator) and volume factor (denominator).
-        The transpose of the scaled inverse is the cofactor matrix.
-    """
-    gdim, tdim = J.shape
-    if gdim == tdim:
-        return adjugate(J), determinant(J)
-    detJ = determinant(J.T @ J)**0.5
-    return pseudoinverse(J) * detJ, detJ

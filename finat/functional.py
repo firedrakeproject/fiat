@@ -8,7 +8,7 @@ axis of :math:`W_q` per value component and one per derivative.
 from functools import cached_property, reduce
 from itertools import permutations, product
 from math import prod
-from operator import mul
+from operator import add, mul
 
 import gem
 import numpy
@@ -312,6 +312,48 @@ class Functional:
                 numerator[j] = numerator[j] + coefficient * row[j]
         denominator = reduce(mul, (pullback.denominator for pullback in pullbacks), one)
         return numerator, denominator
+
+    def dof_scale(self, h, avg=True, tol=1e-10):
+        r"""Return the conditioning scale of the physical node.
+
+        If the node applied to a mapped reference function dilates as
+        :math:`h^{-p}`, use :math:`h^{-p}` to rescale the corresponding basis
+        function.  Derivative axes contribute one to :math:`p`; Cartesian
+        Piola axes contribute their dilation weights.  Framed contravariant
+        tangents contribute :math:`2-d`, while normals are invariant.  A plain
+        facet integral contributes its entity dimension with the opposite sign.
+        The cell size is averaged over the vertices of the owning entity, so
+        adjacent cells use the same scale for shared dofs.
+
+        :arg h: Cell size at each vertex, as a GEM expression or numeric array.
+        :arg avg: Whether physical facet moments are integral averages.
+        :arg tol: Relative tolerance for detecting tangential components.
+        :returns: The scaling factor, or None for no rescaling.
+        """
+        if self.transformation == "invariant":
+            return None
+        sd = self.ref_el.get_spatial_dimension()
+        weights = {DERIVATIVE: 1}
+        if self.transformation == "cartesian":
+            weights.update({"covariant piola": 1, "contravariant piola": sd - 1, DIVERGENCE: sd})
+        exponent = sum(weights.get(mapping, 0) for mapping in self.mappings)
+        if self.transformation == "frame":
+            nu = self.ref_el.compute_scaled_normal(self.entity[1])
+            normal = numpy.outer(nu, nu) / (nu @ nu)
+            W = self.coefficients
+            for k, mapping in enumerate(self.mappings):
+                if mapping == "contravariant piola":
+                    R = numpy.tensordot(W, numpy.eye(sd) - normal, axes=(1 + k, 1))
+                    if numpy.abs(R).max() > tol * numpy.abs(W).max():
+                        exponent += 2 - sd
+            if not avg and len(self.points) > 1:
+                exponent -= self.entity[0]
+        if not exponent:
+            return None
+        dim, entity = self.entity
+        verts = self.ref_el.get_topology()[dim][entity]
+        havg = reduce(add, (h[v] for v in verts)) / len(verts)
+        return havg**-exponent
 
 
 def split_axis_mappings(mapping, rank):
