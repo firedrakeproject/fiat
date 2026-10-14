@@ -1,22 +1,22 @@
 r"""Physically mapped elements and the automatic basis transformation.
 
-The physical basis functions are :math:`M F^*(\hat\Psi)`, with
-:math:`M = V^T`, :math:`V = B^{-1}`, and :math:`B_{ij} = n_i(\hat\psi_j
-\circ F^{-1})` the Vandermonde matrix of the physical nodes :math:`n_i`
-on the pulled-back reference nodal basis :math:`\hat\psi_j` (Kirby 2017,
-Brubeck & Kirby 2025).
+Let :math:`\mathcal{P}` map reference functions to the physical cell,
+including any Piola map.  The physical basis is :math:`M\mathcal{P}\hat\Psi`,
+where :math:`B_{ij} = n_i(\mathcal{P}\hat\psi_j)` and :math:`M = B^{-T}`
+(Kirby 2017, Brubeck & Kirby 2025).
 """
 
 from abc import ABCMeta, abstractmethod
 from collections.abc import Mapping
-from functools import reduce
+from functools import cached_property, reduce
 from operator import add
 
 import gem
 import numpy
 
 from finat.citations import cite
-from finat.functional import DERIVATIVE, DIVERGENCE, Functional, one, zero
+from finat.functional import (DERIVATIVE, DIVERGENCE, Functional, PhysicalEntityFrame,
+                              cartesian_pullback, identity_pullback, to_riesz, one, zero)
 
 
 class NeedsCoordinateMappingElement(metaclass=ABCMeta):
@@ -89,8 +89,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
     #: tabulations are dropped from the symbolic rows.
     tol = 1e-10
 
-    #: If False, physical scalar facet moments are plain integrals rather
-    #: than the measure-intrinsic integral averages of the reference nodes.
+    #: False selects plain integrals for physical scalar facet moments.
     avg = True
 
     def __init__(self, *args, **kwargs):
@@ -166,16 +165,17 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
             J = gem.ListTensor([[coordinate_mapping.detJ_at(bary)]])
         else:
             J = coordinate_mapping.jacobian_at(bary)
-        jacobian = Jacobian(J)
-        return PhysicalVandermondeMatrix(self._element, self.functionals(), jacobian, self.tol, avg=self.avg)
+        J = numpy.array([[J[i, k] for k in range(J.shape[1])]
+                         for i in range(J.shape[0])], dtype=object)
+        return PhysicalVandermondeMatrix(self._element, self.functionals, self.reference_riesz,
+                                         J, self.tol, avg=self.avg)
 
+    @cached_property
     def functionals(self):
         """The degrees of freedom as coefficient tensors.
 
-        Constraint functionals of an extended element that cannot be
-        parsed are not exposed as physical dofs: their physical
-        counterparts are the push-forwards of the reference ones (Kirby
-        2017, section 5), with identity rows.
+        Unparsed constraint nodes retain identity rows in the extended
+        element (Kirby 2017, section 5).  Every exposed dof must be parsed.
 
         :returns: A list with a :class:`~finat.functional.Functional` per
             dof, or None for a dof keeping an identity row.
@@ -194,6 +194,14 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
                         if i < ndof:
                             raise
         return functionals
+
+    @cached_property
+    def reference_riesz(self):
+        """Numeric reference pairings for the physical Vandermonde rows.
+
+        :returns: A dict mapping dofs to their Riesz representations.
+        """
+        return to_riesz(self.functionals, self._element)
 
     def dof_scales(self, coordinate_mapping):
         r"""The rescaling of the physical degrees of freedom by powers of the cell size.
@@ -214,7 +222,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         h = coordinate_mapping.cell_size()
         fiat_element = self._element
         top = fiat_element.get_reference_element().get_topology()
-        functionals = self.functionals()
+        functionals = self.functionals
         entity_ids = fiat_element.entity_dofs()
         scales = [None] * len(functionals)
         for dim in entity_ids:
@@ -226,7 +234,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
                         scales[i] = self.dof_scale(functionals[i], havg)
         return scales
 
-    def dof_scale(self, functional: Functional, havg):
+    def dof_scale(self, functional, havg):
         r"""Return the conditioning rescaling factor of one physical dof.
 
         The physical node of a pulled back reference basis function
@@ -423,16 +431,16 @@ def connected_components(A):
         raise ValueError("A must be square.")
     components = []
     candidates = set(range(m))
-    while len(candidates) > 0:
-        seed = {min(candidates)}
-        while True:
-            ids = set(seed)
-            for i in seed:
-                ids.update(j for j in candidates if not isinstance(A[j, i], gem.Zero))
-                ids.update(j for j in candidates if not isinstance(A[i, j], gem.Zero))
-            if len(ids) == len(seed):
-                break
-            seed = ids
+    neighbors = [{j for j in range(m) if not isinstance(A[i, j], gem.Zero)
+                  or not isinstance(A[j, i], gem.Zero)} for i in range(m)]
+    while candidates:
+        ids = set()
+        pending = [min(candidates)]
+        while pending:
+            i = pending.pop()
+            if i not in ids:
+                ids.add(i)
+                pending.extend(neighbors[i] - ids)
         candidates -= ids
         components.append(sorted(ids))
     return components
@@ -463,13 +471,13 @@ def solve(A, B, cache=None):
         try:
             adj, det = cache[key]
         except KeyError:
-            adj, det = cache.setdefault(key, (adjugate(Aii), determinant(Aii)))
+            adj, det = cache[key] = adjugate_and_determinant(Aii)
         X[ids] = (adj @ B[ids]) / det
     return X
 
 
 def pseudoinverse(A):
-    """Returns the Moore-Penrose pseudoinverse of a full-rank matrix.
+    """Returns the Moore-Penrose pseudoinverse of a full-column-rank matrix.
 
     :arg A: An object array of GEM scalars with at least as many rows as
         columns.
@@ -482,62 +490,35 @@ def pseudoinverse(A):
     return solve(A.T @ A, A.T)
 
 
-class Jacobian:
-    r"""The cell Jacobian and its derived matrices, as object arrays of GEM scalars.
-
-    Following FInAT, :math:`J = \partial x/\partial\hat{x}` maps
-    reference to physical coordinates.
-
-    For a rectangular Jacobian, :attr:`detJ` is the positive metric volume
-    factor :math:`\sqrt{\det(J^T J)}`.  The :func:`pseudoinverse` handles
-    full-rank rectangular Jacobians.
-
-    :arg J: A GEM expression for the Jacobian, shape ``(gdim, tdim)``.
-    """
-    def __init__(self, J):
-        if len(J.shape) != 2:
-            raise ValueError(f"The Jacobian must be a matrix, got shape {J.shape}.")
-        gdim, tdim = J.shape
-        self.J = numpy.array([[J[i, k] for k in range(tdim)] for i in range(gdim)], dtype=object)
-        if gdim == tdim:
-            self.detJ = determinant(self.J)
-            self.adjJ = adjugate(self.J)
-        else:
-            JTJ = self.J.T @ self.J
-            self.detJ = determinant(JTJ)**0.5
-            self.adjJ = self.detJ * pseudoinverse(self.J)
-        #: the cofactor matrix, which maps normals to normals
-        self.K = self.adjJ.T
-
-
 class PhysicalVandermondeMatrix:
     r"""The generalized Vandermonde matrix of the physical nodes.
 
-    :math:`B_{ij} = n_i(\hat\psi_j\circ F^{-1})` pairs the physical
-    nodes with the pulled-back reference nodal basis.  Every row is
-    supported on the dofs of the node's own entity and of the entities
-    in its closure, since the trace of a basis function on an entity is
-    determined by the dofs on the closure of that entity (which is what
-    makes the element conforming), so :math:`B` is block lower
-    triangular in the entity order.
+    :math:`B_{ij} = n_i(\mathcal{P}\hat\psi_j)` pairs physical nodes with
+    mapped reference basis functions.  Closure compatibility makes :math:`B`
+    block lower triangular over entities.  Row assembly checks this property;
+    it requires more than conformity for nodes involving normal derivatives.
 
     :arg fiat_element: The FIAT element.
     :arg functionals: A :class:`~finat.functional.Functional` per dof, or
         None for a dof whose physical node is the push-forward of the
         reference one.
-    :arg jacobian: The :class:`Jacobian`.
+    :arg reference_riesz: Numeric reference pairings from :func:`~finat.functional.to_riesz`.
+    :arg J: The Jacobian as an object array of GEM scalars.
     :arg tol: Relative tolerance below which numeric couplings are dropped.
     :arg avg: Whether physical facet moments are integral averages, as
         the reference nodes are; if not, they carry the physical facet
         measure.
     """
-    def __init__(self, fiat_element, functionals, jacobian, tol, avg=True):
+    def __init__(self, fiat_element, functionals, reference_riesz, J, tol, avg=True):
         self.fiat_element = fiat_element
         self.functionals = functionals
-        self.jacobian = jacobian
+        self.J = J
+        self.adjJ, self.detJ = adjugate_and_determinant(J)
         self.tol = tol
         self.avg = avg
+        self.reference_riesz = reference_riesz
 
+    @cached_property
     def rows(self):
         r"""Assembles the rows of :math:`B` that are not rows of the identity.
 
@@ -549,33 +530,42 @@ class PhysicalVandermondeMatrix:
         """
         fiat_element = self.fiat_element
         nbf = fiat_element.space_dimension()
-        nodes = {i: node for i, node in enumerate(self.functionals)
-                 if node is not None and not node.is_invariant(self.jacobian, self.tol)}
-        if not nodes:
-            return {}
-        # tabulate once at the points of all the nodes, as DualSet.to_riesz does
-        points = sorted({pt for node in nodes.values() for pt in node.points})
-        order = max(node.order for node in nodes.values())
-        tabulation = fiat_element.tabulate(order, points)
-        columns = {pt: q for q, pt in enumerate(points)}
-
+        sd = self.J.shape[1]
         closure_dofs = fiat_element.entity_closure_dofs()
+        cartesian = {}
+        frames = {}
         rows = {}
-        for dim, entities in fiat_element.entity_dofs().items():
-            for entity, dofs in entities.items():
-                allowed = set(closure_dofs[dim][entity])
-                for i in dofs:
-                    if i not in nodes:
-                        continue
-                    T = nodes[i].arrange_tabulation(tabulation, columns)
-                    numerator, denominator = nodes[i].action(T, self.jacobian, self.tol, avg=self.avg)
-                    outside = [j for j in range(nbf) if j not in allowed
-                               and not isinstance(numerator[j], gem.Zero)]
-                    if outside:
-                        raise NotImplementedError(
-                            f"Dof {i} on entity {(dim, entity)} couples to dofs "
-                            f"{outside} outside the closure of its entity.")
-                    rows[i] = (numerator, denominator)
+        for i, node in enumerate(self.functionals):
+            if node is None or node.transformation == "invariant":
+                continue
+            if node.transformation == "cartesian":
+                for mapping in node.mappings:
+                    if mapping not in cartesian:
+                        cartesian[mapping] = cartesian_pullback(mapping, self.J, self.adjJ, self.detJ)
+                on_edge = 0 < node.entity[0] < sd - 1
+                pullbacks = [identity_pullback(sd) if on_edge and mapping == DERIVATIVE
+                             else cartesian[mapping] for mapping in node.mappings]
+                measure = one
+            else:
+                key = (node.entity[1], node.support)
+                if key not in frames:
+                    frames[key] = PhysicalEntityFrame(node.ref_el, *key, self.J, self.adjJ, self.detJ)
+                frame = frames[key]
+                pullbacks = [frame.pullback(mapping) for mapping in node.mappings]
+                measure = frame.measure if not self.avg and len(node.points) > 1 else one
+            if node.is_invariant(pullbacks, self.tol):
+                continue
+            numerator, denominator = node.action(self.reference_riesz[i], pullbacks, self.tol)
+            numerator = numerator * measure
+            dim, entity = node.entity
+            allowed = set(closure_dofs[dim][entity])
+            outside = [j for j in range(nbf) if j not in allowed
+                       and not isinstance(numerator[j], gem.Zero)]
+            if outside:
+                raise NotImplementedError(
+                    f"Dof {i} on entity {node.entity} couples to dofs "
+                    f"{outside} outside the closure of its entity.")
+            rows[i] = (numerator, denominator)
         return rows
 
     def matrix(self):
@@ -584,7 +574,7 @@ class PhysicalVandermondeMatrix:
         :returns: :math:`B` as an object array of GEM scalars.
         """
         B = identity(self.fiat_element.space_dimension())
-        for i, (numerator, denominator) in self.rows().items():
+        for i, (numerator, denominator) in self.rows.items():
             B[i] = numerator / denominator
         return B
 
@@ -596,10 +586,8 @@ class PhysicalVandermondeMatrix:
 
         .. math:: V_e = B_{ee}^{-1}(I_e - B_{ec} V_c).
 
-        Starting from the identity, only the rows of entities carrying
-        transformed nodes are replaced, and the rows of :math:`B` are
-        kept in numerator/denominator form so that only polynomial
-        blocks are inverted.
+        Only entities with transformed nodes are solved.  Row denominators
+        move to the right-hand side, keeping divisions out of the blocks.
 
         :returns: :math:`V` as an object array of GEM scalars.
         """
@@ -607,7 +595,7 @@ class PhysicalVandermondeMatrix:
         nbf = fiat_element.space_dimension()
         entity_dofs = fiat_element.entity_dofs()
         closure_dofs = fiat_element.entity_closure_dofs()
-        rows = self.rows()
+        rows = self.rows
         V = identity(nbf)
         cache = {}
         for dim in sorted(entity_dofs):
@@ -629,8 +617,25 @@ class PhysicalVandermondeMatrix:
                     rhs[k, i] = denominator
                     for j in closure:
                         if not isinstance(numerator[j], gem.Zero):
-                            # keep the object array on the left, lest GEM
-                            # broadcast the scalar into a vector node
+                            # Array first: GEM scalar multiplication otherwise broadcasts.
                             rhs[k] = rhs[k] - V[j] * numerator[j]
                 V[block] = solve(Bee, rhs, cache)
         return V
+
+
+def adjugate_and_determinant(J):
+    r"""Return the determinant-scaled inverse and volume factor of a Jacobian.
+
+    Square matrices use the signed determinant and adjugate.  For a
+    rectangular matrix the volume factor is :math:`\sqrt{\det(J^T J)}`
+    and the scaled inverse is :math:`\det J\,J^+`.
+
+    :arg J: Full-column-rank Jacobian as an object array of GEM scalars.
+    :returns: The scaled inverse (numerator) and volume factor (denominator).
+        The transpose of the scaled inverse is the cofactor matrix.
+    """
+    gdim, tdim = J.shape
+    if gdim == tdim:
+        return adjugate(J), determinant(J)
+    detJ = determinant(J.T @ J)**0.5
+    return pseudoinverse(J) * detJ, detJ

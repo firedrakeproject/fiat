@@ -715,3 +715,17 @@ class IntegralMomentOfTangentialEvaluation(Functional):
         pt_dict = {tuple(pt): [(wt*t[i], (i, )) for i in range(sd)]
                    for pt, wt in zip(points, weights)}
         super().__init__(ref_el, (sd, ), pt_dict, {}, "IntegralMomentOfScaledTangentialEvaluation")
+
+
+def contravariant_piola_dual(J, values):
+    r"""Map test functions so their moments commute with contravariant Piola.
+
+    The factor :math:`\operatorname{sign}(\det J)J^{-T}` cancels both
+    :math:`J/\det J` on the field and :math:`|\det J|` in quadrature.
+
+    :arg J: Square Jacobian mapping reference to physical coordinates.
+    :arg values: Reference test functions, shaped ``(nbasis, dim, npoints)``.
+    :returns: Physical test functions with the same shape.
+    """
+    transform = numpy.sign(numpy.linalg.det(J)) * numpy.linalg.inv(J).T
+    return numpy.einsum("ij,bjq->biq", transform, values)

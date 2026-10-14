@@ -6,16 +6,17 @@ import pytest
 import pprint
 
 from gem.interpreter import evaluate
-from finat.physically_mapped import Jacobian, PhysicallyMappedElement
+from finat.physically_mapped import PhysicallyMappedElement, adjugate_and_determinant
 
 
-def test_jacobian_accepts_rectangular_matrix():
-    jacobian = Jacobian(gem.Literal(np.array([[3., 0.], [0., 4.], [0., 0.]])))
-    assert jacobian.J.shape == (3, 2)
-    assert evaluate([jacobian.detJ])[0].arr == pytest.approx(12.)
-    K = evaluate([gem.ListTensor(jacobian.K)])[0].arr
+def test_rectangular_adjugate_and_determinant():
+    J = gem.Literal(np.array([[3., 0.], [0., 4.], [0., 0.]]))
+    J = np.array([[J[i, k] for k in range(2)] for i in range(3)], dtype=object)
+    adjJ, detJ = adjugate_and_determinant(J)
+    assert evaluate([detJ])[0].arr == pytest.approx(12.)
+    K = evaluate([gem.ListTensor(adjJ.T)])[0].arr
     assert np.allclose(K, [[4, 0], [0, 3], [0, 0]])
-    adjJ = evaluate([gem.ListTensor(jacobian.adjJ)])[0].arr
+    adjJ = evaluate([gem.ListTensor(adjJ)])[0].arr
     assert adjJ.shape == (2, 3)
     assert np.allclose(adjJ, [[4, 0, 0], [0, 3, 0]])
 
