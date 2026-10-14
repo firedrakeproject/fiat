@@ -9,6 +9,7 @@
 from FIAT.functional import (PointEvaluation, PointDerivative,
                              IntegralMoment, IntegralMomentOfDerivative)
 from FIAT import finite_element, dual_set, macro, polynomial_set
+from FIAT.bernstein import BernsteinPolynomialSet
 from FIAT.polynomial_set import mis
 from FIAT.check_format_variant import parse_quadrature_scheme
 from FIAT.reference_element import TRIANGLE, ufc_simplex
@@ -102,7 +103,7 @@ def AlfeldC2Space(ref_el, degree):
     # C4 at minor split barycenters, C3 at major split barycenter
     order[0] = dict.fromkeys(ref_complex.get_interior_facets(0), degree-1)
     order[0][3] = degree-2
-    return macro.CkPolynomialSet(ref_complex, degree, order=order, variant="bubble")
+    return BernsteinPolynomialSet(ref_complex, degree, order=order)
 
 
 class AlfeldC2(finite_element.CiarletElement):
