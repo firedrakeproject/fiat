@@ -116,7 +116,6 @@ class BernsteinExpansionSet(ExpansionSet):
         tables = tuple(_bernstein_factors(n, eta_pts[axis]) for axis in axes)
         values = tuple(table[0] for table in tables)
         result = {(0,) * dim: [(1.0, tuple(zip(axes, values)))]}
-
         if order:
             lower = tuple(table[1] for table in tables)
             # On the default (-1, 1) simplex,

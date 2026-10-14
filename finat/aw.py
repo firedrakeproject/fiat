@@ -27,9 +27,6 @@ class ArnoldWinther(PhysicallyMappedElement, FiatElement):
         cite("Arnold2002")
         super().__init__(FIAT.ArnoldWinther(cell, degree))
 
-    def dof_scale(self, node, dim, havg):
-        return havg**-2 if dim == 0 else None
-
     def entity_dofs(self):
         return {0: {0: [0, 1, 2],
                     1: [3, 4, 5],

@@ -6,14 +6,14 @@ import FIAT
 
 
 class BrambleZlamalC2(PhysicallyMappedElement, ScalarFiatElement):
-    def __init__(self, cell, degree=9, avg=True):
+    def __init__(self, cell, degree=9, avg=False):
         cite("BrambleZlamal1970")
         self.avg = avg
         super().__init__(FIAT.BrambleZlamalC2(cell, degree))
 
 
 class AlfeldC2(PhysicallyMappedElement, ScalarFiatElement):
-    def __init__(self, cell, degree=5, avg=True):
+    def __init__(self, cell, degree=5, avg=False):
         cite("Alfeld1984")
         self.avg = avg
         super().__init__(FIAT.AlfeldC2(cell, degree))
