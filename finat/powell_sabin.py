@@ -16,6 +16,3 @@ class QuadraticPowellSabin12(PhysicallyMappedElement, ScalarFiatElement):
         self.avg = avg
         cite("PowellSabin1977")
         super().__init__(FIAT.QuadraticPowellSabin12(cell))
-
-    def dof_scale(self, node, dim, havg):
-        return super().dof_scale(node, dim, havg) if dim == 0 else None
