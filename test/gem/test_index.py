@@ -62,6 +62,7 @@ def test_literal_index_with_constant_stride_after_symbolic_stride():
     pytest.param(lambda n: 2 + 3 * n, gem.uint_type, [2, 5, 8], id="add_multiply"),
     pytest.param(lambda n: 2 * n - 1, numpy.int64, [-1, 1, 3], id="subtract"),
     pytest.param(lambda n: 1 - n, numpy.int64, [1, 0, -1], id="subtract_from_number"),
+    pytest.param(lambda n: -n, numpy.int64, [0, -1, -2], id="negate"),
     pytest.param(lambda n: 1.5 * n, numpy.float64, [0, 1.5, 3], id="float_operand"),
 ])
 def test_number_operand_takes_the_dtype_of_an_integer_node(build, dtype, expected):
