@@ -902,12 +902,16 @@ kernel, but whose value is not known at compile time.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="gem.gem.as_gem">
-<span class="sig-prename descclassname"><span class="pre">gem.gem.</span></span><span class="sig-name descname"><span class="pre">as_gem</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">expr</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gem/gem.html#as_gem"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.gem.as_gem" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">gem.gem.</span></span><span class="sig-name descname"><span class="pre">as_gem</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">expr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gem/gem.html#as_gem"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.gem.as_gem" title="Link to this definition">¶</a></dt>
 <dd><p>Attempt to convert an expression into GEM of scalar type.</p>
 <section id="id5">
 <h3>Parameters<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>expr<span class="classifier">Node or Number</span></dt><dd><p>The expression.</p>
+</dd>
+<dt>dtype<span class="classifier">numpy.dtype, optional</span></dt><dd><p>The dtype of the node that <code class="docutils literal notranslate"><span class="pre">expr</span></code> combines with. A number then
+converts to the smallest dtype that holds both its value and
+<code class="docutils literal notranslate"><span class="pre">dtype</span></code>. Without <code class="docutils literal notranslate"><span class="pre">dtype</span></code>, a number converts to float or complex.</p>
 </dd>
 </dl>
 </section>

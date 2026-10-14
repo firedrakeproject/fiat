@@ -135,25 +135,25 @@
         <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">Product</span><span class="p">,</span> <span class="n">minus</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__add__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">Sum</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">Sum</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__radd__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">)</span><span class="o">.</span><span class="fm">__add__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="fm">__add__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__sub__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">Sum</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="o">-</span><span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">Sum</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="o">-</span><span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__rsub__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">)</span><span class="o">.</span><span class="fm">__sub__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="fm">__sub__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__mul__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">Product</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">Product</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__rmul__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">)</span><span class="o">.</span><span class="fm">__mul__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="fm">__mul__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__matmul__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-        <span class="n">other</span> <span class="o">=</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
+        <span class="n">other</span> <span class="o">=</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">other</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">Product</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">)</span>
         <span class="k">elif</span> <span class="ow">not</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span> <span class="ow">and</span> <span class="n">other</span><span class="o">.</span><span class="n">shape</span><span class="p">):</span>
@@ -166,7 +166,7 @@
         <span class="k">return</span> <span class="n">ComponentTensor</span><span class="p">(</span><span class="n">IndexSum</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="p">)),</span> <span class="p">(</span><span class="o">*</span><span class="n">i</span><span class="p">,</span> <span class="o">*</span><span class="n">j</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__rmatmul__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">)</span><span class="o">.</span><span class="fm">__matmul__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="fm">__matmul__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__abs__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">MathFunction</span><span class="p">,</span> <span class="s2">"abs"</span><span class="p">),</span> <span class="bp">self</span><span class="p">)</span>
@@ -175,16 +175,16 @@
         <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">Power</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__lt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">Comparison</span><span class="p">,</span> <span class="s2">"&lt;"</span><span class="p">),</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">Comparison</span><span class="p">,</span> <span class="s2">"&lt;"</span><span class="p">),</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__gt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">Comparison</span><span class="p">,</span> <span class="s2">"&gt;"</span><span class="p">),</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">Comparison</span><span class="p">,</span> <span class="s2">"&gt;"</span><span class="p">),</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__le__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">Comparison</span><span class="p">,</span> <span class="s2">"&lt;="</span><span class="p">),</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">Comparison</span><span class="p">,</span> <span class="s2">"&lt;="</span><span class="p">),</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__ge__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">Comparison</span><span class="p">,</span> <span class="s2">"&gt;="</span><span class="p">),</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">Comparison</span><span class="p">,</span> <span class="s2">"&gt;="</span><span class="p">),</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">))</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">T</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -933,11 +933,6 @@
                     <span class="n">idxs_</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">index</span><span class="p">,</span> <span class="n">stride</span><span class="p">))</span>
                     <span class="c1"># last += (unknown_extent - 1) * stride</span>
                 <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
-                    <span class="c1"># TODO: Attach dtype to each Node.</span>
-                    <span class="c1"># Here, we should simply be able to do:</span>
-                    <span class="c1"># &gt;&gt;&gt; offset_ += index * stride</span>
-                    <span class="c1"># but "+" and "*" are not currently correctly overloaded</span>
-                    <span class="c1"># for indices (integers); they assume floats.</span>
                     <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">offset</span><span class="p">,</span> <span class="n">Integral</span><span class="p">):</span>
                         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Found non-Integral offset : </span><span class="si">{</span><span class="n">offset</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
                     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stride</span><span class="p">,</span> <span class="n">Constant</span><span class="p">):</span>
@@ -1471,7 +1466,7 @@
 
 <span class="c1"># Static one object for quicker constant folding</span>
 <span class="n">one</span> <span class="o">=</span> <span class="n">Literal</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
-<span class="n">minus</span> <span class="o">=</span> <span class="n">Literal</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">minus</span> <span class="o">=</span> <span class="n">Literal</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
 
 
 <span class="c1"># Syntax sugar</span>
@@ -1511,13 +1506,17 @@
 
 <div class="viewcode-block" id="as_gem">
 <a class="viewcode-back" href="../../gem.html#gem.gem.as_gem">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">as_gem</span><span class="p">(</span><span class="n">expr</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">as_gem</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Attempt to convert an expression into GEM of scalar type.</span>
 
 <span class="sd">    Parameters</span>
 <span class="sd">    ----------</span>
 <span class="sd">    expr : Node or Number</span>
 <span class="sd">        The expression.</span>
+<span class="sd">    dtype : numpy.dtype, optional</span>
+<span class="sd">        The dtype of the node that ``expr`` combines with. A number then</span>
+<span class="sd">        converts to the smallest dtype that holds both its value and</span>
+<span class="sd">        ``dtype``. Without ``dtype``, a number converts to float or complex.</span>
 
 <span class="sd">    Returns</span>
 <span class="sd">    -------</span>
@@ -1533,7 +1532,9 @@
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">Node</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">expr</span>
     <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">Number</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">Literal</span><span class="p">(</span><span class="n">expr</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">dtype</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">dtype</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">result_type</span><span class="p">(</span><span class="n">dtype</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">min_scalar_type</span><span class="p">(</span><span class="n">expr</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">Literal</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
     <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="p">(</span><span class="nb">bool</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">bool</span><span class="p">)):</span>
         <span class="k">return</span> <span class="n">Literal</span><span class="p">(</span><span class="nb">bool</span><span class="p">(</span><span class="n">expr</span><span class="p">))</span>
     <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
