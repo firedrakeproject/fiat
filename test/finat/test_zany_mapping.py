@@ -19,6 +19,7 @@ def test_jacobian_accepts_rectangular_matrix():
     assert adjJ.shape == (2, 3)
     assert np.allclose(adjJ, [[4, 0, 0], [0, 3, 0]])
 
+
 @pytest.fixture(params=["positive", "negative"])
 def phys_el(request):
     K = {dim: FIAT.ufc_simplex(dim) for dim in (1, 2, 3)}

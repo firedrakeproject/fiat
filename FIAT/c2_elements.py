@@ -10,7 +10,6 @@ from FIAT.bernstein import BernsteinPolynomialSet
 from FIAT.functional import (PointEvaluation, PointDerivative,
                              IntegralMoment, IntegralMomentOfDerivative)
 from FIAT import finite_element, dual_set, macro, polynomial_set
-from FIAT.bernstein import BernsteinPolynomialSet
 from FIAT.polynomial_set import mis
 from FIAT.check_format_variant import parse_quadrature_scheme
 from FIAT.reference_element import TRIANGLE, ufc_simplex
