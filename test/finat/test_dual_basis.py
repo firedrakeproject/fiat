@@ -4,11 +4,12 @@ import pytest
 import numpy
 import finat
 import gem
+import gem.driver
 import ufl
 import finat.ufl
 from finat.element_factory import create_element
 from finat.enriched import as_enriched
-from finat.point_set import AbstractPointSet, UnionPointSet
+from finat.point_set import AbstractPointSet, PointSet, UnionPointSet
 from finat.quadrature import QuadratureRule
 from finat.quadrature_element import QuadratureElement
 from gem.interpreter import evaluate
@@ -139,7 +140,8 @@ def test_mixed_enriched_element_dual_evaluation() -> None:
     check_nodal(mixed)
 
 
-def test_quadrature_element_on_union_of_points():
+@pytest.mark.parametrize("repeated", (False, True))
+def test_quadrature_element_on_union_of_points(repeated: bool) -> None:
     # Firedrake interpolates through a quadrature space on the points of the
     # target's dual basis, which for a direct sum is a union.  That element
     # has to evaluate on each point set of the union, just as the sum does.
@@ -147,6 +149,8 @@ def test_quadrature_element_on_union_of_points():
     enriched = restricted_lagrange_sum(cell)
 
     _, ps = enriched.dual_basis
+    if repeated:
+        ps = UnionPointSet([ps, PointSet(ps.point_sets[0].points.copy())])
     # The weights are not used, this quadrature scheme is not for integration.
     rule = QuadratureRule(ps, numpy.full(len(ps.points), numpy.nan), ref_el=cell)
     element = QuadratureElement(cell, rule)
@@ -191,6 +195,29 @@ def test_non_nodal_enriched_element_has_no_dual_basis():
     with pytest.raises(NotImplementedError):
         mini.dual_evaluation(lambda x: gem.Literal(1.0))
     assert not mini.has_pointwise_dual_basis
+
+
+def test_integrated_legendre_dual_evaluation():
+    element = finat.IntegratedLegendre(ufc_simplex(2), 4)
+    check_nodal(element)
+
+
+def test_restricted_integrated_legendre_dual_basis() -> None:
+    element = finat.RestrictedElement(
+        finat.IntegratedLegendre(ufc_simplex(1), 5), restriction_domain="interior")
+    check_dual_basis(element)
+
+
+def test_restricted_integrated_legendre_quadrature_entity_numbering() -> None:
+    cell = ufc_simplex(2)
+    element = finat.RestrictedElement(
+        finat.IntegratedLegendre(cell, 3), restriction_domain="interior")
+    _, points = element.dual_basis
+    rule = QuadratureRule(points, numpy.full(len(points.points), numpy.nan), ref_el=cell)
+    quadrature = QuadratureElement(cell, rule)
+
+    entity_dofs = quadrature.entity_dofs()
+    assert [len(entity_dofs[0][entity]) for entity in sorted(entity_dofs[0])] == [1, 1, 1]
 
 
 def test_enriched_element_dual_evaluation():
@@ -238,7 +265,7 @@ def coefficient_evaluation(element, ps, dofs):
     table = element.basis_evaluation(0, ps)[(0,) * dim]
     dofs = gem.Literal(dofs.reshape([index.extent for index in beta]))
     value = gem.Product(gem.Indexed(table, beta + zeta), gem.Indexed(dofs, beta))
-    return gem.ComponentTensor(gem.optimise.contraction(gem.IndexSum(value, beta)), zeta)
+    return gem.ComponentTensor(gem.driver.contraction(gem.IndexSum(value, beta)), zeta)
 
 
 def nodal_values(element, fn):

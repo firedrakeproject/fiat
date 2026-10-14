@@ -10,6 +10,7 @@ Brubeck & Kirby 2025).
 from abc import ABCMeta, abstractmethod
 from collections.abc import Iterable, Mapping
 from functools import cached_property, reduce
+from numbers import Number
 from operator import add
 
 import gem
@@ -57,7 +58,8 @@ class MappedTabulation(Mapping):
             row = []
             for column in range(M.shape[1]):
                 value = M.array[source_row, column]
-                if not isinstance(value, gem.Zero):
+                if not (isinstance(value, gem.Zero)
+                        or isinstance(value, Number) and value == 0):
                     row.append((column, value))
             nonzero_rows.append(row)
         width = max((len(row) for row in nonzero_rows), default=0)

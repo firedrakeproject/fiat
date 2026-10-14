@@ -5,7 +5,7 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 from FIAT.dual_set import DualSet
-from FIAT.finite_element import CiarletElement
+from FIAT.finite_element import CiarletElement, FiniteElement
 
 
 class RestrictedDualSet(DualSet):
@@ -21,18 +21,23 @@ class RestrictedDualSet(DualSet):
         indices = list(sorted(indices)) if sort else list(indices)
         ref_el = dual.get_reference_element()
         nodes_old = dual.get_nodes()
+        coeffs = dual.get_coeffs()
+        source = dual._dual if isinstance(dual, RestrictedDualSet) else dual
+        if coeffs is not None:
+            coeffs = coeffs[indices, :]
+            nodes = nodes_old
+        else:
+            nodes = [nodes_old[i] for i in indices]
         entity_ids = {}
-        nodes = []
         for d, entities in dual.get_entity_ids().items():
             entity_ids[d] = {}
             for entity, dofs in entities.items():
                 entity_ids[d][entity] = [indices.index(dof)
                                          for dof in dofs if dof in indices]
-        nodes = [nodes_old[i] for i in indices]
-        self._dual = dual
+        self._dual = source
         entity_permutations = self._restrict_entity_permutations(dual, entity_ids)
 
-        super().__init__(nodes, ref_el, entity_ids, entity_permutations)
+        super().__init__(nodes, ref_el, entity_ids, entity_permutations, coeffs=coeffs)
 
     @staticmethod
     def _restrict_entity_permutations(dual, entity_ids):
@@ -94,6 +99,8 @@ class RestrictedElement(CiarletElement):
         if len(indices) == 0:
             raise ValueError("No point in creating empty RestrictedElement.")
 
+        indices = list(sorted(indices))
+
         self._element = element
         self._indices = indices
 
@@ -108,5 +115,7 @@ class RestrictedElement(CiarletElement):
         mapping_new = [mapping_old[dof] for dof in indices]
         assert all(e_mapping == mapping_new[0] for e_mapping in mapping_new)
 
-        # Call constructor of CiarletElement
-        super().__init__(poly_set, dual, element.degree(), element.get_formdegree(), mapping_new[0])
+        # Restricting matching primal and dual indices preserves nodality.
+        FiniteElement.__init__(self, dual.get_reference_element(), dual, element.get_order(),
+                               element.get_formdegree(), mapping_new[0], element.get_reference_complex())
+        self.poly_set = poly_set

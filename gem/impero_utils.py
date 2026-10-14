@@ -10,7 +10,7 @@ from functools import singledispatch
 from itertools import chain, groupby
 
 from gem.node import traversal, collect_refcount
-from gem import gem, impero as imp, optimise, scheduling
+from gem import gem, impero as imp, jagged, optimise, scheduling
 
 
 # ImperoC is named tuple for C code generation.
@@ -30,6 +30,7 @@ class NoopError(Exception):
 
 def preprocess_gem(expressions, replace_delta=True, remove_componenttensors=True):
     """Lower GEM nodes that cannot be translated to C directly."""
+    expressions = jagged.replace_flattened(expressions)
     if remove_componenttensors:
         expressions = optimise.remove_componenttensors(expressions)
     if replace_delta:
@@ -72,8 +73,36 @@ def compile_gem(assignments, prefix_ordering, remove_zeros=False,
 
     get_indices = lambda expr: apply_ordering(expr.free_indices)
 
+    def get_loop_indices(expr: gem.Node) -> tuple[gem.Index, ...]:
+        """Return every explicit loop axis used to evaluate an expression.
+
+        Parameters
+        ----------
+        expr
+            GEM expression being scheduled.
+
+        Returns
+        -------
+        tuple of gem.Index
+            Free indices followed by bound value indices in global loop
+            order.
+
+        Notes
+        -----
+        A ``ComponentTensor`` binds its multi-index in GEM, but evaluating
+        the tensor still executes that index as a value loop.  Exposing the
+        loop to Impero lets several tensor outputs share scalar work within
+        one fused loop instead of materializing that work as arrays.
+
+        """
+        indices = expr.free_indices
+        if isinstance(expr, gem.ComponentTensor):
+            indices = (*indices, *expr.multiindex)
+        return apply_ordering(indices)
+
     # Build operation ordering
-    ops = scheduling.emit_operations(assignments, get_indices, emit_return_accumulate)
+    ops = scheduling.emit_operations(
+        assignments, get_loop_indices, emit_return_accumulate)
 
     # Empty kernel
     if len(ops) == 0:
@@ -83,7 +112,7 @@ def compile_gem(assignments, prefix_ordering, remove_zeros=False,
     ops = inline_temporaries(expressions, ops)
 
     # Build Impero AST
-    tree = make_loop_tree(ops, get_indices)
+    tree = make_loop_tree(ops, get_loop_indices)
 
     # Collect temporaries
     temporaries = collect_temporaries(tree)
@@ -97,9 +126,25 @@ def compile_gem(assignments, prefix_ordering, remove_zeros=False,
 
 def make_prefix_ordering(indices, prefix_ordering):
     """Creates an ordering of ``indices`` which starts with those
-    indices in ``prefix_ordering``."""
+    indices in ``prefix_ordering``.  A `gem.JaggedIndex` is placed after
+    its parents, so that its loop nests inside theirs and the jagged
+    bound can be tightened."""
     # Need to return deterministically ordered indices
-    return tuple(prefix_ordering) + tuple(k for k in indices if k not in prefix_ordering)
+    ordering = tuple(prefix_ordering) + tuple(k for k in indices if k not in prefix_ordering)
+    result = []
+    seen = set()
+
+    def visit(k):
+        if k not in seen:
+            seen.add(k)
+            for parent in getattr(k, 'parents', ()):
+                if parent in ordering:
+                    visit(parent)
+            result.append(k)
+
+    for k in ordering:
+        visit(k)
+    return tuple(result)
 
 
 def make_index_orderer(index_ordering):
@@ -203,11 +248,18 @@ def place_declarations(tree, temporaries, get_indices):
     numbering = {t: n for n, t in enumerate(temporaries)}
     assert len(numbering) == len(temporaries)
 
-    # Collect the total number of temporary references
+    # Collect the total number of temporary references.  Impero is a
+    # tree, so structurally equal subtrees still represent distinct
+    # executions and every occurrence must be visited.  The generic GEM
+    # traversal is DAG-oriented and deliberately skips equal nodes.
     total_refcount = collections.Counter()
-    for node in traversal((tree,)):
+    pending = [tree]
+    while pending:
+        node = pending.pop()
         if isinstance(node, imp.Terminal):
             total_refcount.update(temp_refcount(numbering, node))
+        else:
+            pending.extend(reversed(node.children))
     assert set(total_refcount) == set(temporaries)
 
     # Result

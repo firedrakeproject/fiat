@@ -87,7 +87,7 @@ class C2DualSet(dual_set.DualSet):
 class BrambleZlamalC2(finite_element.CiarletElement):
     """The Bramble-Zlamal C2 element."""
     def __init__(self, ref_el, degree=9, reduced=False, quad_scheme=None):
-        poly_set = BernsteinPolynomialSet(ref_el, degree, ordering="topological")
+        poly_set = BernsteinPolynomialSet(ref_el, degree)
         dual = C2DualSet(ref_el, degree, reduced=reduced, quad_scheme=quad_scheme)
         super().__init__(poly_set, dual, degree, formdegree=0)
 
@@ -103,7 +103,7 @@ def AlfeldC2Space(ref_el, degree):
     # C4 at minor split barycenters, C3 at major split barycenter
     order[0] = dict.fromkeys(ref_complex.get_interior_facets(0), degree-1)
     order[0][3] = degree-2
-    return macro.CkPolynomialSet(ref_complex, degree, order=order, variant="bubble")
+    return BernsteinPolynomialSet(ref_complex, degree, order=order)
 
 
 class AlfeldC2(finite_element.CiarletElement):

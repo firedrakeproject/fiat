@@ -4,12 +4,12 @@ expressions."""
 from collections import Counter, OrderedDict, defaultdict
 from collections.abc import Callable, Iterable
 from functools import singledispatch, partial
-from itertools import combinations, permutations, zip_longest
+from itertools import combinations, permutations
 from numbers import Integral
 
 import numpy
 
-from gem.cost import estimate_cost, index_space_literal, iteration_count
+from gem.cost import estimate_cost, index_space_literal
 from gem.utils import groupby
 from gem.node import (Memoizer, MemoizerArg, reuse_if_untouched,
                       reuse_if_untouched_arg, traversal, traversal_children)
@@ -17,7 +17,7 @@ from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
                      Product, Sum, Comparison, Conditional, Division,
                      Index, IndexBase, VariableIndex, Indexed, FlexiblyIndexed,
                      IndexSum, ComponentTensor, ListTensor, Delta,
-                     partial_indexed, one)
+                     jagged_lattice, partial_indexed, one)
 
 
 @singledispatch
@@ -810,6 +810,44 @@ def traverse_sum(expression, stop_at=None):
     return result
 
 
+def _distributed_indexsum_term(
+        term: Node, indices: tuple[Index, ...]) -> Node:
+    """Preserve a joint contraction domain after distributing one term."""
+    active = tuple(index for index in indices if index in term.free_indices)
+    missing = tuple(index for index in indices if index not in active)
+    if not missing:
+        return IndexSum(term, indices)
+
+    domain = OrderedDict()
+
+    def include(index):
+        for parent in index.parents:
+            include(parent)
+        domain.setdefault(index)
+
+    for index in indices:
+        include(index)
+    parents = {parent for index in domain for parent in index.parents}
+    if all(not index.parents and index not in parents for index in missing):
+        return IndexSum(Product(term, index_space_literal(missing)), active)
+
+    retained = set(domain).difference(indices).union(active)
+    for index in reversed(domain):
+        if index in retained:
+            retained.update(index.parents)
+    retained = tuple(index for index in domain if index in retained)
+    points = jagged_lattice(tuple(domain))
+    if retained:
+        positions = tuple(tuple(domain).index(index) for index in retained)
+        multiplicity = numpy.zeros(tuple(index.extent for index in retained))
+        numpy.add.at(multiplicity, tuple(points[:, p] for p in positions), 1)
+        factor = Indexed(Literal(multiplicity), retained)
+    else:
+        factor = Literal(float(len(points)))
+    active = tuple(index for index in retained if index in indices)
+    return IndexSum(Product(term, factor), active)
+
+
 def distribute_sum(expr: Node, predicate: Callable[[Node], bool]) -> list[Node]:
     """Distribute selected sums through products and contractions.
 
@@ -842,9 +880,7 @@ def distribute_sum(expr: Node, predicate: Callable[[Node], bool]) -> list[Node]:
             elif isinstance(node, IndexSum):
                 body, = node.children
                 results[key] = [
-                    IndexSum(term, tuple(
-                        index for index in node.multiindex
-                        if index in term.free_indices))
+                    _distributed_indexsum_term(term, node.multiindex)
                     for term in results[id(body)]]
             else:  # Product
                 a, b = node.children
@@ -1085,66 +1121,6 @@ def cancel_nested_deltas(expression: Node) -> Node:
     return Memoizer(visit)(expression)
 
 
-def contraction(expression):
-    """Optimise the contractions of the tensor product at the root of
-    the expression, including:
-
-    - IndexSum-Delta cancellation
-    - Sum factorisation
-
-    This routine was designed with finite element coefficient
-    evaluation in mind.
-    """
-
-    # Common memoizer to remove ComponentTensors
-    index_replacer = MemoizerArg(filtered_replace_indices)
-
-    # Eliminate annoying ComponentTensors
-    expression = index_replacer(expression, ())
-
-    # Flatten product tree, eliminate deltas, sum factorise
-    def rebuild(expression):
-        root = expression
-        # The contraction at the root is always broken up, as that is the
-        # one being optimised
-        keep = repeated_contractions(expression)
-        sum_indices, factors = traverse_product(
-            expression, index_replacer=index_replacer,
-            stop_at=lambda e: e is not root and e in keep)
-        sum_indices, factors = pull_back_indirect_delta(
-            sum_indices, factors, index_replacer)
-        sum_indices, factors = delta_elimination(
-            sum_indices, factors, index_replacer=index_replacer)
-        factors = [index_replacer(f, ()) for f in factors]
-        return sum_factorise(sum_indices, factors)
-
-    # Sometimes the value shape is composed as a ListTensor, which
-    # could get in the way of decomposing factors.  In particular,
-    # this is the case for H(div) and H(curl) conforming tensor
-    # product elements.  So if ListTensors are used, they are pulled
-    # out to be outermost, so we can straightforwardly factorise each
-    # of its entries.
-    lt_fis = OrderedDict()  # ListTensor free indices
-    for node in traversal((expression,)):
-        if isinstance(node, Indexed):
-            child, = node.children
-            if isinstance(child, ListTensor):
-                lt_fis.update(zip_longest(node.multiindex, ()))
-    lt_fis = tuple(index for index in lt_fis if index in expression.free_indices)
-
-    if lt_fis:
-        # Rebuild each split component
-        tensor = ComponentTensor(expression, lt_fis)
-        entries = [Indexed(tensor, zeta) for zeta in numpy.ndindex(tensor.shape)]
-        entries = [index_replacer(e, ()) for e in entries]
-        return Indexed(ListTensor(
-            numpy.array(list(map(rebuild, entries))).reshape(tensor.shape)
-        ), lt_fis)
-    else:
-        # Rebuild whole expression at once
-        return rebuild(expression)
-
-
 @singledispatch
 def _replace_delta(node, self):
     raise AssertionError("cannot handle type %s" % type(node))
@@ -1342,11 +1318,8 @@ def tabulate_indirect_contractions(expression: Node) -> Node:
     if not gathers:
         return expression
 
-    # Gathers that select the same rows with the same arguments read one
-    # tabulation, so they pay for it once between them.
-    readers = Counter((frozenset(gather.expression.free_indices), nrows)
-                      for gather, nrows in gathers.items())
     row_indices = {}
+    candidates = OrderedDict()
 
     def rename(node, self, substitution):
         target, replacement = substitution
@@ -1357,35 +1330,29 @@ def tabulate_indirect_contractions(expression: Node) -> Node:
             return Indexed(self(aggregate, substitution), multiindex)
         return reuse_if_untouched_arg(node, self, substitution)
 
-    def hoist(node):
+    for node in traversal((expression,)):
+        if not isinstance(node, IndexSum):
+            continue
         body, = node.children
         free = frozenset(body.free_indices)
         contracted = frozenset(node.multiindex)
-
-        candidates = []
         for gather, nrows in gathers.items():
             arguments = frozenset(gather.expression.free_indices)
-            if arguments <= free and arguments.isdisjoint(contracted):
-                sharing = readers[(arguments, nrows)]
-                saving = sharing * iteration_count(arguments) - nrows
-                if saving > 0:
-                    candidates.append((saving, gather, arguments, nrows))
-
-        for _, gather, arguments, nrows in sorted(candidates, key=lambda c: -c[0]):
-            # One index per table, so that gathers sharing a tabulation build
-            # the same node and evaluate it one time.
-            row = row_indices.setdefault((arguments, nrows), Index(extent=nrows))
+            if not (arguments <= free and arguments.isdisjoint(contracted)):
+                continue
+            row = row_indices.setdefault(nrows, Index(extent=nrows))
             per_row = MemoizerArg(rename)(body, (gather, row))
-            # The body must reach the arguments only through this gather.
             if arguments.isdisjoint(per_row.free_indices):
                 table = ComponentTensor(IndexSum(per_row, node.multiindex), (row,))
-                return Indexed(table, (gather,))
-        return node
+                candidates.setdefault(table, {})[node] = Indexed(table, (gather,))
 
-    def visit(node, self):
-        node = reuse_if_untouched(node, self)
-        if isinstance(node, IndexSum):
-            node = hoist(node)
-        return node
+    for replacements in candidates.values():
+        def replace(node, self):
+            if node in replacements:
+                return replacements[node]
+            return reuse_if_untouched(node, self)
 
-    return Memoizer(visit)(expression)
+        candidate = Memoizer(replace)(expression)
+        if estimate_cost((candidate,)) < estimate_cost((expression,)):
+            expression = candidate
+    return expression
