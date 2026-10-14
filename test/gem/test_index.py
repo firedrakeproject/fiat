@@ -3,6 +3,7 @@ import pytest
 
 import gem
 from gem.gem import unique
+from gem.node import traversal
 from gem.interpreter import evaluate
 
 
@@ -55,3 +56,26 @@ def test_literal_index_with_constant_stride_after_symbolic_stride():
     assert offset.dtype == gem.uint_type
     result, = evaluate([offset])
     assert numpy.array_equal(result.arr, numpy.array([1, 2]) + 2)
+
+
+@pytest.mark.parametrize(("build", "dtype", "expected"), [
+    pytest.param(lambda n: 2 + 3 * n, gem.uint_type, [2, 5, 8], id="add_multiply"),
+    pytest.param(lambda n: 2 * n - 1, numpy.int64, [-1, 1, 3], id="subtract"),
+    pytest.param(lambda n: 1 - n, numpy.int64, [1, 0, -1], id="subtract_from_number"),
+    pytest.param(lambda n: 1.5 * n, numpy.float64, [0, 1.5, 3], id="float_operand"),
+])
+def test_number_operand_takes_the_dtype_of_an_integer_node(build, dtype, expected):
+    """A number in index arithmetic gets the smallest dtype that holds its value."""
+    i = gem.Index(extent=3)
+    n = gem.Indexed(gem.Literal(numpy.arange(3), dtype=gem.uint_type), (i,))
+    expression = build(n)
+    assert expression.dtype == dtype
+    result, = evaluate([expression])
+    assert numpy.array_equal(result.arr, expected)
+
+
+def test_number_operand_of_an_untyped_node_is_float():
+    """A number with an untyped node converts to a float literal."""
+    expression = gem.Variable("x", ()) - 3
+    assert expression.dtype is None
+    assert all(child.dtype == numpy.float64 for child in traversal([expression]) if isinstance(child, gem.Literal))
