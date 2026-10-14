@@ -113,7 +113,10 @@ class IntegratedLegendreDual(dual_set.DualSet):
                 continue
             ref_facet = symmetric_simplex(dim)
             test_deg = degree - dim - 1 if dim > 0 else 0
-            Q_ref = parse_quadrature_scheme(ref_facet, test_deg + interpolant_deg, quad_scheme)
+            if dim == 0:
+                Q_ref = parse_quadrature_scheme(ref_facet, 0, None)
+            else:
+                Q_ref = parse_quadrature_scheme(ref_facet, degree + interpolant_deg, quad_scheme)
             poly_set = ONPolynomialSet(ref_facet, test_deg, variant="dual")
             phis = poly_set.tabulate(Q_ref.get_points())[(0,) * dim]
             for entity in sorted(top[dim]):
