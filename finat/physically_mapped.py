@@ -15,7 +15,8 @@ import numpy
 
 from finat.citations import cite
 from finat.functional import (DERIVATIVE, Functional, PhysicalEntityFrame,
-                              cartesian_pullback, identity_pullback, to_riesz, one, zero)
+                              cartesian_pullback, identity_pullback, physical_node_row,
+                              to_riesz, one, zero)
 
 
 class NeedsCoordinateMappingElement(metaclass=ABCMeta):
@@ -492,7 +493,7 @@ class PhysicalVandermondeMatrix:
                 measure = frame.measure if not self.avg and len(node.points) > 1 else one
             if node.is_invariant(pullbacks, self.tol):
                 continue
-            numerator, denominator = node.action(self.reference_riesz[i], pullbacks, self.tol)
+            numerator, denominator = physical_node_row(self.reference_riesz[i], pullbacks, self.tol)
             numerator = numerator * measure
             dim, entity = node.entity
             allowed = set(closure_dofs[dim][entity])

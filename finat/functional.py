@@ -27,24 +27,21 @@ class DirectionPullback:
     r"""The pullback to the reference cell of one axis of a physical node.
 
     The matrix :math:`G = P + \sum_t g_t C_t / d` combines the physical
-    direction with the chain rule or Piola map.  Keeping the matrices
-    numeric allows cancellations before symbolic row assembly.
+    direction with the chain rule or Piola map.  Its numerator is stored
+    as a linear combination of numeric matrices with arbitrary GEM
+    coefficients, including :math:`dP` for the invariant directions.
+    This lets reference contractions cancel before applying the geometry.
 
     :arg invariant: Numeric projector :math:`P` onto invariant directions.
-    :arg terms: Pairs :math:`(g_t, C_t)` of GEM scalars and numeric matrices.
+    :arg terms: Pairs :math:`(g_t, C_t)` for the non-invariant contribution.
     :arg denominator: Common denominator :math:`d`.
     """
     def __init__(self, invariant, terms, denominator):
         self.invariant = numpy.asarray(invariant)
-        self.terms = list(terms)
         self.denominator = denominator
-
-    def numerator_terms(self):
-        """Return the terms of :math:`Gd`, including the invariant projector."""
-        terms = list(self.terms)
+        self.numerator = list(terms)
         if self.invariant.any():
-            terms.insert(0, (self.denominator, self.invariant))
-        return terms
+            self.numerator.insert(0, (denominator, self.invariant))
 
 
 class PhysicalEntityFrame:
@@ -286,33 +283,6 @@ class Functional:
                 return False
         return True
 
-    def action(self, riesz, pullbacks, tol):
-        """The values of the physical node on the pulled-back nodal basis.
-
-        Contract each tensor-product term with the numeric Riesz representation.
-        Drop small couplings before multiplying by GEM coefficients, so
-        reference identities determine symbolic sparsity.
-
-        :arg riesz: Numeric reference pairing, as returned by :func:`to_riesz`.
-        :arg pullbacks: A :class:`DirectionPullback` per coefficient axis.
-        :arg tol: Relative tolerance below which numeric couplings are dropped.
-        :returns: The pair ``(numerator, denominator)`` of an object
-            array of GEM scalars and a GEM scalar, the row of the
-            physical Vandermonde matrix being their ratio.
-        """
-        N = riesz
-        nbf = N.shape[1]
-        scale = tol * numpy.abs(N).max()
-        numerator = numpy.full(nbf, zero, dtype=object)
-        for choice in product(*(pullback.numerator_terms() for pullback in pullbacks)):
-            coefficient = reduce(mul, (g for g, _ in choice), one)
-            C = reduce(numpy.kron, [C for _, C in choice]) if choice else numpy.ones((1, 1))
-            row = C.T.ravel() @ N
-            for j in numpy.flatnonzero(numpy.abs(row) > scale * numpy.abs(C).max()):
-                numerator[j] = numerator[j] + coefficient * row[j]
-        denominator = reduce(mul, (pullback.denominator for pullback in pullbacks), one)
-        return numerator, denominator
-
     def dof_scale(self, h, avg=True, tol=1e-10):
         r"""Return the conditioning scale of the physical node.
 
@@ -471,3 +441,32 @@ def to_riesz(functionals, fiat_element):
         nbf = T.shape[0]
         riesz[i] = N.reshape(size, nbf, size).transpose(0, 2, 1).reshape(size * size, nbf)
     return riesz
+
+
+def physical_node_row(riesz, pullbacks, tol):
+    r"""Contract a physical node's pullbacks with its reference Riesz representation.
+
+    For :math:`G_a = \sum_t g_{a,t} C_{a,t}/d_a`, the row is
+    :math:`\sum_{t_1,\ldots,t_r} (\prod_a g_{a,t_a}) N_{t_1,\ldots,t_r}`
+    divided by :math:`\prod_a d_a`.  Each :math:`N` is a numeric reference
+    contraction.  Pruning it before multiplying by GEM coefficients preserves
+    reference identities up to the tabulation tolerance, without requiring
+    symbolic cancellation or rounding geometry-dependent expressions.
+
+    :arg riesz: Numeric reference pairing from :func:`to_riesz`.
+    :arg pullbacks: A :class:`DirectionPullback` per coefficient axis.
+    :arg tol: Relative tolerance below which numeric couplings are dropped.
+    :returns: The row numerator as an object array of GEM scalars and its denominator.
+    """
+    numerator = numpy.full(riesz.shape[1], zero, dtype=object)
+    cutoff = tol * numpy.abs(riesz).max()
+    for terms in product(*(pullback.numerator for pullback in pullbacks)):
+        coefficients, matrices = zip(*terms) if terms else ((), ())
+        C = reduce(numpy.kron, matrices) if matrices else numpy.ones((1, 1))
+        reference_row = C.T.ravel() @ riesz
+        nonzeros = numpy.flatnonzero(numpy.abs(reference_row) > cutoff * numpy.abs(C).max())
+        coefficient = gem.Product(*coefficients)
+        for j in nonzeros:
+            numerator[j] += coefficient * reference_row[j]
+    denominator = gem.Product(*(pullback.denominator for pullback in pullbacks))
+    return numerator, denominator
