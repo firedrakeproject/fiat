@@ -52,6 +52,20 @@ Agents modifying FIAT code must follow these fundamental development principles:
 
 ---
 
+## Element Implementations
+
+* Reuse FIAT's `CiarletElement`, `PolynomialSet`, `DualSet`, and `Functional`
+  APIs. Do not hand-roll basis transforms or dual-matrix logic.
+* Before adding custom element or dual-set infrastructure, identify the
+  specific limitation in those APIs; fix it generically rather than adding an
+  element-specific workaround.
+* Avoid one-off helper collections and duplicated degree-of-freedom
+  definitions. Keep reusable mathematics in shared modules and element code
+  focused on spaces and functionals.
+* Test unisolvence through the public element and dual APIs.
+
+---
+
 ## Pattern Matching and Mathematical Reasoning
 
 When designing or debugging FIAT, FInAT, and GEM changes, use the existing codebase as a library of
