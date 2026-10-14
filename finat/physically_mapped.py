@@ -76,13 +76,7 @@ class MappedTabulation(Mapping):
 
 class PhysicallyMappedElement(NeedsCoordinateMappingElement):
     """A mixin that applies a "physical" transformation to tabulated
-    basis functions.
-
-    :meth:`basis_transformation` derives the transformation from the
-    FIAT dual basis by the duality formulation of the module docstring.
-    :attr:`avg` records the normalization of physical facet moments;
-    :meth:`~finat.functional.Functional.dof_scale` infers their conditioning scales.
-    """
+    basis functions."""
 
     #: Relative tolerance below which entries of the numeric reference
     #: tabulations are dropped from the symbolic rows.
