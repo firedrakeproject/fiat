@@ -14,9 +14,6 @@ class HsiehCloughTocher(PhysicallyMappedElement, ScalarFiatElement):
         self.avg = avg
         super().__init__(FIAT.HsiehCloughTocher(cell, degree))
 
-    def dof_scale(self, node, dim, havg):
-        return super().dof_scale(node, dim, havg) if dim == 0 else None
-
 
 class ReducedHsiehCloughTocher(PhysicallyMappedElement, ScalarFiatElement):
     def __init__(self, cell, degree=3):

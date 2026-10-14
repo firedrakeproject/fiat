@@ -13,10 +13,11 @@ def test_jacobian_accepts_rectangular_matrix():
     jacobian = Jacobian(gem.Literal(np.array([[3., 0.], [0., 4.], [0., 0.]])))
     assert jacobian.J.shape == (3, 2)
     assert evaluate([jacobian.detJ])[0].arr == pytest.approx(12.)
-    assert jacobian.adjJ is None
     K = evaluate([gem.ListTensor(jacobian.K)])[0].arr
     assert np.allclose(K, [[4, 0], [0, 3], [0, 0]])
-
+    adjJ = evaluate([gem.ListTensor(jacobian.adjJ)])[0].arr
+    assert adjJ.shape == (2, 3)
+    assert np.allclose(adjJ, [[4, 0, 0], [0, 3, 0]])
 
 @pytest.fixture(params=["positive", "negative"])
 def phys_el(request):

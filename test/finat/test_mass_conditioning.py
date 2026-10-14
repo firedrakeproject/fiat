@@ -24,15 +24,31 @@ from gem.interpreter import evaluate
     (2, finat.BrambleZlamalC2, 9, None),
     (2, finat.AlfeldC2, 5, None),
     (3, finat.Walkington, 5, None),
+    (3, finat.MardalTaiWinther, 2, None),
 ])
 def test_mass_scaling(scaled_ref_to_phys, sd, element, degree, variant):
-    ref_cell = scaled_ref_to_phys[sd][0].ref_cell
-    if variant is not None:
-        ref_element = element(ref_cell, degree, variant=variant)
-    else:
-        ref_element = element(ref_cell, degree)
+    kwargs = {} if variant is None else dict(variant=variant)
+    check_mass_scaling(scaled_ref_to_phys, sd, element, degree, **kwargs)
 
-    Q = finat.quadrature.make_quadrature(ref_element.complex, 2*degree)
+
+@pytest.mark.parametrize("avg", [True, False])
+@pytest.mark.parametrize("element,degree", [
+    (finat.QuadraticPowellSabin12, 2),
+    (finat.HsiehCloughTocher, 3),
+    (finat.HsiehCloughTocher, 4),
+    (finat.Argyris, 5),
+    (finat.AlfeldC2, 5),
+    (finat.BrambleZlamalC2, 9),
+])
+def test_mass_scaling_avg(scaled_ref_to_phys, element, degree, avg):
+    check_mass_scaling(scaled_ref_to_phys, 2, element, degree, avg=avg)
+
+
+def check_mass_scaling(scaled_ref_to_phys, sd, element, degree, **kwargs):
+    ref_cell = scaled_ref_to_phys[sd][0].ref_cell
+    ref_element = element(ref_cell, degree, **kwargs)
+
+    Q = finat.quadrature.make_quadrature(ref_element.complex, 2*ref_element.degree)
     qpts = Q.point_set
     qwts = Q.weights
 

@@ -10,7 +10,3 @@ class HuZhang(PhysicallyMappedElement, FiatElement):
         cite("Hu2015")
         self.variant = "integral" if variant is None else variant
         super().__init__(FIAT.HuZhang(cell, degree, variant=variant, quad_scheme=quad_scheme))
-
-    def dof_scale(self, node, dim, havg):
-        point = dim == 0 or (self.variant == "point" and dim == self.cell.get_spatial_dimension())
-        return havg**-2 if point else None

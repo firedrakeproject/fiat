@@ -16,7 +16,7 @@ import gem
 import numpy
 
 from finat.citations import cite
-from finat.functional import Functional, one, zero
+from finat.functional import DERIVATIVE, DIVERGENCE, Functional, one, zero
 
 
 class NeedsCoordinateMappingElement(metaclass=ABCMeta):
@@ -141,6 +141,15 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         key = None
         return MappedTabulation(B, {key: Q})[key]
 
+    def map_tabulation(self, ref_tabulation, coordinate_mapping):
+        assert coordinate_mapping is not None
+        M = self.basis_transformation(coordinate_mapping)
+        return MappedTabulation(M, ref_tabulation, indices=self.restriction_indices)
+
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
+        result = super().basis_evaluation(order, ps, entity=entity)
+        return self.map_tabulation(result, coordinate_mapping)
+
     def physical_vandermonde(self, coordinate_mapping):
         """The physical Vandermonde matrix of the element.
 
@@ -205,43 +214,70 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         h = coordinate_mapping.cell_size()
         fiat_element = self._element
         top = fiat_element.get_reference_element().get_topology()
-        nodes = fiat_element.dual_basis()
+        functionals = self.functionals()
         entity_ids = fiat_element.entity_dofs()
-        scales = [None] * len(nodes)
+        scales = [None] * len(functionals)
         for dim in entity_ids:
             for entity in entity_ids[dim]:
                 verts = top[dim][entity]
                 havg = reduce(add, (h[v] for v in verts)) / len(verts)
                 for i in entity_ids[dim][entity]:
-                    scales[i] = self.dof_scale(nodes[i], dim, havg)
+                    if functionals[i] is not None:
+                        scales[i] = self.dof_scale(functionals[i], havg)
         return scales
 
-    def dof_scale(self, node, dim, havg):
+    def dof_scale(self, functional: Functional, havg):
         r"""Return the conditioning rescaling factor of one physical dof.
 
-        The default convention redefines each physical node of derivative
-        order :math:`m > 0` with a factor :math:`h^{-m}`; elements whose
-        hand-coded transformations established a different convention
-        (e.g. the :math:`h^{-2}` vertex values of Hu-Zhang) override this
-        method.
+        The physical node of a pulled back reference basis function
+        dilates as :math:`h^{-p}`, and the dof is rescaled by :math:`h^{-p}`
+        to make it dimensionless.  The exponent :math:`p` is inferred from
+        the axes of the node:
 
-        :arg node: The FIAT functional of the dof.
-        :arg dim: Topological dimension of the entity the dof sits on.
+        * a derivative axis carries :math:`J^{-T}`, of exponent :math:`1`;
+        * a covariant component axis carries :math:`J^{-T}`, of exponent
+          :math:`1`, a contravariant component axis carries
+          :math:`J/\det J`, of exponent :math:`d-1`, and a divergence axis
+          carries :math:`1/\det J`, of exponent :math:`d`, where :math:`d`
+          is the spatial dimension.  These Piola weights only affect nodes
+          that are Cartesian components;
+        * a node in the physical frame of a facet absorbs the Piola
+          weights of its components, since its normals and tangents are
+          the images of the reference ones, except that the tangential
+          components of a contravariant axis have exponent :math:`2-d`;
+        * a node that is the push-forward of a reference node has exponent
+          zero.
+
+        Unless :attr:`avg` is set, a node that integrates over its entity
+        of dimension :math:`k` is a plain integral rather than an average,
+        which contributes the entity measure :math:`h^k`.
+
+        :arg functional: The :class:`~finat.functional.Functional` of the dof.
         :arg havg: GEM scalar for the cell size averaged over the vertices
             of the dof's entity.
         :returns: The GEM scaling factor, or ``None`` for no rescaling.
         """
-        order = node.max_deriv_order
-        return havg**(-order) if order > 0 else None
-
-    def map_tabulation(self, ref_tabulation, coordinate_mapping):
-        assert coordinate_mapping is not None
-        M = self.basis_transformation(coordinate_mapping)
-        return MappedTabulation(M, ref_tabulation, indices=self.restriction_indices)
-
-    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
-        result = super().basis_evaluation(order, ps, entity=entity)
-        return self.map_tabulation(result, coordinate_mapping)
+        sd = functional.ref_el.get_spatial_dimension()
+        weights = {DERIVATIVE: 1}
+        if functional.transformation == "cartesian":
+            weights.update({"covariant piola": 1, "contravariant piola": sd - 1, DIVERGENCE: sd})
+        elif functional.transformation == "invariant":
+            weights = {}
+        exponent = sum(weights.get(mapping, 0) for mapping in functional.mappings)
+        if functional.transformation == "frame":
+            # The normal component of a contravariant axis is invariant, and
+            # the tangential components pull back with degree sd - 2.
+            nu = functional.ref_el.compute_scaled_normal(functional.entity[1])
+            normal = numpy.outer(nu, nu) / (nu @ nu)
+            W = functional.coefficients
+            for k, mapping in enumerate(functional.mappings):
+                if mapping == "contravariant piola":
+                    R = numpy.tensordot(W, numpy.eye(sd) - normal, axes=(1 + k, 1))
+                    if numpy.abs(R).max() > self.tol * numpy.abs(W).max():
+                        exponent += 2 - sd
+            if not self.avg and len(functional.points) > 1:
+                exponent -= functional.entity[0]
+        return havg**-exponent if exponent else None
 
 
 class DirectlyDefinedElement(NeedsCoordinateMappingElement):
@@ -450,12 +486,10 @@ class Jacobian:
     r"""The cell Jacobian and its derived matrices, as object arrays of GEM scalars.
 
     Following FInAT, :math:`J = \partial x/\partial\hat{x}` maps
-    reference to physical coordinates; the papers' Jacobian is its
-    inverse.
+    reference to physical coordinates.
 
     For a rectangular Jacobian, :attr:`detJ` is the positive metric volume
-    factor :math:`\sqrt{\det(J^T J)}`.  The adjugate and cofactor matrix are
-    only defined here for square Jacobians; :func:`pseudoinverse` handles
+    factor :math:`\sqrt{\det(J^T J)}`.  The :func:`pseudoinverse` handles
     full-rank rectangular Jacobians.
 
     :arg J: A GEM expression for the Jacobian, shape ``(gdim, tdim)``.
@@ -468,13 +502,12 @@ class Jacobian:
         if gdim == tdim:
             self.detJ = determinant(self.J)
             self.adjJ = adjugate(self.J)
-            #: the cofactor matrix, which maps normals to normals
-            self.K = self.adjJ.T
         else:
             JTJ = self.J.T @ self.J
             self.detJ = determinant(JTJ)**0.5
-            self.adjJ = None
-            self.K = self.detJ * pseudoinverse(self.J).T
+            self.adjJ = self.detJ * pseudoinverse(self.J)
+        #: the cofactor matrix, which maps normals to normals
+        self.K = self.adjJ.T
 
 
 class PhysicalVandermondeMatrix:
