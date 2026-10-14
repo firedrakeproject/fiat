@@ -63,10 +63,8 @@ def check_dual_basis(element):
     Q, x = element.dual_basis
     assert Q.shape == element.index_shape + element.value_shape
     assert set(Q.free_indices) == set(x.indices)
-    summands = as_enriched(element)
-    if summands is not None:
-        assert len(x.points) == sum(len(e.dual_basis[1].points)
-                                    for e in summands._summands)
+    assert len(x.points) == sum(len(e.dual_basis[1].points)
+                                for e in element.summands)
 
     i = element.get_indices()
     j = element.get_indices()
@@ -100,8 +98,18 @@ def test_enriched_element_dual_basis():
     check_dual_basis(enriched)
 
 
+def test_mixed_enriched_element_dual_evaluation():
+    """Dual-evaluate a mixed NCE x Q element on an extruded cell."""
+    cell = ufl.TensorProductCell(ufl.quadrilateral, ufl.interval)
+    nce = create_element(finat.ufl.FiniteElement("NCE", cell, 1))
+    q = create_element(finat.ufl.FiniteElement("Q", cell, 1))
+    mixed = finat.MixedElement([nce, q])
+
+    check_nodal(mixed)
+
+
 @pytest.mark.parametrize("repeated", (False, True))
-def test_quadrature_element_on_union_of_points(repeated: bool) -> None:
+def test_quadrature_element_on_union_of_points(repeated: bool):
     # Firedrake interpolates through a quadrature space on the points of the
     # target's dual basis, which for a direct sum is a union.  That element
     # has to evaluate on each point set of the union, just as the sum does.
@@ -162,13 +170,13 @@ def test_integrated_legendre_dual_evaluation():
     check_nodal(element)
 
 
-def test_restricted_integrated_legendre_dual_basis() -> None:
+def test_restricted_integrated_legendre_dual_basis():
     element = finat.RestrictedElement(
         finat.IntegratedLegendre(ufc_simplex(1), 5), restriction_domain="interior")
     check_dual_basis(element)
 
 
-def test_restricted_integrated_legendre_quadrature_entity_numbering() -> None:
+def test_restricted_integrated_legendre_quadrature_entity_numbering():
     cell = ufc_simplex(2)
     element = finat.RestrictedElement(
         finat.IntegratedLegendre(cell, 3), restriction_domain="interior")
