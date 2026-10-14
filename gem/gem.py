@@ -92,10 +92,10 @@ class Node(NodeBase, metaclass=NodeMeta):
         return componentwise(Product, minus, self)
 
     def __add__(self, other):
-        return componentwise(Sum, self, as_gem(other))
+        return componentwise(Sum, self, as_gem_operand(other, self))
 
     def __radd__(self, other):
-        return as_gem(other).__add__(self)
+        return as_gem_operand(other, self).__add__(self)
 
     def __sub__(self, other):
         return componentwise(Sum, self, -as_gem(other))
@@ -104,10 +104,10 @@ class Node(NodeBase, metaclass=NodeMeta):
         return as_gem(other).__sub__(self)
 
     def __mul__(self, other):
-        return componentwise(Product, self, as_gem(other))
+        return componentwise(Product, self, as_gem_operand(other, self))
 
     def __rmul__(self, other):
-        return as_gem(other).__mul__(self)
+        return as_gem_operand(other, self).__mul__(self)
 
     def __matmul__(self, other):
         other = as_gem(other)
@@ -808,14 +808,10 @@ class FlexiblyIndexed(Scalar):
                 elif isinstance(index, int):
                     if not isinstance(offset, Integral):
                         raise NotImplementedError(f"Found non-Integral offset : {offset}")
-                    step = stride.value if isinstance(stride, Constant) else stride
-                    if isinstance(step, Node) or isinstance(offset_, Node):
-                        # The overloaded "+" and "*" convert numbers with
-                        # as_gem, which makes float literals; an offset is an
-                        # array index, so it must stay an unsigned integer.
-                        offset_ = as_gem_uint(offset_) + as_gem_uint(index) * as_gem_uint(step)
+                    if isinstance(stride, Constant):
+                        offset_ += index * stride.value
                     else:
-                        offset_ += index * step
+                        offset_ += index * stride
                 else:
                     raise ValueError("Unexpected index type for flexible indexing")
                 if isinstance(stride, Node):
@@ -1359,6 +1355,29 @@ def as_gem(expr):
             return Literal(expr)
     else:
         raise ValueError("Do not know how to convert %r to GEM" % expr)
+
+
+def as_gem_operand(expr, node):
+    """Convert an operand of an arithmetic operation with a GEM node.
+
+    Parameters
+    ----------
+    expr : Node or Number
+        The other operand.
+    node : Node
+        The node that ``expr`` is added to or multiplied with.
+
+    Returns
+    -------
+    Node
+        An integer with an integer-typed ``node`` becomes a literal of the
+        node's dtype, so that index arithmetic stays integer. Any other
+        operand converts with :func:`as_gem`.
+
+    """
+    if isinstance(expr, Integral) and node.dtype is not None and numpy.issubdtype(node.dtype, numpy.integer):
+        return Literal(expr, dtype=node.dtype)
+    return as_gem(expr)
 
 
 def as_gem_uint(expr):
