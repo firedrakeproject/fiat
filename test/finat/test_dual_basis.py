@@ -108,7 +108,6 @@ def test_mixed_enriched_element_dual_evaluation():
     check_nodal(mixed)
 
 
-def test_quadrature_element_on_union_of_points():
 @pytest.mark.parametrize("repeated", (False, True))
 def test_quadrature_element_on_union_of_points(repeated: bool):
     # Firedrake interpolates through a quadrature space on the points of the
