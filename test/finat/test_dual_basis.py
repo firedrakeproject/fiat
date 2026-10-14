@@ -9,7 +9,7 @@ import ufl
 import finat.ufl
 from finat.element_factory import create_element
 from finat.enriched import as_enriched
-from finat.point_set import UnionPointSet
+from finat.point_set import PointSet, UnionPointSet
 from finat.quadrature import QuadratureRule
 from finat.quadrature_element import QuadratureElement
 from gem.interpreter import evaluate
@@ -171,13 +171,13 @@ def test_integrated_legendre_dual_evaluation():
     check_nodal(element)
 
 
-def test_restricted_integrated_legendre_dual_basis() -> None:
+def test_restricted_integrated_legendre_dual_basis():
     element = finat.RestrictedElement(
         finat.IntegratedLegendre(ufc_simplex(1), 5), restriction_domain="interior")
     check_dual_basis(element)
 
 
-def test_restricted_integrated_legendre_quadrature_entity_numbering() -> None:
+def test_restricted_integrated_legendre_quadrature_entity_numbering():
     cell = ufc_simplex(2)
     element = finat.RestrictedElement(
         finat.IntegratedLegendre(cell, 3), restriction_domain="interior")
