@@ -7,7 +7,7 @@ import pytest
 import gem
 from gem.interpreter import evaluate
 from gem import cost, optimise
-from gem.node import traversal
+from gem.node import post_traversal, traversal
 from gem.optimise import sum_factorise
 from gem.coffee import optimise_monomial_sum
 from gem.refactorise import (ATOMIC, COMPOUND, OTHER,
@@ -242,6 +242,34 @@ def test_preserved_linear_map_is_shared():
     assert numpy.allclose(result.arr, expected)
 
 
+def test_linear_map_sharing_normalises_order_and_scale():
+    i, j = gem.Index(extent=3), gem.Index(extent=3)
+    a_values = numpy.array([1.0, 2.0, 3.0])
+    b_values = numpy.array([4.0, 5.0, 6.0])
+    a = gem.Literal(a_values)
+    b = gem.Literal(b_values)
+    left_terms = (gem.Indexed(a, (i,)), gem.Indexed(b, (i,)))
+    right_terms = (gem.Indexed(b, (j,)), gem.Indexed(a, (j,)))
+    left_map = optimise.make_sum(left_terms * 2)
+    right_map = optimise.make_sum(right_terms * 2)
+    expression = gem.Product(left_map, right_map)
+
+    arguments = (i, j)
+    classifier = partial(_classify, frozenset(arguments))
+    preserved, = collect_monomials(
+        [expression], classifier, arguments)
+    optimised = optimise_monomial_sum(preserved, arguments)
+    tensors = [node for node in traversal((optimised,))
+               if isinstance(node, gem.ComponentTensor)]
+    assert len(tensors) == 1
+    body, = tensors[0].children
+    assert len(optimise.traverse_sum(body)) == 2
+
+    result, = evaluate([gem.ComponentTensor(optimised, arguments)])
+    expected = 4 * numpy.outer(a_values + b_values, a_values + b_values)
+    assert numpy.allclose(result.arr, expected)
+
+
 def test_expanded_and_preserved_agree():
     arguments, expanded, expected = monomial_sum(linear_indices=False)
     expression = optimise_monomial_sum(expanded, arguments)
@@ -266,6 +294,96 @@ def test_estimate_cost_counts_the_contraction():
     assert nodes > 0
 
 
+def test_common_factor_is_extracted_from_scalar_sum():
+    common = gem.Variable("common", ())
+    left = gem.Variable("left", ())
+    right = gem.Variable("right", ())
+    expression = gem.Sum(
+        gem.Product(common, left), gem.Product(common, right))
+
+    expression = optimise.factorise_scalar_sums(expression)
+
+    _, factors = optimise.traverse_product(expression)
+    assert common in factors
+    result, = evaluate([expression], {
+        common: numpy.asarray(2.0),
+        left: numpy.asarray(3.0),
+        right: numpy.asarray(4.0),
+    })
+    assert result.arr == 14
+
+
+def test_scalar_factorisation_leaves_indexed_sum_to_planner():
+    i = gem.Index(extent=3)
+    common = gem.Variable("common", ())
+    left = gem.Indexed(gem.Literal(numpy.arange(3.0)), (i,))
+    right = gem.Indexed(gem.Literal(numpy.arange(3.0, 6.0)), (i,))
+    expression = gem.Sum(
+        gem.Product(common, left), gem.Product(common, right))
+
+    assert optimise.factorise_scalar_sums(expression) is expression
+
+
+def test_contraction_plan_follows_the_callers_index_order():
+    """A plan depends only on the caller's ordering of the sum indices."""
+    def plan(reverse_creation):
+        if reverse_creation:
+            r = gem.Index(extent=4)
+            q = gem.Index(extent=4)
+        else:
+            q = gem.Index(extent=4)
+            r = gem.Index(extent=4)
+        # Both factors carry both indices, so the two reduce at the same
+        # subset and the tie decides their order within one IndexSum.
+        factors = [gem.Indexed(gem.Variable(name, (4, 4)), (q, r))
+                   for name in ("A", "B")]
+        expression = optimise.sum_factorise([q, r], factors)
+        role = {q: "q", r: "r"}
+        return [tuple(role[i] for i in node.multiindex)
+                for node in post_traversal((expression,))
+                if isinstance(node, gem.IndexSum)]
+
+    assert plan(False) == plan(True) == [("q", "r")]
+
+
+def test_gathers_sharing_a_table_tabulate_it_once():
+    """Several gathers of one table share a single tabulation.
+
+    A padded basis transformation reads one reference tabulation through a
+    map per padded column.  Each gather alone selects as many rows as it has
+    arguments, so on its own it saves nothing; together they repeat one
+    contraction once per column.
+    """
+    nrows, npoints, nwidth = 4, 3, 3
+    j = gem.Index(extent=nrows)
+    q = gem.Index(extent=npoints)
+    table = gem.Literal(numpy.arange(nrows * npoints, dtype=float)
+                        .reshape(nrows, npoints))
+    weights = gem.Literal(numpy.arange(1.0, npoints + 1))
+    columns = [gem.Literal(numpy.roll(numpy.arange(nrows), k),
+                           dtype=gem.uint_type)
+               for k in range(nwidth)]
+    terms = [gem.IndexSum(
+        gem.Product(
+            gem.Indexed(table,
+                        (gem.VariableIndex(gem.Indexed(column, (j,))), q)),
+            gem.Indexed(weights, (q,))), (q,))
+        for column in columns]
+    expression = optimise.make_sum(terms)
+
+    tabulated = optimise.tabulate_indirect_contractions(expression)
+
+    tensors = {node for node in traversal((tabulated,))
+               if isinstance(node, gem.ComponentTensor)}
+    assert len(tensors) == 1
+
+    contracted = table.array @ weights.array
+    expected = sum(contracted[numpy.roll(numpy.arange(nrows), k)]
+                   for k in range(nwidth))
+    result, = evaluate([gem.ComponentTensor(tabulated, (j,))])
+    assert numpy.allclose(result.arr, expected)
+
+
 @pytest.mark.parametrize("extent", [2, 3, 5])
 def test_distributed_linear_map_preserves_multiplicity(extent):
     i, j = gem.Index(extent=2), gem.Index(extent=2)
@@ -280,6 +398,33 @@ def test_distributed_linear_map_preserves_multiplicity(extent):
     optimized = optimise_monomial_sum(monomials, arguments)
     actual, = evaluate([gem.ComponentTensor(optimized, arguments)])
     assert numpy.array_equal(actual.arr, numpy.full((2, 2), 3 * extent))
+
+
+@pytest.mark.parametrize("nrows,npoints,nargs", [(6, 3, 4), (4, 5, 3)])
+@pytest.mark.parametrize("distinct", ["tables", "weights", "neither"])
+def test_indirect_tabulation_costs_equivalent_bodies(nrows, npoints, nargs, distinct):
+    j, q = gem.Index(extent=nargs), gem.Index(extent=npoints)
+    tables = [gem.Literal(numpy.arange(nrows * npoints, dtype=float)
+                          .reshape(nrows, npoints) + offset)
+              for offset in (0, 1)]
+    weights = [gem.Literal(numpy.arange(1.0, npoints + 1) + offset)
+               for offset in (0, 1)]
+    terms = []
+    for number in range(2):
+        columns = gem.Literal(numpy.arange(nargs) + number, dtype=gem.uint_type)
+        row = gem.VariableIndex(gem.Indexed(columns, (j,)))
+        table = tables[number if distinct == "tables" else 0]
+        weight = weights[number if distinct == "weights" else 0]
+        terms.append(gem.IndexSum(
+            gem.Indexed(table, (row, q)) * gem.Indexed(weight, (q,)), (q,)))
+    expression = optimise.make_sum(terms)
+    optimized = optimise.tabulate_indirect_contractions(expression)
+    assert cost.estimate_cost((optimized,)) <= cost.estimate_cost((expression,))
+    if distinct == "neither":
+        assert cost.estimate_cost((optimized,))[0] < cost.estimate_cost((expression,))[0]
+    expected, actual = evaluate([gem.ComponentTensor(e, (j,))
+                                for e in (expression, optimized)])
+    assert numpy.allclose(actual.arr, expected.arr)
 
 
 def test_equal_cost_contraction_follows_axis_order():
@@ -401,3 +546,49 @@ def test_cancel_indirect_delta_through_componenttensor():
     assert not any(isinstance(node, gem.Delta) for node in traversal((result,)))
     actual, expected = evaluate([result, expression])
     assert numpy.array_equal(actual.arr, expected.arr)
+
+
+def reduction_view():
+    """A view of the reduction y_m = sum_j A_mj x_j, and its bound index m."""
+    m, j = gem.indices(2)
+    view = gem.ComponentTensor(gem.IndexSum(gem.Product(
+        gem.Indexed(gem.Variable('A', (3, 4)), (m, j)),
+        gem.Indexed(gem.Variable('x', (4,)), (j,))), (j,)), (m,))
+    return view, m
+
+
+def stored_tensors(assignments, prefix_ordering):
+    """The tensors that compiling the assignments stores."""
+    from gem.impero_utils import compile_gem
+
+    impero_c = compile_gem(assignments, prefix_ordering)
+    return [t for t in impero_c.temporaries
+            if isinstance(t, gem.ComponentTensor)]
+
+
+def test_reduction_view_is_shared_by_its_readers():
+    """Several readers of a view read the reduction without a copy."""
+    view, m = reduction_view()
+    i, k = gem.indices(2)
+    u = gem.Indexed(gem.Variable('u', (3, 3)), (i, k))
+    value = gem.Product(gem.Indexed(view, (i,)), gem.Indexed(view, (k,)))
+    assert not stored_tensors([(u, value)], (i, k))
+
+
+def test_reduction_view_read_elsewhere_keeps_its_storage():
+    """A loop over the bound index of a view cannot read its other entries."""
+    view, m = reduction_view()
+    k = gem.Index(extent=3)
+    v = gem.Indexed(gem.Variable('v', (3, 3)), (m, k))
+    value = gem.Product(gem.Indexed(gem.Variable('w', (3,)), (m,)),
+                        gem.Indexed(view, (k,)))
+    assert stored_tensors([(v, value)], (m, k))
+
+
+def test_reduction_view_read_whole_keeps_its_storage():
+    """A view read whole, as a FlexiblyIndexed reshape, keeps its storage."""
+    view, m = reduction_view()
+    i = gem.Index(extent=3)
+    u = gem.Indexed(gem.Variable('u', (3,)), (i,))
+    value = gem.FlexiblyIndexed(view, ((0, ((i, 1),)),))
+    assert stored_tensors([(u, value)], (i,))

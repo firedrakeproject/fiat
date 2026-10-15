@@ -5,7 +5,7 @@ from collections.abc import Mapping
 import gem
 import numpy
 
-from gem.optimise import canonical_bound_indices
+from gem.optimise import canonical_bound_indices, factorise_scalar_sums
 
 from finat.citations import cite
 from finat.finiteelementbase import broadcast_tensor
@@ -69,8 +69,9 @@ class MappedTabulation(Mapping):
         self._dimension = len(restriction_indices)
         for support, entries in groups.items():
             columns = tuple(column for _, dofs in support for column in dofs)
-            coefficients = gem.ListTensor([[transformation[basis_index, c] for c in columns]
-                                           for _, basis_index in entries])
+            coefficients = gem.ListTensor([
+                [factorise_scalar_sums(transformation[basis_index, c]) for c in columns]
+                for _, basis_index in entries])
             self._blocks.append((coefficients, columns, tuple(dof for dof, _ in entries)))
 
     def __getitem__(self, alpha):

@@ -112,6 +112,59 @@ def make_index_orderer(index_ordering):
     return apply_ordering
 
 
+def _misread_views(expressions, ops):
+    """Find the tensors that a statement cannot read through a view.
+
+    A reduction view names no storage of its own, so a consumer of an
+    inlined view reads the reduction at the running values of the view's
+    bound indices.  A statement looping over one of those indices while
+    indexing the view by other indices would read the wrong entries.
+    Inverse, Solve and FlexiblyIndexed read a tensor whole.  Any other
+    consumer may read the reduction directly, however many there are, as
+    the reduction keeps its own temporary.
+
+    :arg expressions: a multi-root GEM expression DAG
+    :arg ops: ordered list of Impero terminals
+    :returns: the set of ComponentTensors that need their own storage
+    """
+    misread = {child for node in traversal(expressions)
+               for child in node.children
+               if isinstance(child, gem.ComponentTensor)
+               and not isinstance(node, gem.Indexed)}
+
+    statements = {}
+    for op in ops:
+        if isinstance(op, imp.Evaluate):
+            root = op.expression
+            loops = set(root.free_indices)
+            if isinstance(root, gem.ComponentTensor):
+                loops.update(root.multiindex)
+            statements[root] = loops
+        elif isinstance(op, (imp.Accumulate, imp.ReturnAccumulate)):
+            root = op.indexsum
+            statements[root] = set(root.free_indices) | set(root.multiindex)
+        elif isinstance(op, imp.Return):
+            statements[op.expression] = set(op.expression.free_indices)
+
+    for root, loops in statements.items():
+        seen = set()
+        stack = [root]
+        while stack:
+            node = stack.pop()
+            if node in seen:
+                continue
+            seen.add(node)
+            if isinstance(node, gem.Indexed):
+                view, = node.children
+                if (isinstance(view, gem.ComponentTensor)
+                        and node.multiindex != view.multiindex
+                        and not loops.isdisjoint(view.multiindex)):
+                    misread.add(view)
+            stack.extend(child for child in node.children
+                         if child not in statements)
+    return misread
+
+
 def inline_temporaries(expressions, ops):
     """Inline temporaries which could be inlined without blowing up
     the code.
@@ -125,17 +178,23 @@ def inline_temporaries(expressions, ops):
     refcount = collect_refcount(expressions)
 
     candidates = set()  # candidates for inlining
+    misread = _misread_views(expressions, ops)
     for op in ops:
         if isinstance(op, imp.Evaluate):
             expr = op.expression
-            if expr.shape == () and refcount[expr] == 1:
+            if isinstance(expr, gem.ComponentTensor):
+                if (isinstance(expr.children[0], gem.IndexSum)
+                        and expr not in misread):
+                    candidates.add(expr)
+            elif expr.shape == () and refcount[expr] == 1:
                 candidates.add(expr)
 
     # Prevent inlining that pulls expressions into inner loops
     for node in traversal(expressions):
         for child in node.children:
             if child in candidates and set(child.free_indices) < set(node.free_indices):
-                candidates.remove(child)
+                if not isinstance(child, gem.ComponentTensor):
+                    candidates.remove(child)
 
     # Filter out candidates
     return [op for op in ops if not (isinstance(op, imp.Evaluate) and op.expression in candidates)]
