@@ -72,6 +72,7 @@ def compile_gem(assignments, prefix_ordering, remove_zeros=False,
     apply_ordering = make_index_orderer(index_ordering)
 
     get_indices = lambda expr: apply_ordering(expr.free_indices)
+    output_indices = set(chain.from_iterable(e.free_indices for e in expressions))
 
     def get_loop_indices(expr: gem.Node) -> tuple[gem.Index, ...]:
         """Return every explicit loop axis used to evaluate an expression.
@@ -92,11 +93,15 @@ def compile_gem(assignments, prefix_ordering, remove_zeros=False,
         A ``ComponentTensor`` binds its multi-index in GEM, but evaluating
         the tensor still executes that index as a value loop.  Exposing the
         loop to Impero lets several tensor outputs share scalar work within
-        one fused loop instead of materializing that work as arrays.
+        one fused loop instead of materializing that work as arrays.  An
+        output running over the same indices would fuse with that loop and
+        read the tensor before it is complete, so the tensor then evaluates
+        its entries in loops of its own.
 
         """
         indices = expr.free_indices
-        if isinstance(expr, gem.ComponentTensor):
+        if (isinstance(expr, gem.ComponentTensor)
+                and output_indices.isdisjoint(expr.multiindex)):
             indices = (*indices, *expr.multiindex)
         return apply_ordering(indices)
 
