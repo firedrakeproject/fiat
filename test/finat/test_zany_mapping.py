@@ -11,7 +11,10 @@ from gem.flop_count import count_flops
 from gem.impero_utils import compile_gem
 from gem.node import traversal
 from gem.optimise import contraction
-from finat.physically_mapped import MappedTabulation, PhysicallyMappedElement
+from finat.physically_mapped import (MappedTabulation, PhysicallyMappedElement,
+                                     SparseRows)
+
+from .conftest import MyMapping
 
 
 def test_sparse_mapped_tabulation():
@@ -24,21 +27,16 @@ def test_sparse_mapped_tabulation():
     table_values = np.arange(1.0, 7.0).reshape(3, 2)
     table = gem.Literal(table_values)
 
-    mapped_tabulation = MappedTabulation(matrix, {None: table})
-    # Equal symbolic entries share one coefficient slot, so the sparse map
-    # indexes a vector rather than materialising a symbolic matrix.
-    assert mapped_tabulation._values.shape == (3,)
+    mapped_tabulation = MappedTabulation(SparseRows(matrix), {None: table})
+    # Each row keeps only its nonzero entries, padded with zeros.
+    assert mapped_tabulation.rows.coefficients.shape == (2, 2)
 
     i, j = gem.indices(2)
     mapped = contraction(gem.Indexed(mapped_tabulation[None], (i, j)))
-
+    # Two padded entries per row and component, rather than three columns.
     products = [node for node in traversal((mapped,))
                 if isinstance(node, gem.Product)]
     assert sum(map(operation_count, products)) == 8
-    output = gem.Indexed(gem.Variable("output", (2, 2)), (i, j))
-    assert count_flops(compile_gem([(output, mapped)], (i, j))) == 16
-    assert not any(isinstance(node, gem.Conditional)
-                   for node in traversal((mapped,)))
 
     actual, = evaluate(
         [gem.ComponentTensor(mapped, (i, j))],
@@ -47,6 +45,44 @@ def test_sparse_mapped_tabulation():
     expected = np.asarray([[1.0, 0.0, 2.0], [0.0, 1.0, 0.0]]) \
         @ table_values
     assert np.array_equal(actual.arr, expected)
+
+    # Coefficient evaluation pulls the sparse map back onto the coefficient
+    # vector: one product for the only non-unit entry, then two flops per
+    # reference function and component.
+    weights = gem.Variable("weights", (2,))
+    value = contraction(gem.IndexSum(
+        gem.Product(gem.Indexed(weights, (i,)),
+                    gem.Indexed(mapped_tabulation[None], (i, j))), (i,)))
+    output = gem.Indexed(gem.Variable("output", (2,)), (j,))
+    assert count_flops(compile_gem([(output, value)], (j,))) == 1 + 2 * 3 * 2
+    assert not any(isinstance(node, gem.Conditional)
+                   for node in traversal((value,)))
+
+    actual, = evaluate(
+        [gem.ComponentTensor(value, (j,))],
+        {coefficient: np.asarray(2.0), weights: np.asarray([1.0, 10.0])},
+    )
+    assert np.array_equal(actual.arr, np.asarray([1.0, 10.0]) @ expected)
+
+
+class TranslatedMapping(MyMapping):
+    """Translate the Jacobian afresh on every call, as a form compiler does."""
+
+    def jacobian_at(self, point):
+        i, j, k = gem.indices(3)
+        product = gem.Product(gem.Indexed(gem.Literal(self.A), (i, k)),
+                              gem.Indexed(gem.Literal(np.eye(len(self.A))), (k, j)))
+        return gem.ComponentTensor(gem.IndexSum(product, (k,)), (i, j))
+
+
+def test_mapped_tabulations_share_rows(ref_to_phys):
+    """Separately translated transformations share one sparse map."""
+    mapping = TranslatedMapping(ref_to_phys[2].ref_cell, ref_to_phys[2].phys_cell)
+    element = finat.Hermite(mapping.ref_cell, 3)
+    ps = finat.point_set.PointSet([[0.25, 0.25]])
+    values = element.basis_evaluation(0, ps, coordinate_mapping=mapping)
+    gradients = element.basis_evaluation(1, ps, coordinate_mapping=mapping)
+    assert values[(0, 0)] == gradients[(0, 0)]
 
 
 def make_unisolvent_points(element, interior=False):
