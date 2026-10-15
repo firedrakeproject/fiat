@@ -228,6 +228,22 @@ def constant_fold_zero(exprs):
     return list(map(mapper, exprs))
 
 
+def _selection_indices(multiindex, expressions):
+    """Bound indices for a selection among expressions.
+
+    Reusing the bound indices of one expression makes the selection
+    deterministic, so that equal selections share their code.  Fresh indices
+    replace them only where another expression has them free.
+
+    :arg multiindex: bound indices of one of the expressions
+    :arg expressions: the expressions to select from
+    :returns: a multiindex with the same extents
+    """
+    if all(set(e.free_indices).isdisjoint(multiindex) for e in expressions):
+        return multiindex
+    return tuple(Index(extent=index.extent) for index in multiindex)
+
+
 def _select_expression(expressions, self, index):
     """Helper function to select an expression from a list of
     expressions with an index.  This function expect sanitised input,
@@ -260,7 +276,9 @@ def _select_expression(expressions, self, index):
 
     if types <= {ComponentTensor, Zero}:
         shape, = set(e.shape for e in expressions)
-        multiindex = tuple(Index(extent=d) for d in shape)
+        multiindex = _selection_indices(
+            next(e.multiindex for e in expressions
+                 if isinstance(e, ComponentTensor)), expressions)
         children = remove_componenttensors([Indexed(e, multiindex) for e in expressions])
         return ComponentTensor(self(tuple(children), index), multiindex)
 
@@ -273,7 +291,7 @@ def _select_expression(expressions, self, index):
     if types == {IndexSum}:
         extents = {tuple(i.extent for i in e.multiindex) for e in expressions}
         if len(extents) == 1:
-            multiindex = tuple(Index(extent=extent) for extent in extents.pop())
+            multiindex = _selection_indices(expr.multiindex, expressions)
             summands = [Indexed(ComponentTensor(e.children[0], e.multiindex),
                                 multiindex)
                         for e in expressions]
@@ -312,7 +330,11 @@ def select_expression(expressions, index):
     assert all(e.shape == shape for e in expressions)
 
     # Sanitise input expressions
-    alpha = tuple(Index() for s in shape)
+    first = expressions[0]
+    if isinstance(first, ComponentTensor):
+        alpha = _selection_indices(first.multiindex, expressions)
+    else:
+        alpha = tuple(Index() for s in shape)
     exprs = remove_componenttensors([Indexed(e, alpha) for e in expressions])
 
     # Factor the expressions recursively and convert result
