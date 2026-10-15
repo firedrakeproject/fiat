@@ -645,3 +645,44 @@ def test_select_shared_expression_dag(monkeypatch):
     monkeypatch.setattr(gem.Product, 'reconstruct', counted)
     select_expression(expressions, gem.Index(extent=2))
     assert len(visits) <= 8
+
+
+def test_select_expression_is_deterministic():
+    """Selecting equal expressions twice gives equal results."""
+    from gem.optimise import select_expression
+
+    x = gem.Variable('x', (3,))
+    i, j = gem.indices(2)
+    expressions = [
+        gem.ComponentTensor(gem.IndexSum(gem.Product(
+            gem.Indexed(gem.Variable(name, (2, 3)), (i, j)),
+            gem.Indexed(x, (j,))), (j,)), (i,))
+        for name in 'AB']
+    facet = gem.Index(extent=2)
+    assert (select_expression(expressions, facet)
+            == select_expression(expressions, facet))
+
+
+def test_select_expression_avoids_capture():
+    """A bound index of one expression may be free in another."""
+    from gem.interpreter import evaluate
+    from gem.optimise import select_expression
+
+    x = gem.Variable('x', (2,))
+    y = gem.Variable('y', (2,))
+    i, j = gem.indices(2)
+    expressions = [
+        gem.ComponentTensor(gem.Product(gem.Indexed(x, (i,)),
+                                        gem.Indexed(x, (i,))), (i,)),
+        gem.ComponentTensor(gem.Product(
+            gem.Indexed(x, (j,)),
+            gem.MathFunction('abs', gem.Indexed(y, (i,)))), (j,))]
+    facet = gem.Index(extent=2)
+    selected = gem.ComponentTensor(
+        gem.Indexed(select_expression(expressions, facet), (j,)), (facet, i, j))
+    expected = gem.ComponentTensor(
+        gem.Indexed(gem.ListTensor(expressions), (facet, j)), (facet, i, j))
+    bindings = {x: numpy.asarray([2., 3.]),
+                y: numpy.asarray([-5., 7.])}
+    actual, expected = evaluate([selected, expected], bindings)
+    assert numpy.array_equal(actual.arr, expected.arr)

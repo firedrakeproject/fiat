@@ -546,3 +546,40 @@ def test_cancel_indirect_delta_through_componenttensor():
     assert not any(isinstance(node, gem.Delta) for node in traversal((result,)))
     actual, expected = evaluate([result, expression])
     assert numpy.array_equal(actual.arr, expected.arr)
+
+
+def reduction_view():
+    """A view of the reduction y_m = sum_j A_mj x_j, and its bound index m."""
+    m, j = gem.indices(2)
+    view = gem.ComponentTensor(gem.IndexSum(gem.Product(
+        gem.Indexed(gem.Variable('A', (3, 4)), (m, j)),
+        gem.Indexed(gem.Variable('x', (4,)), (j,))), (j,)), (m,))
+    return view, m
+
+
+def stored_tensors(assignments, prefix_ordering):
+    """The tensors that compiling the assignments stores."""
+    from gem.impero_utils import compile_gem
+
+    impero_c = compile_gem(assignments, prefix_ordering)
+    return [t for t in impero_c.temporaries
+            if isinstance(t, gem.ComponentTensor)]
+
+
+def test_reduction_view_is_shared_by_its_readers():
+    """Several readers of a view read the reduction without a copy."""
+    view, m = reduction_view()
+    i, k = gem.indices(2)
+    u = gem.Indexed(gem.Variable('u', (3, 3)), (i, k))
+    value = gem.Product(gem.Indexed(view, (i,)), gem.Indexed(view, (k,)))
+    assert not stored_tensors([(u, value)], (i, k))
+
+
+def test_reduction_view_read_elsewhere_keeps_its_storage():
+    """A loop over the bound index of a view cannot read its other entries."""
+    view, m = reduction_view()
+    k = gem.Index(extent=3)
+    v = gem.Indexed(gem.Variable('v', (3, 3)), (m, k))
+    value = gem.Product(gem.Indexed(gem.Variable('w', (3,)), (m,)),
+                        gem.Indexed(view, (k,)))
+    assert stored_tensors([(v, value)], (m, k))
