@@ -5,7 +5,7 @@ import numpy
 import gem
 
 from FIAT.expansions import C0_basis
-from finat.physically_mapped import MappedTabulation, SparseRows
+from finat.physically_mapped import MappedTabulation
 from finat.point_set import CollapsedTensorProductPointSet
 
 
@@ -109,4 +109,5 @@ class DuffyElement:
         tabulation = {
             alpha: gem.FlattenedTensor(expr, multiindex)
             for alpha, expr in result.items()}
-        return MappedTabulation(SparseRows(coefficients), tabulation)
+        return MappedTabulation(
+            coefficients, tabulation, {cell_dim: {0: range(coefficients.shape[1])}})
