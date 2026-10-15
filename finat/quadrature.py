@@ -10,7 +10,8 @@ from FIAT.reference_element import HEXAHEDRON, LINE, QUADRILATERAL, TENSORPRODUC
 from gem.utils import safe_repr
 
 from finat.point_set import (GaussLegendrePointSet, GaussLobattoLegendrePointSet,
-                             KMVPointSet, PointSet, TensorPointSet)
+                             KMVPointSet, PointSet, PointSingleton,
+                             TensorPointSet)
 
 
 def make_quadrature(ref_el, degree, scheme="default"):
@@ -64,7 +65,11 @@ def make_quadrature(ref_el, degree, scheme="default"):
         point_set = GaussLegendrePointSet(fiat_rule.get_points())
     else:
         fiat_rule = fiat_scheme(ref_el, degree, scheme)
-        point_set = PointSet(fiat_rule.get_points())
+        if ref_el.get_spatial_dimension() == 0:
+            # A rule on a point is that point, with nothing to index over.
+            point_set = PointSingleton(fiat_rule.get_points()[0])
+        else:
+            point_set = PointSet(fiat_rule.get_points())
 
     return QuadratureRule(point_set, fiat_rule.get_weights(), ref_el=ref_el, io_ornt_map_tuple=fiat_rule._intrinsic_orientation_permutation_map_tuple)
 
