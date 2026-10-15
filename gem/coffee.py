@@ -10,7 +10,7 @@ import logging
 
 import numpy
 
-from gem.gem import ComponentTensor, Index, Indexed, IndexSum, Literal, Node, one
+from gem.gem import ComponentTensor, Index, Indexed, IndexSum, Literal, one
 from gem.node import MemoizerArg
 from gem.cost import has_arithmetic
 from gem.optimise import (filtered_replace_indices,
@@ -201,15 +201,12 @@ def factorise_atomics(monomials, optimal_atomics, linear_indices):
     return new_monomials
 
 
-def _additive_map_key(
-        expression: Node) -> frozenset[tuple[Node, int]]:
+def _additive_map_key(expression):
     """Represent an additive linear map independently of term order."""
     return frozenset(Counter(traverse_sum(expression)).items())
 
 
-def _extract_repeated_linear_maps(
-        monomial_sum: MonomialSum,
-        linear_indices: tuple[Index, ...]) -> MonomialSum:
+def _extract_repeated_linear_maps(monomial_sum, linear_indices):
     """Move uniform multiplicities from linear maps into scalar factors.
 
     A repeated additive map is a scalar multiple of the map formed from its
@@ -247,21 +244,15 @@ def _extract_repeated_linear_maps(
     return result
 
 
-def _share_linear_maps(
-        monomial_sum: MonomialSum,
-        linear_indices: tuple[Index, ...]) -> MonomialSum:
-    """Share isomorphic maps of distinct multilinear axes.
+def _share_linear_maps(monomial_sum, linear_indices):
+    """Share equivalent linear maps of distinct form arguments.
 
-    Test and trial axes use distinct indices even when they apply the same
-    finite element map.  Renaming each axis to a canonical index exposes that
-    isomorphism without inspecting the element family.  Materialising the
-    canonical map is generalised code motion: the basis transformation is
-    evaluated once and both axes index its result.
+    Test and trial tabulations use different argument indices. Replacing each
+    with a common index exposes equal maps, which can be tabulated once.
 
-    :arg monomial_sum: sum-of-products representation of a multilinear
-                       expression
-    :arg linear_indices: free indices identifying argument axes
-    :returns: representation whose repeated linear maps access one tensor
+    :arg monomial_sum: sum of products representing a multilinear expression
+    :arg linear_indices: argument indices
+    :returns: monomial sum whose equivalent maps index the same tensor
     """
     linear_indices = tuple(linear_indices)
     monomial_sum = _extract_repeated_linear_maps(monomial_sum, linear_indices)

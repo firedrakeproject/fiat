@@ -727,15 +727,11 @@ class Indexed(Scalar):
                 C, = B.children
                 kk = B.multiindex
                 ff = C.free_indices
-                # An index reached only through a VariableIndex is not a key
-                # of kk, so the rewrite below would drop its replacement and
-                # leave the old index behind, bound by nothing.  Those belong
-                # to replace_indices, which does substitute inside the lookup.
+                # Substitution inside indirect lookups needs replace_indices.
                 hh = frozenset(chain.from_iterable(
                     k.expression.free_indices
                     for k in kk if isinstance(k, VariableIndex)))
                 if not any((j in ff or j in hh) for j in jj):
-                    # Only replace indices that are not present in C
                     rep = dict(zip(jj, ii))
                     ll = tuple(rep.get(k, k) for k in kk)
                     aggregate = C

@@ -138,3 +138,40 @@ def test_product_of_sums_over_one_index():
     square = gem.IndexSum(gem.Product(first(gather), second(gather)), (k0, k1))
     result, = evaluate([square])
     assert numpy.isclose(result.arr, (1.0 + 2.0 + 3.0) ** 2)
+
+
+@pytest.mark.parametrize('kind', ['abs', 'mixed'])
+def test_select_facet_expression(kind):
+    """Facet selection preserves node parameters and differing structures."""
+    from gem.interpreter import evaluate
+    from gem.optimise import select_expression
+
+    x = gem.Variable('x', ())
+    facet = gem.Index(extent=2)
+    expressions = [gem.MathFunction('abs', x),
+                   gem.MathFunction('abs', gem.Product(gem.Literal(4.), x))]
+    if kind == 'mixed':
+        expressions[1] = gem.Product(gem.Literal(2.), x)
+    selected = select_expression(expressions, facet)
+    actual, = evaluate([selected], {x: numpy.asarray(9.)})
+    expected = evaluate(expressions, {x: numpy.asarray(9.)})
+    assert numpy.array_equal(actual.arr, [value.arr for value in expected])
+
+
+def test_select_shared_expression_dag(monkeypatch):
+    """Facet selection visits shared products without expanding the DAG."""
+    from gem.optimise import select_expression
+
+    expressions = [gem.Variable('a', ()), gem.Variable('b', ())]
+    for _ in range(8):
+        expressions = [e*e for e in expressions]
+    reconstruct = gem.Product.reconstruct
+    visits = []
+
+    def counted(node, *children):
+        visits.append(node)
+        return reconstruct(node, *children)
+
+    monkeypatch.setattr(gem.Product, 'reconstruct', counted)
+    select_expression(expressions, gem.Index(extent=2))
+    assert len(visits) <= 8

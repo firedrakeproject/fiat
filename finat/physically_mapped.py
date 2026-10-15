@@ -1,9 +1,10 @@
 from abc import ABCMeta, abstractmethod
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from functools import cached_property
 
 import gem
 import numpy
+
 from gem.optimise import factorise_scalar_sums
 
 from finat.citations import cite
@@ -22,28 +23,23 @@ class NeedsCoordinateMappingElement(metaclass=ABCMeta):
 
 
 class MappedTabulation(Mapping):
-    """A lazy tabulation dict that applies the basis transformation only
-    on the requested derivatives.
+    """Apply a sparse basis transformation to reference tabulations.
 
-    Rows are padded to a common number of entries, so that a loop over the
-    basis index has an affine iteration domain.  Constant tables select the
-    reference column and one of the distinct symbolic coefficients, which
-    shares equal entries without materialising the matrix entry by entry.
+    Rows are padded to a common width. Constant tables select the reference
+    columns and symbolic coefficients; equal coefficients share one slot.
 
-    :arg M: a gem.ListTensor with the basis transformation matrix.
-    :arg ref_tabulation: a dict of tabulations on the reference cell.
-    :kwarg indices: an optional list of restriction indices on the basis functions.
+    :arg M: basis transformation as a gem.ListTensor
+    :arg ref_tabulation: reference tabulations indexed by derivative order
+    :arg indices: optional rows retained by an element restriction
     """
 
-    def __init__(
-            self, M: gem.ListTensor, ref_tabulation: Mapping,
-            indices: Iterable[int] | None = None) -> None:
+    def __init__(self, M, ref_tabulation, indices=None):
         self.ref_tabulation = ref_tabulation
         if indices is None:
             indices = range(M.shape[0])
         self.indices = tuple(indices)
-        self._space_dim = len(self.indices)
-        self._value_dim = M.shape[1]
+        self._space_dimension = len(self.indices)
+        self._reference_dimension = M.shape[1]
 
         nonzero_rows = []
         for source_row in self.indices:
@@ -79,34 +75,35 @@ class MappedTabulation(Mapping):
         self._tabulation_cache = {}
 
     @cached_property
-    def _reference_index(self) -> gem.Index:
-        """Contraction over the reference basis, shared by all tabulations."""
-        return gem.Index(extent=self._value_dim)
+    def _reference_index(self):
+        """Index over the reference basis, shared by all tabulations."""
+        return gem.Index(extent=self._reference_dimension)
 
     @cached_property
-    def _row_index(self) -> gem.Index:
-        """Contraction over a padded row, shared by all tabulations."""
+    def _entry_index(self):
+        """Index over the padded entries of a matrix row."""
         return gem.Index(extent=self._width)
 
-    def _entry(self, r: gem.Index, a: gem.Index) -> gem.Node:
-        """Entry ``M[r, a]`` of the basis transformation.
+    def _entry(self, r, a):
+        """Entry M[r, a] of the sparse basis transformation.
 
-        :arg r: index over the rows retained by the element
+        Sum over the padded row, using a Delta to select each reference column.
+        Both matrix axes remain available to ordinary contraction optimisation.
+
+        :arg r: index over the retained rows
         :arg a: index over the reference basis
-        :returns: a sum over the padded row of an interned entry against a
-                  Delta selecting its column, so that contracting either axis
-                  of ``M`` is ordinary GEM algebra
+        :returns: scalar GEM expression for the matrix entry
         """
-        k = self._row_index
+        k = self._entry_index
         entry = gem.Indexed(
             self._values,
             (gem.VariableIndex(gem.Indexed(self._value_indices, (r, k))),))
         column = gem.VariableIndex(gem.Indexed(self._columns, (r, k)))
         return gem.IndexSum(gem.Product(entry, gem.Delta(column, a)), (k,))
 
-    def matmul(self, table: gem.Node) -> gem.Node:
+    def matmul(self, table):
         """Apply the basis transformation to a reference tabulation."""
-        r = gem.Index(extent=self._space_dim)
+        r = gem.Index(extent=self._space_dimension)
         a = self._reference_index
         tail = gem.indices(len(table.shape) - 1)
         mapped = gem.IndexSum(
