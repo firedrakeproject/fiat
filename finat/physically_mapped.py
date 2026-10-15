@@ -1,6 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from collections.abc import Mapping
+from numbers import Number
 
 import gem
 import numpy
@@ -54,15 +55,21 @@ class MappedTabulation(Mapping):
         self._tabulation_cache = {}
         if restriction_indices is None:
             restriction_indices = range(transformation.shape[0])
+        matrix = transformation.array
         groups = defaultdict(list)
         for dof, basis_index in enumerate(restriction_indices):
             support = []
             for dim, entities in ref_entity_dofs.items():
                 for entity, dofs in entities.items():
-                    columns = tuple(column for column in dofs
-                                    if not isinstance(transformation[basis_index, column], gem.Zero))
+                    columns = []
+                    for column in dofs:
+                        value = matrix[basis_index, column]
+                        if (isinstance(value, gem.Zero)
+                                or isinstance(value, Number) and value == 0):
+                            continue
+                        columns.append(column)
                     if columns:
-                        support.append(((dim, entity), columns))
+                        support.append(((dim, entity), tuple(columns)))
             if support:
                 groups[tuple(support)].append((dof, basis_index))
         self._blocks = []
@@ -70,7 +77,7 @@ class MappedTabulation(Mapping):
         for support, entries in groups.items():
             columns = tuple(column for _, dofs in support for column in dofs)
             coefficients = gem.ListTensor([
-                [factorise_scalar_sums(transformation[basis_index, c]) for c in columns]
+                [factorise_scalar_sums(gem.as_gem(matrix[basis_index, c])) for c in columns]
                 for _, basis_index in entries])
             self._blocks.append((coefficients, columns, tuple(dof for dof, _ in entries)))
 

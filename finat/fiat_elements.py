@@ -3,6 +3,7 @@ import gem
 import numpy as np
 from gem.utils import cached_property
 
+from finat.duffy import DuffyElement
 from finat.finiteelementbase import FiniteElementBase
 from finat.point_set import PointSet, PointSingleton
 
@@ -302,9 +303,9 @@ class ScalarFiatElement(FiatElement):
         return ()
 
 
-class Bernstein(ScalarFiatElement):
-    # TODO: Replace this with a smarter implementation
-    def __init__(self, cell, degree, **kwargs):
+class Bernstein(DuffyElement, ScalarFiatElement):
+    def __init__(self, cell: FIAT.reference_element.SimplicialComplex,
+                 degree: int, **kwargs: object) -> None:
         super().__init__(FIAT.Bernstein(cell, degree, **kwargs))
 
 

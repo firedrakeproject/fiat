@@ -22,14 +22,14 @@ import math
 import numpy
 import pytest
 
-from FIAT.reference_element import ufc_simplex
 from FIAT.bernstein import Bernstein, BernsteinPolynomialSet
+from FIAT.quadrature_schemes import create_quadrature
+from FIAT.reference_element import ufc_simplex
 from FIAT.barycentric_interpolation import get_lagrange_points
 from FIAT.finite_element import CiarletElement
 from FIAT.hct import HCTDualSet, HsiehCloughTocher
 from FIAT.lagrange import Lagrange
 from FIAT.macro import AlfeldSplit, CkPolynomialSet, PowellSabinSplit, WorseyFarinSplit
-from FIAT.quadrature_schemes import create_quadrature
 from FIAT.walkington import Walkington, WalkingtonDualSet
 
 

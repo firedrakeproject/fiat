@@ -4,8 +4,10 @@ import gem
 from abc import ABCMeta, abstractmethod
 
 from finat.citations import cite
+from finat.duffy import DuffyElement
 from finat.fiat_elements import ScalarFiatElement, Lagrange, DiscontinuousLagrange
-from finat.point_set import GaussLobattoLegendrePointSet, GaussLegendrePointSet, KMVPointSet
+from finat.point_set import (GaussLobattoLegendrePointSet, GaussLegendrePointSet,
+                             KMVPointSet)
 
 
 class SpectralElement(metaclass=ABCMeta):
@@ -64,7 +66,7 @@ class KongMulderVeldhuizen(SpectralElement, ScalarFiatElement):
         cite("Geevers2018new")
 
 
-class Legendre(ScalarFiatElement):
+class Legendre(DuffyElement, ScalarFiatElement):
     """DG element with Legendre polynomials."""
 
     def __init__(self, cell, degree, variant=None):
@@ -72,7 +74,7 @@ class Legendre(ScalarFiatElement):
         super().__init__(fiat_element)
 
 
-class IntegratedLegendre(ScalarFiatElement):
+class IntegratedLegendre(DuffyElement, ScalarFiatElement):
     """CG element with integrated Legendre polynomials."""
 
     def __init__(self, cell, degree, variant=None):

@@ -8,6 +8,7 @@ from functools import singledispatch
 import itertools
 
 from gem import gem, node
+from gem.jagged import replace_flattened
 from gem.optimise import replace_delta
 
 __all__ = ("evaluate", )
@@ -383,6 +384,7 @@ def evaluate(expressions, bindings=None):
         exprs = tuple(expressions)
     except TypeError:
         exprs = (expressions, )
+    exprs = replace_flattened(exprs)
     mapper = node.Memoizer(_evaluate)
     mapper.bindings = bindings if bindings is not None else {}
     return list(map(mapper, exprs))

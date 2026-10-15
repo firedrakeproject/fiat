@@ -6,7 +6,7 @@ import pytest
 
 import gem
 from gem.interpreter import evaluate
-from gem import cost, optimise
+from gem import cost, driver, optimise
 from gem.node import post_traversal, traversal
 from gem.optimise import sum_factorise
 from gem.coffee import optimise_monomial_sum
@@ -120,7 +120,7 @@ def test_contraction_preserves_repeated_contractions():
 
     table = gem.Indexed(gem.Literal(numpy.random.rand(3, 3, 3, 4)), ijk + (p,))
     dofs = numpy.random.rand(3, 3, 3)
-    evaluation = optimise.contraction(gem.IndexSum(gem.Product(table, gem.Indexed(gem.Literal(dofs), ijk)), ijk))
+    evaluation = driver.contraction(gem.IndexSum(gem.Product(table, gem.Indexed(gem.Literal(dofs), ijk)), ijk))
     assert isinstance(evaluation, gem.IndexSum)
 
     weights = numpy.random.rand(4, 4)
@@ -128,7 +128,7 @@ def test_contraction_preserves_repeated_contractions():
                         gem.Product(evaluation, evaluation))
     expression = gem.IndexSum(cubed, (p,))
 
-    optimised = optimise.contraction(expression)
+    optimised = driver.contraction(expression)
     assert evaluation in set(traversal([optimised]))
 
     # The evaluation is contracted once and reused, so the result holds
@@ -529,7 +529,7 @@ def test_indirect_delta_pullback_domain(shared_source):
     else:
         table = gem.Literal(numpy.arange(1., 5.).reshape(2, 2))[a, q]
     expression = gem.IndexSum(values[r] * gem.Delta(column, a) * table, (r, a))
-    result = optimise.contraction(expression)
+    result = driver.contraction(expression)
     assert result.free_indices == expression.free_indices
     actual, expected = evaluate([result, expression])
     assert numpy.array_equal(actual.arr, expected.arr)

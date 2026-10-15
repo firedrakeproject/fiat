@@ -10,10 +10,16 @@ from gem.cost import operation_count
 from gem.flop_count import count_flops
 from gem.impero_utils import compile_gem
 from gem.node import traversal
-from gem.optimise import contraction
+from gem.driver import contraction
 from finat.physically_mapped import MappedTabulation, PhysicallyMappedElement
 
 from .conftest import MyMapping
+
+
+def test_numeric_zero_mapped_tabulation_is_sparse():
+    """Discard numeric zeros when constructing mapped blocks."""
+    mapped = MappedTabulation(gem.Literal(np.eye(3)), {}, {0: {0: [0, 1, 2]}})
+    assert sum(np.prod(coefficients.shape) for coefficients, _, _ in mapped._blocks) == 3
 
 
 def test_entity_mapped_tabulation():

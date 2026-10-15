@@ -3,7 +3,7 @@ expressions."""
 
 from collections import Counter, OrderedDict, defaultdict
 from functools import lru_cache, singledispatch, partial
-from itertools import combinations, permutations, zip_longest
+from itertools import combinations, permutations
 from numbers import Integral
 
 import numpy
@@ -16,7 +16,7 @@ from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
                      Product, Sum, Comparison, Conditional, Division,
                      Index, VariableIndex, Indexed, FlexiblyIndexed,
                      IndexSum, ComponentTensor, ListTensor, Delta,
-                     partial_indexed, one)
+                     jagged_lattice, partial_indexed, one)
 
 
 @singledispatch
@@ -858,6 +858,87 @@ def traverse_sum(expression, stop_at=None):
     return result
 
 
+def _distributed_indexsum_term(term, indices):
+    """Preserve a joint contraction domain after distributing one term."""
+    active = tuple(index for index in indices if index in term.free_indices)
+    missing = tuple(index for index in indices if index not in active)
+    if not missing:
+        return IndexSum(term, indices)
+
+    domain = OrderedDict()
+
+    def include(index):
+        for parent in index.parents:
+            include(parent)
+        domain.setdefault(index)
+
+    for index in indices:
+        include(index)
+    parents = {parent for index in domain for parent in index.parents}
+    if all(not index.parents and index not in parents for index in missing):
+        return IndexSum(Product(term, index_space_literal(missing)), active)
+
+    retained = set(domain).difference(indices).union(active)
+    for index in reversed(domain):
+        if index in retained:
+            retained.update(index.parents)
+    retained = tuple(index for index in domain if index in retained)
+    points = jagged_lattice(tuple(domain))
+    if retained:
+        positions = tuple(tuple(domain).index(index) for index in retained)
+        multiplicity = numpy.zeros(tuple(index.extent for index in retained))
+        numpy.add.at(multiplicity, tuple(points[:, p] for p in positions), 1)
+        factor = Indexed(Literal(multiplicity), retained)
+    else:
+        factor = Literal(float(len(points)))
+    active = tuple(index for index in retained if index in indices)
+    return IndexSum(Product(term, factor), active)
+
+
+def distribute_sum(expr, predicate):
+    """Distribute selected sums through products and contractions.
+
+    Memoisation is by object identity, which reuses each node of the DAG once.
+
+    :arg expr: GEM expression to distribute
+    :arg predicate: predicate selecting the operations to distribute
+    :returns: the additive terms after distribution
+    """
+    results = {}
+    active = {}
+    stack = [(expr, False)]
+    while stack:
+        node, expanded = stack.pop()
+        key = id(node)
+        if key in results:
+            continue
+        if not expanded:
+            stack.append((node, True))
+            stack.extend((c, False) for c in node.children)
+            continue
+        active[key] = predicate(node) or any(
+            active[id(child)] for child in node.children)
+        if active[key] and isinstance(node, (Sum, IndexSum, Product)):
+            if isinstance(node, Sum):
+                results[key] = [
+                    term
+                    for child in node.children
+                    for term in results[id(child)]]
+            elif isinstance(node, IndexSum):
+                body, = node.children
+                results[key] = [
+                    _distributed_indexsum_term(term, node.multiindex)
+                    for term in results[id(body)]]
+            else:  # Product
+                a, b = node.children
+                ta, tb = results[id(a)], results[id(b)]
+                results[key] = [node] if len(ta) == 1 and len(tb) == 1 \
+                    else [Product(x, y) for x in ta for y in tb]
+        else:
+            results[key] = [node]
+    return results[id(expr)]
+
+
 def is_linear_map(node, linear_indices):
     """Is a sum a linear map of exactly one form argument?
 
@@ -1058,113 +1139,6 @@ def cancel_indirect_deltas(expression):
         return IndexSum(make_product(factors), tuple(cancelled))
 
     return Memoizer(visit)(expression)
-
-
-def _contract_listtensor(expression):
-    """Collect geometry before tabulation in a contraction of tensor entries.
-
-    Contracting a tensor assembled from local basis blocks can hide a common
-    reference tabulation. Expand the contracted tensor axis and constant
-    gathers, then collect equal point-dependent factors. The remaining
-    coefficient expressions can be evaluated independently of the points.
-
-    :arg expression: contraction with ComponentTensors removed
-    :returns: a refactorised expression, or the input when no tensor is contracted
-    """
-    nodes = tuple(traversal((expression,)))
-    bound = {i for node in nodes if isinstance(node, IndexSum) for i in node.multiindex}
-    axes = {i for node in nodes if isinstance(node, Indexed)
-            and isinstance(node.children[0], ListTensor)
-            for i in node.multiindex if i in bound}
-    if not axes:
-        return expression
-    for node in nodes:
-        if isinstance(node, Indexed):
-            for index in node.multiindex:
-                lookup = _constant_map(index)
-                if lookup is not None:
-                    axes.update(i for i in lookup[1] if i in bound)
-    expanded, = unroll_indexsum((expression,), predicate=lambda i: i in axes)
-    # Import locally because refactorise uses the contraction primitives.
-    from gem.refactorise import ATOMIC, COMPOUND, OTHER, FactorisationError, collect_monomials
-
-    def classify(node):
-        if not set(node.free_indices).intersection(expression.free_indices):
-            return OTHER
-        return ATOMIC if isinstance(node, (Indexed, FlexiblyIndexed)) else COMPOUND
-
-    try:
-        monomials, = collect_monomials((expanded,), classify)
-    except FactorisationError:
-        return expression
-    return make_sum(sum_factorise(m.sum_indices, (*m.atomics, m.rest)) for m in monomials)
-
-
-def contraction(expression):
-    """Optimise the contractions of the tensor product at the root of
-    the expression, including:
-
-    - IndexSum-Delta cancellation
-    - Sum factorisation
-
-    This routine was designed with finite element coefficient
-    evaluation in mind.
-    """
-
-    # Common memoizer to remove ComponentTensors
-    index_replacer = MemoizerArg(filtered_replace_indices)
-
-    # Eliminate annoying ComponentTensors
-    expression = index_replacer(expression, ())
-
-    # Flatten product tree, eliminate deltas, sum factorise
-    def rebuild(expression):
-        root = expression
-        # The contraction at the root is always broken up, as that is the
-        # one being optimised
-        keep = repeated_contractions(expression)
-        sum_indices, factors = traverse_product(
-            expression, index_replacer=index_replacer,
-            stop_at=lambda e: e is not root and e in keep)
-        sum_indices, factors = pull_back_indirect_delta(
-            sum_indices, factors, index_replacer)
-        sum_indices, factors = delta_elimination(
-            sum_indices, factors, index_replacer=index_replacer)
-        factors = [index_replacer(f, ()) for f in factors]
-        result = sum_factorise(sum_indices, factors)
-        expanded = _contract_listtensor(root)
-        # Expanding tables trades loops for scalar expressions. Limit both
-        # storage and expression growth when reducing the arithmetic.
-        old_cost, new_cost = estimate_cost((result,)), estimate_cost((expanded,))
-        if all(new <= old for new, old in zip(new_cost, old_cost)):
-            return expanded
-        return result
-
-    # Sometimes the value shape is composed as a ListTensor, which
-    # could get in the way of decomposing factors.  In particular,
-    # this is the case for H(div) and H(curl) conforming tensor
-    # product elements.  So if ListTensors are used, they are pulled
-    # out to be outermost, so we can straightforwardly factorise each
-    # of its entries.
-    lt_fis = OrderedDict()  # ListTensor free indices
-    for node in traversal((expression,)):
-        if isinstance(node, Indexed):
-            child, = node.children
-            if isinstance(child, ListTensor):
-                lt_fis.update(zip_longest(node.multiindex, ()))
-    lt_fis = tuple(index for index in lt_fis if index in expression.free_indices)
-
-    if lt_fis:
-        # Rebuild each split component
-        tensor = ComponentTensor(expression, lt_fis)
-        entries = [Indexed(tensor, zeta) for zeta in numpy.ndindex(tensor.shape)]
-        entries = [index_replacer(e, ()) for e in entries]
-        return Indexed(ListTensor(
-            numpy.array(list(map(rebuild, entries))).reshape(tensor.shape)
-        ), lt_fis)
-    else:
-        # Rebuild whole expression at once
-        return rebuild(expression)
 
 
 @singledispatch
