@@ -179,7 +179,10 @@ def convert_finiteelement(element, **kwargs):
             element = element.reconstruct(cell=quadrilateral_tpc)
         elif element.cell.cellname == "hexahedron":
             # Handle hexahedron short names like NCF and NCE.
-            element = element.reconstruct(cell=hexahedron_tpc)
+            tensor_cell = hexahedron_tpc
+            if element.family() in {"NCF", "NCE"}:
+                tensor_cell = ufl.TensorProductCell(ufl.quadrilateral, ufl.interval)
+            element = element.reconstruct(cell=tensor_cell)
         else:
             raise ValueError("%s is supported, but handled incorrectly" %
                              element.family())

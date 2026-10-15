@@ -269,18 +269,29 @@ def _select_expression(expressions, index):
         elif all(e.j == k and e.i == expr.i for k, e in enumerate(expressions)):
             return expr.reconstruct(expr.i, index)
 
+    if types == {IndexSum}:
+        extents = {tuple(i.extent for i in e.multiindex) for e in expressions}
+        if len(extents) == 1:
+            multiindex = tuple(Index(extent=extent) for extent in extents.pop())
+            summands = [Indexed(ComponentTensor(e.children[0], e.multiindex),
+                                multiindex)
+                        for e in expressions]
+            return IndexSum(_select_expression(summands, index), multiindex)
+
     if len(types) == 1:
         cls, = types
-        if cls.__front__ or cls.__back__:
-            raise NotImplementedError("How to factorise {} expressions?".format(cls.__name__))
-        assert all(len(e.children) == len(expr.children) for e in expressions)
-        assert len(expr.children) > 0
+        attributes = cls.__front__ + cls.__back__
+        if (expr.children and all(
+                len(e.children) == len(expr.children)
+                and all(getattr(e, name) == getattr(expr, name)
+                        for name in attributes)
+                for e in expressions)):
+            return expr.reconstruct(*(
+                _select_expression(nth_children, index)
+                for nth_children in zip(*(e.children for e in expressions))))
 
-        return expr.reconstruct(*(_select_expression(nth_children, index)
-                                  for nth_children in zip(*(e.children
-                                                            for e in expressions))))
-
-    raise NotImplementedError("No rule for factorising expressions of this kind.")
+    # Different facet expressions can always be selected as tensor entries.
+    return partial_indexed(ListTensor(expressions), (index,))
 
 
 def select_expression(expressions, index):
@@ -382,6 +393,11 @@ def associate(operator, operands):
     return result, flops
 
 
+def index_space_literal(indices):
+    """Return the cardinality of a rectangular index domain as a scalar."""
+    return Literal(float(numpy.prod([i.extent for i in indices], dtype=int)))
+
+
 def _independent_contractions(sum_indices, groups):
     """Split a contraction into independent subproblems.
 
@@ -478,9 +494,8 @@ def _contract_greedily(sum_indices, groups):
     return _contract_in_order(ordering, groups)
 
 
-# Planning a tree visits 3**factors subset pairs, while searching the
-# orderings of the contraction indices costs indices!.  Above this many
-# factors the exhaustive search over orderings is the cheaper plan.
+# Bound the 3**factors product-tree search. Wider products use index
+# orderings, with a greedy fallback when there are also many indices.
 _MAX_PLANNED_FACTORS = 10
 
 
@@ -498,17 +513,10 @@ def _plan_contraction(sum_indices, groups):
     :arg sum_indices: free indices for contractions, which must not split
                       into independent subproblems
     :arg groups: product factors, grouped by free indices
-    :returns: optimised GEM expression
+    :returns: optimised GEM expression and its arithmetic cost
     """
-    extents = {}
-    for index in sum_indices:
-        extents[index] = index.extent
-    for group in groups:
-        for index in group.free_indices:
-            extents[index] = index.extent
-
     def size(indices):
-        return numpy.prod([extents[i] for i in indices], dtype=int)
+        return numpy.prod([i.extent for i in indices], dtype=int)
 
     # The factors each contraction index occurs in, as a bit mask
     incidence = {}
@@ -525,26 +533,24 @@ def _plan_contraction(sum_indices, groups):
 
     def order(indices):
         """Sum out the widest index first, breaking ties reproducibly."""
-        return tuple(sorted(indices, key=lambda i: (-extents[i], i.count)))
+        return tuple(sorted(indices, key=lambda i: (-i.extent, i.count)))
 
-    def reduce_indices(expression, free, indices):
+    def reduce_indices(free, indices):
         """Sum out indices, largest extent first, costing each reduction."""
         flops = 0
         indices = order(indices)
         for index in indices:
             flops += size(free)
             free = free - {index}
-        if indices:
-            expression = IndexSum(expression, indices)
-        return expression, free, flops
+        return free, flops, indices
 
-    # plans[subset] = (flops, expression, free indices)
+    # plans[subset] = (flops, factor or split, free indices, reduction indices)
     plans = {}
     for n, group in enumerate(groups):
         subset = 1 << n
         free = frozenset(group.free_indices)
-        expression, free, flops = reduce_indices(group, free, reducible[subset])
-        plans[subset] = (flops, expression, free)
+        free, flops, indices = reduce_indices(free, reducible[subset])
+        plans[subset] = (flops, group, free, indices)
 
     for subset in range(1, full + 1):
         if subset in plans:
@@ -559,47 +565,56 @@ def _plan_contraction(sum_indices, groups):
                 left, right = plans[part], plans[other]
                 free = left[2] | right[2]
                 flops = left[0] + right[0] + size(free)
-                expression = Product(left[1], right[1])
                 indices = reducible[subset] - reducible[part] - reducible[other]
-                expression, free, extra = reduce_indices(expression, free, indices)
-                candidate = (flops + extra, expression, free)
+                free, extra, indices = reduce_indices(free, indices)
+                candidate = (flops + extra, (part, other), free, indices)
                 if best is None or candidate[0] < best[0]:
                     best = candidate
             part = (part - 1) & subset
         plans[subset] = best
 
-    return plans[full][1]
+    def build(subset):
+        _, tree, _, indices = plans[subset]
+        expression = Product(*(build(part) for part in tree)) \
+            if isinstance(tree, tuple) else tree
+        return IndexSum(expression, indices) if indices else expression
+
+    return build(full), plans[full][0]
 
 
 def _sum_factorise_connected(sum_indices, groups):
     """Sum factorise a single connected contraction.
 
-    Take whichever of the two searches the contraction is small enough for;
-    see `_MAX_PLANNED_FACTORS`.
+    Plan small products as trees, retaining the supplied axis order on equal
+    arithmetic. Wider products use an index-order search.
 
     :arg sum_indices: free indices for contractions, which must not split
                       into independent subproblems
     :arg groups: product factors, grouped by free indices
     :returns: optimised GEM expression
     """
+    if not groups:
+        return index_space_literal(sum_indices)
+
     if len(groups) <= _MAX_PLANNED_FACTORS:
-        return _plan_contraction(sum_indices, groups)
+        planned, planned_flops = _plan_contraction(sum_indices, groups)
+        ordered, ordered_flops = _contract_in_order(sum_indices, groups)
+        # Equal-work trees retain the supplied axes for streaming loops.
+        return ordered if ordered_flops <= planned_flops else planned
 
     if len(sum_indices) > 6:
-        # Exhaustive search costs a factorial in the number of indices.
         expression, _ = _contract_greedily(sum_indices, groups)
         return expression
 
+    # Prefer the index-order search on equal arithmetic. Its first ordering
+    # follows the supplied axes and preserves streaming tensor-product loops.
     expression = None
     best_flops = numpy.inf
-
-    # Consider all orderings of contraction indices
     for ordering in permutations(sum_indices):
         expr, flops = _contract_in_order(ordering, groups)
         if flops < best_flops:
             expression = expr
             best_flops = flops
-
     return expression
 
 
@@ -796,10 +811,14 @@ def repeated_contractions(expression):
     stack = [expression]
     while stack:
         expr = stack.pop()
-        if isinstance(expr, IndexSum):
-            counts[expr] += 1
+        # Only distinguish one use from several. Each node's children are
+        # visited at most twice, even when shared products nest deeply.
+        if counts[expr] == 2:
+            continue
+        counts[expr] += 1
         stack.extend(_product_descent(expr))
-    return frozenset(expr for expr, count in counts.items() if count > 1)
+    return frozenset(expr for expr, count in counts.items()
+                     if count > 1 and isinstance(expr, IndexSum))
 
 
 def contraction(expression):

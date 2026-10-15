@@ -170,3 +170,11 @@ if __name__ == "__main__":
     import os
     import sys
     pytest.main(args=[os.path.abspath(__file__)] + sys.argv[1:])
+
+
+@pytest.mark.parametrize('family,dimension', [('NCF', 36), ('NCE', 54)])
+def test_hexahedron_piola_element(family, dimension):
+    """Hexahedral Piola spaces retain their horizontal and vertical factors."""
+    element = create_element(finat.ufl.FiniteElement(family, ufl.hexahedron, 2))
+    assert element.value_shape == (3,)
+    assert element.space_dimension() == dimension

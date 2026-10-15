@@ -100,3 +100,21 @@ def test_flatten_indexsum(A):
     result = gem.IndexSum(gem.IndexSum(Aij, (i,)), (j,))
     expected = gem.IndexSum(Aij, (i, j))
     assert result == expected
+
+
+@pytest.mark.parametrize('kind', ['abs', 'mixed'])
+def test_select_facet_expression(kind):
+    """Facet selection preserves node parameters and differing structures."""
+    from gem.interpreter import evaluate
+    from gem.optimise import select_expression
+
+    x = gem.Variable('x', ())
+    facet = gem.Index(extent=2)
+    expressions = [gem.MathFunction('abs', x),
+                   gem.MathFunction('abs', gem.Product(gem.Literal(4.), x))]
+    if kind == 'mixed':
+        expressions[1] = gem.Product(gem.Literal(2.), x)
+    selected = select_expression(expressions, facet)
+    actual, = evaluate([selected], {x: numpy.asarray(9.)})
+    expected = evaluate(expressions, {x: numpy.asarray(9.)})
+    assert numpy.array_equal(actual.arr, [value.arr for value in expected])

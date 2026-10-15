@@ -164,3 +164,51 @@ def test_contractions_joined_by_a_shared_index():
     evaluations = [numpy.einsum("ijkp,ijk->p", table, coefficient)
                    for table, coefficient in zip(tables, coefficients)]
     assert numpy.allclose(result.arr, evaluations[0].dot(evaluations[1]))
+
+
+def test_equal_cost_contraction_follows_axis_order():
+    """Equal-work plans retain the axis order used by streaming loops."""
+    i, j, k, p, q, r = gem.indices(6)
+    table = gem.Literal(numpy.arange(6.).reshape(2, 3))
+    coefficient = gem.Literal(numpy.arange(27.).reshape(3, 3, 3))
+    expression = sum_factorise(
+        (i, j, k), [table[p, i], table[q, j], table[r, k], coefficient[i, j, k]])
+    reductions = [node.multiindex for node in traversal((expression,))
+                  if isinstance(node, gem.IndexSum)]
+    assert reductions == [(k,), (j,), (i,)]
+
+
+def test_repeated_contractions_walks_shared_products_once(monkeypatch):
+    """Repeated product subtrees must not expand the DAG exponentially."""
+    i = gem.Index()
+    evaluation = gem.IndexSum(gem.Literal([1., 2.])[i], (i,))
+    expression = evaluation
+    for _ in range(8):
+        expression = expression * expression
+    descent = optimise._product_descent
+    visits = []
+
+    def counted(node):
+        visits.append(node)
+        return descent(node)
+
+    monkeypatch.setattr(optimise, '_product_descent', counted)
+    assert optimise.repeated_contractions(expression) == {evaluation}
+    assert len(visits) <= 2*len(tuple(traversal((expression,))))
+
+
+def test_empty_product_contraction_counts_index_tuples():
+    i, j = gem.Index(extent=2), gem.Index(extent=3)
+    expression = sum_factorise((i, j), ())
+    result, = evaluate([expression])
+    assert result.arr == 6
+
+
+def test_contraction_counts_index_absent_from_factors():
+    i, j = gem.Index(extent=2), gem.Index(extent=3)
+    factor = gem.Indexed(gem.Literal(numpy.arange(3.0)), (j,))
+
+    expression = sum_factorise((i, j), (factor,))
+    result, = evaluate([expression])
+
+    assert result.arr == 2 * numpy.arange(3.0).sum()
