@@ -678,6 +678,23 @@ class VariableIndex(IndexBase):
         return type(self), (self.expression,)
 
 
+def _index_free_indices(index):
+    """Return the free indices represented by an index expression."""
+    if isinstance(index, Index):
+        return (index,)
+    if isinstance(index, VariableIndex):
+        return index.expression.free_indices
+    return ()
+
+
+def _index_ordering(index):
+    """Return the running indices of an index expression in indexing order."""
+    if isinstance(index, VariableIndex) and isinstance(
+            index.expression, (Indexed, FlexiblyIndexed)):
+        return index.expression.index_ordering()
+    return _index_free_indices(index)
+
+
 class Indexed(Scalar):
     __slots__ = ('children', 'multiindex', 'indirect_children')
     __back__ = ('multiindex',)
@@ -715,8 +732,9 @@ class Indexed(Scalar):
                 C, = B.children
                 kk = B.multiindex
                 ff = C.free_indices
-                if not any((j in ff) for j in jj):
-                    # Only replace indices that are not present in C
+                if not any((j in ff) for j in jj) and not B.indirect_children:
+                    # Renaming indirect lookups requires substituting inside
+                    # their expressions, which replace_indices handles.
                     rep = dict(zip(jj, ii))
                     ll = tuple(rep.get(k, k) for k in kk)
                     aggregate = C
@@ -751,7 +769,7 @@ class Indexed(Scalar):
             if isinstance(i, Index):
                 free_indices.append(i)
             elif isinstance(i, VariableIndex):
-                free_indices.extend(i.expression.free_indices)
+                free_indices.extend(_index_ordering(i))
         return tuple(free_indices)
 
 
@@ -843,7 +861,7 @@ class FlexiblyIndexed(Scalar):
                 if isinstance(index, Index):
                     free_indices.append(index)
                 elif isinstance(index, VariableIndex):
-                    free_indices.extend(index.expression.free_indices)
+                    free_indices.extend(_index_ordering(index))
                 if isinstance(stride, Node):
                     free_indices.extend(stride.free_indices)
         return tuple(free_indices)
@@ -1064,9 +1082,11 @@ class Delta(Scalar, Terminal):
         self = super(Delta, cls).__new__(cls)
         self.i = i
         self.j = j
-        # Set up free indices
-        free_indices = [index for index in (i, j) if isinstance(index, Index)]
-        self.free_indices = tuple(unique(free_indices))
+        # Set up free indices.  A VariableIndex is not itself a free index,
+        # but the expression it wraps may be free in others; those propagate
+        # here exactly as they do through Indexed.
+        self.free_indices = tuple(unique(chain.from_iterable(
+            _index_free_indices(index) for index in (i, j))))
         self._dtype = dtype
         return self
 

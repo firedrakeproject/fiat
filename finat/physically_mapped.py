@@ -1,10 +1,18 @@
 from abc import ABCMeta, abstractmethod
+from collections import defaultdict
 from collections.abc import Mapping
 
 import gem
 import numpy
 
+from gem.optimise import canonical_bound_indices
+
 from finat.citations import cite
+from finat.finiteelementbase import broadcast_tensor
+
+
+zero = gem.Zero()
+one = gem.Literal(1.0)
 
 
 class NeedsCoordinateMappingElement(metaclass=ABCMeta):
@@ -16,45 +24,75 @@ class NeedsCoordinateMappingElement(metaclass=ABCMeta):
 
 
 class MappedTabulation(Mapping):
-    """A lazy tabulation dict that applies the basis transformation only
-    on the requested derivatives.
+    """Apply entity blocks of a basis transformation to reference tabulations.
 
-    :arg M: a gem.ListTensor with the basis transformation matrix.
-    :arg ref_tabulation: a dict of tabulations on the reference cell.
-    :kwarg indices: an optional list of restriction indices on the basis functions.
+    Parameters
+    ----------
+    transformation : gem.Node
+        Matrix mapping reference basis functions to physical basis functions.
+        Its nonzero blocks couple physical and reference entity functionals.
+    ref_tabulation : Mapping
+        Reference tabulations indexed by derivative order.
+    ref_entity_dofs : Mapping
+        Reference degrees of freedom on each entity, including constraint
+        functions removed from the physical element.
+    restriction_indices : sequence of int, optional
+        Indices of the physical basis functions retained by a restriction.
+        Their order defines the ordering of the restricted basis.
+
+    Notes
+    -----
+    Basis functions with common reference entity support form dense
+    transformation blocks. This retains diagonal jet maps and their
+    couplings to higher-dimensional entities, including constraint functions.
+    Every reduction has a fixed extent and contains only nonzero entries.
     """
-    def __init__(self, M, ref_tabulation, indices=None):
-        self.M = M
+
+    def __init__(self, transformation, ref_tabulation, ref_entity_dofs,
+                 restriction_indices=None):
         self.ref_tabulation = ref_tabulation
-        if indices is None:
-            indices = list(range(M.shape[0]))
-        self.indices = indices
-        # we expect M to be sparse with O(1) nonzeros per row
-        # for each row, get the column index of each nonzero entry
-        csr = [[j for j in range(M.shape[1]) if not isinstance(M.array[i, j], gem.Zero)]
-               for i in indices]
-        self.csr = csr
         self._tabulation_cache = {}
-
-    def matvec(self, table):
-        # basis recombination using hand-rolled sparse-dense matrix multiplication
-        ii = gem.indices(len(table.shape)-1)
-        phi = [gem.Indexed(table, (j, *ii)) for j in range(self.M.shape[1])]
-        # the sum approach is faster than calling numpy.dot or gem.IndexSum
-        exprs = [gem.ComponentTensor(gem.Sum(*(self.M.array[i, j] * phi[j] for j in js)), ii)
-                 for i, js in zip(self.indices, self.csr)]
-
-        result = gem.ListTensor(exprs)
-        result, = gem.optimise.unroll_indexsum((result,), lambda index: True)
-        # result = gem.optimise.aggressive_unroll(self.M @ table)
-        return result
+        if restriction_indices is None:
+            restriction_indices = range(transformation.shape[0])
+        groups = defaultdict(list)
+        for dof, basis_index in enumerate(restriction_indices):
+            support = []
+            for dim, entities in ref_entity_dofs.items():
+                for entity, dofs in entities.items():
+                    columns = tuple(column for column in dofs
+                                    if not isinstance(transformation[basis_index, column], gem.Zero))
+                    if columns:
+                        support.append(((dim, entity), columns))
+            if support:
+                groups[tuple(support)].append((dof, basis_index))
+        self._blocks = []
+        self._dimension = len(restriction_indices)
+        for support, entries in groups.items():
+            columns = tuple(column for _, dofs in support for column in dofs)
+            coefficients = gem.ListTensor([[transformation[basis_index, c] for c in columns]
+                                           for _, basis_index in entries])
+            self._blocks.append((coefficients, columns, tuple(dof for dof, _ in entries)))
 
     def __getitem__(self, alpha):
-        try:
-            return self._tabulation_cache[alpha]
-        except KeyError:
-            result = self.matvec(self.ref_tabulation[alpha])
-            return self._tabulation_cache.setdefault(alpha, result)
+        if alpha not in self._tabulation_cache:
+            table = self.ref_tabulation[alpha]
+            tail = gem.indices(len(table.shape) - 1)
+            values = [zero] * self._dimension
+            for coefficients, columns, positions in self._blocks:
+                r, k = gem.indices(2)
+                columns = gem.Literal(columns, dtype=gem.uint_type)
+                reference = gem.VariableIndex(gem.Indexed(columns, (k,)))
+                mapped = gem.IndexSum(gem.Product(
+                    gem.Indexed(coefficients, (r, k)),
+                    gem.Indexed(table, (reference, *tail))), (k,))
+                block = gem.ComponentTensor(mapped, (r,))
+                for local, position in enumerate(positions):
+                    values[position] = gem.Indexed(block, (local,))
+            r = gem.Index(extent=self._dimension)
+            mapped = gem.Indexed(gem.ListTensor(values), (r,))
+            self._tabulation_cache[alpha] = canonical_bound_indices(
+                broadcast_tensor(mapped, (r, *tail)))
+        return self._tabulation_cache[alpha]
 
     def __iter__(self):
         return iter(self.ref_tabulation)
@@ -83,7 +121,8 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
     def map_tabulation(self, ref_tabulation, coordinate_mapping):
         assert coordinate_mapping is not None
         M = self.basis_transformation(coordinate_mapping)
-        return MappedTabulation(M, ref_tabulation, indices=self.restriction_indices)
+        return MappedTabulation(M, ref_tabulation, self._element.entity_dofs(),
+                                restriction_indices=self.restriction_indices)
 
     def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
         result = super().basis_evaluation(order, ps, entity=entity)
@@ -103,7 +142,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         M_dual = gem.ListTensor(M_dual)
 
         key = None
-        return MappedTabulation(M_dual, {key: Q})[key]
+        return MappedTabulation(M_dual, {key: Q}, self.entity_dofs())[key]
 
 
 class DirectlyDefinedElement(NeedsCoordinateMappingElement):
@@ -193,10 +232,6 @@ class PhysicalGeometry(metaclass=ABCMeta):
 
         :returns: a GEM expression for the physical vertices, shape
                 (gdim, )."""
-
-
-zero = gem.Zero()
-one = gem.Literal(1.0)
 
 
 def identity(*shape):

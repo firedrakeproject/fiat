@@ -370,3 +370,34 @@ def test_estimate_cost_counts_tabulation_storage():
     mapped = gem.ComponentTensor(table[i, q] + gem.Literal(1.), (i,))
     _, storage, largest, _ = cost.estimate_cost([mapped])
     assert storage == largest == 6
+
+
+@pytest.mark.parametrize('shared_source', [False, True])
+def test_indirect_delta_pullback_domain(shared_source):
+    """A sparse transpose preserves shared source axes and diagonal lookups."""
+    r, a, q = gem.indices(3)
+    values = gem.Literal([2., 3.])
+    columns = gem.Literal([[0, 1], [0, 1]], dtype=gem.uint_type)
+    column = gem.VariableIndex(columns[r, r])
+    if shared_source:
+        table = gem.Literal(numpy.arange(1., 9.).reshape(2, 2, 2))[a, r, q]
+    else:
+        table = gem.Literal(numpy.arange(1., 5.).reshape(2, 2))[a, q]
+    expression = gem.IndexSum(values[r] * gem.Delta(column, a) * table, (r, a))
+    result = optimise.contraction(expression)
+    assert result.free_indices == expression.free_indices
+    actual, expected = evaluate([result, expression])
+    assert numpy.array_equal(actual.arr, expected.arr)
+
+
+def test_cancel_indirect_delta_through_componenttensor():
+    """A tensor view must expose its bound column to Delta cancellation."""
+    r, a, b, q = gem.indices(4)
+    column = gem.VariableIndex(gem.Literal([1, 0], dtype=gem.uint_type)[r])
+    table = gem.Literal(numpy.arange(6.).reshape(2, 3))[a, q]
+    view = gem.ComponentTensor(gem.Delta(column, a) * table, (a,))
+    expression = gem.IndexSum(view[b], (b,))
+    result = optimise.cancel_indirect_deltas(expression)
+    assert not any(isinstance(node, gem.Delta) for node in traversal((result,)))
+    actual, expected = evaluate([result, expression])
+    assert numpy.array_equal(actual.arr, expected.arr)

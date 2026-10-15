@@ -2,16 +2,16 @@
 expressions."""
 
 from collections import Counter, OrderedDict, defaultdict
-from functools import singledispatch, partial
+from functools import lru_cache, singledispatch, partial
 from itertools import combinations, permutations, zip_longest
 from numbers import Integral
 
 import numpy
 
-from gem.cost import index_space_literal, iteration_count
+from gem.cost import estimate_cost, index_space_literal, iteration_count
 from gem.utils import groupby
 from gem.node import (Memoizer, MemoizerArg, reuse_if_untouched,
-                      reuse_if_untouched_arg, traversal)
+                      reuse_if_untouched_arg, traversal, traversal_children)
 from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
                      Product, Sum, Comparison, Conditional, Division,
                      Index, VariableIndex, Indexed, FlexiblyIndexed,
@@ -100,7 +100,13 @@ replace_indices.register(Node)(reuse_if_untouched_arg)
 def _replace_indices_atomic(i, self, subst):
     if isinstance(i, VariableIndex):
         new_expr = self(i.expression, subst)
-        return i if new_expr == i.expression else VariableIndex(new_expr)
+        if new_expr == i.expression:
+            return i
+        # A variable index that substitution has made constant is a fixed
+        # index, and folding it lets the lookup itself be evaluated.
+        if isinstance(new_expr, Literal) and not new_expr.shape:
+            return int(new_expr.array)
+        return VariableIndex(new_expr)
     else:
         substitute = dict(subst)
         return substitute.get(i, i)
@@ -177,6 +183,37 @@ def filtered_replace_indices(node, self, subst):
         raise NotImplementedError("Can not replace VariableIndex (will need inverse)")
     filtered_subst = tuple((k, v) for k, v in subst if k in node.free_indices)
     return replace_indices(node, self, filtered_subst)
+
+
+@lru_cache(maxsize=None)
+def _canonical_index(depth, extent):
+    """The bound index at a binding depth in every canonical form."""
+    return Index(extent=extent)
+
+
+def canonical_bound_indices(expression):
+    """Rename the bound indices of an expression by their binding depth.
+
+    Expressions that differ only in the names of their bound indices have
+    equal canonical forms, so the canonical form can identify an expression.
+    All canonical forms share their bound indices, so they are not meant for
+    code generation.
+
+    :arg expression: a GEM expression
+    :returns: the expression with canonically named bound indices
+    """
+    replacer = MemoizerArg(filtered_replace_indices)
+
+    def canonicalise(node, self, depth):
+        if isinstance(node, (ComponentTensor, IndexSum)):
+            multiindex = tuple(_canonical_index(depth + position, index.extent)
+                               for position, index in enumerate(node.multiindex))
+            child, = node.children
+            child = replacer(child, tuple(zip(node.multiindex, multiindex)))
+            return type(node)(self(child, depth + len(multiindex)), multiindex)
+        return reuse_if_untouched_arg(node, self, depth)
+
+    return MemoizerArg(canonicalise)(expression, 0)
 
 
 def remove_componenttensors(expressions, subst=()):
@@ -343,12 +380,15 @@ def select_expression(expressions, index):
     return ComponentTensor(selected, alpha)
 
 
-def delta_elimination(sum_indices, factors, index_replacer=None):
+def delta_elimination(sum_indices, factors, index_replacer=None, indirect_only=False):
     """IndexSum-Delta cancellation.
 
     :arg sum_indices: free indices for contractions
     :arg factors: product factors
     :kwarg index_replacer: MemoizerArg(filtered_replace_indices)
+    :kwarg indirect_only: only cancel a Delta that compares a
+                          :class:`~.VariableIndex`, leaving one between two
+                          plain indices to a later pass
 
     :returns: optimised (sum_indices, factors)
     """
@@ -365,9 +405,15 @@ def delta_elimination(sum_indices, factors, index_replacer=None):
         else:
             return Indexed(ComponentTensor(expression, (from_,)), (to_,))
 
-    delta_queue = [(f, index)
-                   for f in factors if isinstance(f, Delta)
-                   for index in (f.i, f.j) if index in sum_indices]
+    def cancellable(factors):
+        return [(f, index)
+                for f in factors if isinstance(f, Delta)
+                if not indirect_only
+                or isinstance(f.i, VariableIndex) or isinstance(f.j, VariableIndex)
+                for index in (f.i, f.j)
+                if index in sum_indices]
+
+    delta_queue = cancellable(factors)
     while delta_queue:
         delta, from_ = delta_queue[0]
         to_, = list({delta.i, delta.j} - {from_})
@@ -376,9 +422,7 @@ def delta_elimination(sum_indices, factors, index_replacer=None):
 
         factors = [substitute(f, from_, to_) for f in factors]
 
-        delta_queue = [(f, index)
-                       for f in factors if isinstance(f, Delta)
-                       for index in (f.i, f.j) if index in sum_indices]
+        delta_queue = cancellable(factors)
 
     return sum_indices, factors
 
@@ -641,9 +685,8 @@ def sum_factorise(sum_indices, factors):
     :arg factors: product factors
     :returns: optimised GEM expression
     """
-    if len(factors) == 0 and len(sum_indices) == 0:
-        # Empty product
-        return one
+    if len(factors) == 0:
+        return index_space_literal(sum_indices)
 
     # Form groups by free indices
     groups = groupby(factors, key=lambda f: f.free_indices)
@@ -860,6 +903,200 @@ def repeated_contractions(expression):
                      if count > 1 and isinstance(expr, IndexSum))
 
 
+def _indirect_delta_axes(node, self):
+    """The axes compared by the indirect Deltas below a node, including its own.
+
+    An indirect Delta compares a :class:`~.VariableIndex`, and is the only
+    kind `cancel_indirect_deltas` cancels.  Memoising this over the DAG keeps
+    the search for one linear, rather than re-walking the subtree at every
+    enclosing contraction.
+
+    :arg node: a GEM expression
+    :arg self: memoizer visiting the DAG
+    :returns: the indices some indirect Delta at or below ``node`` compares
+    """
+    axes = frozenset().union(*map(self, traversal_children(node)))
+    if isinstance(node, Delta) and any(isinstance(i, VariableIndex)
+                                       for i in (node.i, node.j)):
+        axes = axes | {node.i, node.j}
+    return axes
+
+
+def _constant_map(index):
+    """Find a constant lookup table and its indexing axes.
+
+    :arg index: a plain or indirect index
+    :returns: (array, multiindex) for an indirect lookup into a Literal,
+              otherwise None
+    """
+    if not isinstance(index, VariableIndex):
+        return None
+    expression = index.expression
+    if not isinstance(expression, Indexed):
+        return None
+    table, = expression.children
+    if not isinstance(table, Literal):
+        return None
+    if not all(isinstance(i, Index) for i in expression.multiindex):
+        return None
+    return table.array, expression.multiindex
+
+
+def pull_back_indirect_delta(sum_indices, factors, replacer):
+    """Contract an indirect Delta's own axes before its column axis.
+
+    ``sum_a (sum_rk v(r,k) delta(c(r,k), a)) T(a, q)`` is cancelled by
+    `delta_elimination` substituting ``a := c(r,k)``, which makes ``T``
+    depend on ``r`` and ``k`` and so forces that contraction inside the ``q``
+    loop.  When ``r`` and ``k`` are contracted here and ``T`` carries indices
+    of its own, summing them first can be cheaper: it yields a dense vector
+    indexed by ``a``. Compare the gathered and dense contractions using the
+    same arithmetic and storage model as linear-map preservation.
+
+    :arg sum_indices: indices contracted over the product
+    :arg factors: product factors
+    :arg replacer: ``MemoizerArg(filtered_replace_indices)``
+    :returns: new ``(sum_indices, factors)``, unchanged when no Delta is
+              worth pulling back
+    """
+    for delta in factors:
+        if not isinstance(delta, Delta):
+            continue
+        column = delta.j if isinstance(delta.i, VariableIndex) else delta.i
+        variable = delta.i if isinstance(delta.i, VariableIndex) else delta.j
+        if not isinstance(column, Index) or not isinstance(variable, VariableIndex):
+            continue
+        lookup = _constant_map(variable)
+        if lookup is None:
+            continue
+        table, source_indices = lookup
+        sources = frozenset(source_indices)
+        if column not in sum_indices or not sources <= set(sum_indices):
+            continue
+
+        others = [f for f in factors if f is not delta]
+        spanning = [f for f in others if column in f.free_indices]
+        pulled = [f for f in others if column not in f.free_indices]
+        if not spanning or not pulled:
+            continue
+        # A factor depending on a source axis must remain inside its sum.
+        if any(sources.intersection(f.free_indices) for f in spanning):
+            continue
+        # Cancelling couples the spanning factors to the source indices.  That
+        # only costs anything when they carry indices of their own.
+        if not any(set(f.free_indices) - sources - {column} for f in spanning):
+            continue
+
+        vector = numpy.empty(column.extent, dtype=object)
+        contributions = defaultdict(list)
+        axes = tuple(dict.fromkeys(source_indices))
+        for position in numpy.ndindex(*(i.extent for i in axes)):
+            substitution = tuple(zip(axes, position))
+            lookup_position = tuple(position[axes.index(i)] for i in source_indices)
+            contributions[int(table[lookup_position])].append(substitution)
+        for value in range(column.extent):
+            terms = [make_product([replacer(f, substitution) for f in pulled])
+                     for substitution in contributions.get(value, ())]
+            # A reference basis function that no row maps onto contributes
+            # nothing.
+            vector[value] = make_sum(terms) if terms else Zero()
+
+        rest = tuple(i for i in sum_indices if i not in sources)
+        dense_factors = [Indexed(ListTensor(vector), (column,)), *spanning]
+        # Compare the two ordinary contractions after cancelling the Delta.
+        # Restrictions can make gathering cheaper than a dense pullback.
+        gathered_indices, gathered_factors = delta_elimination(
+            sum_indices, factors, index_replacer=replacer)
+        gathered_factors = [replacer(f, ()) for f in gathered_factors]
+        gathered = sum_factorise(gathered_indices, gathered_factors)
+        dense = sum_factorise(rest, dense_factors)
+        if estimate_cost((dense,)) < estimate_cost((gathered,)):
+            return rest, dense_factors
+
+    return sum_indices, factors
+
+
+def cancel_indirect_deltas(expression):
+    """Cancel indirect Deltas throughout a GEM expression DAG.
+
+    `delta_elimination` only inspects top-level product factors, so a Delta
+    inside a preserved linear map is invisible to it.  Flattening the product
+    tree first exposes it, and hoists the contractions it sits under so that
+    substituting the Delta's variable index cannot capture them.
+
+    Only Deltas comparing a :class:`~.VariableIndex` are handled here.
+    Cancelling them avoids materialising an identity tensor for an indirect
+    lookup. Plain-index Deltas remain available to monomial collection.
+
+    :arg expression: root of a scalar GEM expression
+    :returns: the expression with those Deltas cancelled
+    """
+    replacer = MemoizerArg(filtered_replace_indices)
+    expression = replacer(expression, ())
+    delta_axes = Memoizer(_indirect_delta_axes)
+
+    def visit(node, self):
+        node = reuse_if_untouched(node, self)
+        if not isinstance(node, IndexSum):
+            return node
+        if not delta_axes(node).intersection(node.multiindex):
+            return node
+        sum_indices, factors = traverse_product(node, index_replacer=replacer)
+        cancelled, new_factors = pull_back_indirect_delta(
+            sum_indices, factors, replacer)
+        cancelled, new_factors = delta_elimination(
+            cancelled, new_factors, index_replacer=replacer, indirect_only=True)
+        if tuple(cancelled) == tuple(sum_indices) and tuple(new_factors) == tuple(factors):
+            # Nothing cancelled, so rebuilding would only flatten the
+            # contractions this node nests into a single product, and sum
+            # factorisation needs them nested.
+            return node
+        factors = [replacer(factor, ()) for factor in new_factors]
+        return IndexSum(make_product(factors), tuple(cancelled))
+
+    return Memoizer(visit)(expression)
+
+
+def _contract_listtensor(expression):
+    """Collect geometry before tabulation in a contraction of tensor entries.
+
+    Contracting a tensor assembled from local basis blocks can hide a common
+    reference tabulation. Expand the contracted tensor axis and constant
+    gathers, then collect equal point-dependent factors. The remaining
+    coefficient expressions can be evaluated independently of the points.
+
+    :arg expression: contraction with ComponentTensors removed
+    :returns: a refactorised expression, or the input when no tensor is contracted
+    """
+    nodes = tuple(traversal((expression,)))
+    bound = {i for node in nodes if isinstance(node, IndexSum) for i in node.multiindex}
+    axes = {i for node in nodes if isinstance(node, Indexed)
+            and isinstance(node.children[0], ListTensor)
+            for i in node.multiindex if i in bound}
+    if not axes:
+        return expression
+    for node in nodes:
+        if isinstance(node, Indexed):
+            for index in node.multiindex:
+                lookup = _constant_map(index)
+                if lookup is not None:
+                    axes.update(i for i in lookup[1] if i in bound)
+    expanded, = unroll_indexsum((expression,), predicate=lambda i: i in axes)
+    # Import locally because refactorise uses the contraction primitives.
+    from gem.refactorise import ATOMIC, COMPOUND, OTHER, FactorisationError, collect_monomials
+
+    def classify(node):
+        if not set(node.free_indices).intersection(expression.free_indices):
+            return OTHER
+        return ATOMIC if isinstance(node, (Indexed, FlexiblyIndexed)) else COMPOUND
+
+    try:
+        monomials, = collect_monomials((expanded,), classify)
+    except FactorisationError:
+        return expression
+    return make_sum(sum_factorise(m.sum_indices, (*m.atomics, m.rest)) for m in monomials)
+
+
 def contraction(expression):
     """Optimise the contractions of the tensor product at the root of
     the expression, including:
@@ -886,9 +1123,19 @@ def contraction(expression):
         sum_indices, factors = traverse_product(
             expression, index_replacer=index_replacer,
             stop_at=lambda e: e is not root and e in keep)
-        sum_indices, factors = delta_elimination(sum_indices, factors, index_replacer=index_replacer)
+        sum_indices, factors = pull_back_indirect_delta(
+            sum_indices, factors, index_replacer)
+        sum_indices, factors = delta_elimination(
+            sum_indices, factors, index_replacer=index_replacer)
         factors = [index_replacer(f, ()) for f in factors]
-        return sum_factorise(sum_indices, factors)
+        result = sum_factorise(sum_indices, factors)
+        expanded = _contract_listtensor(root)
+        # Expanding tables trades loops for scalar expressions. Limit both
+        # storage and expression growth when reducing the arithmetic.
+        old_cost, new_cost = estimate_cost((result,)), estimate_cost((expanded,))
+        if all(new <= old for new, old in zip(new_cost, old_cost)):
+            return expanded
+        return result
 
     # Sometimes the value shape is composed as a ListTensor, which
     # could get in the way of decomposing factors.  In particular,

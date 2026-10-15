@@ -86,3 +86,31 @@ def test_number_operand_of_an_untyped_node_is_float():
     expression = gem.Variable("x", ()) - 3
     assert expression.dtype is None
     assert all(child.dtype == numpy.float64 for child in traversal([expression]) if isinstance(child, gem.Literal))
+
+
+def test_rename_indirect_componenttensor():
+    """Renaming a tensor axis also renames its indirect lookups."""
+    from gem.optimise import remove_componenttensors
+
+    i, j = gem.indices(2)
+    lookup = gem.VariableIndex(gem.Indexed(
+        gem.Literal([2, 0, 1], dtype=gem.uint_type), (i,)))
+    expression = gem.Indexed(gem.ComponentTensor(
+        gem.Indexed(gem.Literal([4., 5., 6.]), (lookup,)), (i,)), (j,))
+    assert expression.free_indices == (j,)
+    expression, = remove_componenttensors([expression])
+    result, = evaluate([expression])
+    assert numpy.array_equal(result.arr, [6., 4., 5.])
+
+
+def test_index_ordering_follows_indirect_lookup():
+    """A lookup orders its running indices as it indexes them."""
+    k, r = gem.indices(2)
+    columns = gem.Literal(numpy.zeros((3, 2)), dtype=gem.uint_type)
+    lookup = gem.VariableIndex(gem.Indexed(columns, (r, k)))
+    j = gem.Index(extent=4)
+    indexed = gem.Indexed(gem.Variable('A', (5, 4)), (lookup, j))
+    assert indexed.index_ordering() == (r, k, j)
+    flexibly_indexed = gem.FlexiblyIndexed(
+        gem.Variable('B', (20,)), ((0, ((lookup, 4), (j, 1))),))
+    assert flexibly_indexed.index_ordering() == (r, k, j)
