@@ -89,7 +89,7 @@ class Node(NodeBase, metaclass=NodeMeta):
         return Indexed(self, indices)
 
     def __neg__(self):
-        return componentwise(Product, as_gem(-1, dtype=self.dtype), self)
+        return componentwise(Product, minus, self)
 
     def __add__(self, other):
         return componentwise(Sum, self, as_gem(other, dtype=self.dtype))
@@ -311,13 +311,10 @@ class Literal(Constant):
             return False
         if self.shape != other.shape:
             return False
-        if self.dtype != other.dtype:
-            return False
         return numpy.array_equal(self.array, other.array)
 
     def get_hash(self):
-        return hash((type(self), self.shape, self.dtype,
-                     tuple(self.array.flat)))
+        return hash((type(self), self.shape, tuple(self.array.flat)))
 
     @property
     def value(self):
@@ -1310,6 +1307,7 @@ def view(expression, *slices):
 
 # Static one object for quicker constant folding
 one = Literal(1)
+minus = Literal(-1, dtype=int)
 
 
 # Syntax sugar
