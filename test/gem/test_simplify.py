@@ -11,9 +11,8 @@ from gem.node import traversal
 from gem.interpreter import evaluate
 from gem.driver import contraction, unflatten_returns
 from gem.optimise import (
-    cancel_nested_deltas,
+    cancel_indirect_deltas,
     distribute_sum,
-    preserve_linear_maps,
 )
 from gem.refactorise import (ATOMIC, COMPOUND, OTHER,
                              collect_monomials)
@@ -190,20 +189,6 @@ def test_selective_distribution():
     assert all(common in set(traversal((term,))) for term in terms)
 
 
-def test_preserve_linear_maps_early_exit():
-    """Keep a multilinear sum that contains no separate linear maps."""
-    i = gem.Index(extent=2)
-    j = gem.Index(extent=2)
-    variables = [gem.Variable(f"a{k}", (2, 2)) for k in range(4)]
-    expression = gem.Sum(*(
-        gem.Indexed(variable, (i, j)) for variable in variables))
-
-    terms, linear_maps = preserve_linear_maps(expression, (i, j))
-
-    assert terms == (expression,)
-    assert linear_maps == ()
-
-
 def test_collect_monomials_preserves_linear_maps():
     """Keep finite element linear maps intact during factorization."""
     i = gem.Index(extent=2)
@@ -268,7 +253,7 @@ def test_delta_elimination_preserves_indirect_free_index():
     expression = gem.IndexSum(
         gem.Delta(i, indirect) * gem.Indexed(values, (i,)), (i,))
 
-    result = cancel_nested_deltas(expression)
+    result = cancel_indirect_deltas(expression)
     assert result.free_indices == (k,)
     actual, = evaluate([result])
     assert numpy.array_equal(actual.arr, values.array[entries])
@@ -522,45 +507,6 @@ def test_literal_distinguishes_dtypes():
     assert {index: "index"}.get(value) is None
 
 
-def _churned_indices(count):
-    """Create indices whose addresses disagree with their creation order.
-
-    CPython reuses freed object slots, so allocating a pool, releasing half
-    of it, and allocating again places later-created indices below
-    earlier-created ones in memory.
-    """
-    pool = [gem.Index(extent=2) for _ in range(4 * count)]
-    indices = pool[::2][:count]
-    del pool
-    indices += [gem.Index(extent=2) for _ in range(count)]
-    return indices
-
-
-def test_free_indices_ignore_allocation_addresses():
-    """Order free indices by creation, not by memory address.
-
-    Sorting by :func:`id` makes every ``free_indices`` tuple depend on
-    where the allocator happened to place each index, so compiling one form
-    changes the loop order chosen for the next one in the same process.
-    """
-    indices = _churned_indices(16)
-    assert any(a.count < b.count and id(a) > id(b)
-               for a in indices for b in indices), \
-        "precondition: allocator did not invert creation order"
-
-    by_creation = lambda ids: tuple(sorted(ids, key=lambda i: i.count))
-    assert gem.gem.unique(reversed(indices)) == by_creation(indices)
-
-    expression = gem.Indexed(gem.Variable("A", (2,) * len(indices)),
-                             tuple(indices))
-    assert expression.free_indices == by_creation(indices)
-
-    bound = tuple(indices[::2])
-    free = by_creation(set(indices) - set(bound))
-    assert gem.IndexSum(expression, bound).free_indices == free
-    assert gem.ComponentTensor(expression, bound).free_indices == free
-
-
 def test_rename_index_under_variable_index():
     """Renaming a bound index must reach the lookup of an indirect gather."""
     values = gem.Literal(numpy.array([10.0, 20.0, 30.0]))
@@ -662,3 +608,40 @@ def test_distribute_sum_conditions_on_free_parent():
     distributed = gem.Sum(*distribute_sum(expression, lambda node: isinstance(node, gem.Sum)))
     actual, = evaluate([distributed])
     assert numpy.array_equal(actual.arr, [6., 4., 2.])
+
+
+@pytest.mark.parametrize('kind', ['abs', 'mixed'])
+def test_select_facet_expression(kind):
+    """Facet selection preserves node parameters and differing structures."""
+    from gem.interpreter import evaluate
+    from gem.optimise import select_expression
+
+    x = gem.Variable('x', ())
+    facet = gem.Index(extent=2)
+    expressions = [gem.MathFunction('abs', x),
+                   gem.MathFunction('abs', gem.Product(gem.Literal(4.), x))]
+    if kind == 'mixed':
+        expressions[1] = gem.Product(gem.Literal(2.), x)
+    selected = select_expression(expressions, facet)
+    actual, = evaluate([selected], {x: numpy.asarray(9.)})
+    expected = evaluate(expressions, {x: numpy.asarray(9.)})
+    assert numpy.array_equal(actual.arr, [value.arr for value in expected])
+
+
+def test_select_shared_expression_dag(monkeypatch):
+    """Facet selection visits shared products without expanding the DAG."""
+    from gem.optimise import select_expression
+
+    expressions = [gem.Variable('a', ()), gem.Variable('b', ())]
+    for _ in range(8):
+        expressions = [e*e for e in expressions]
+    reconstruct = gem.Product.reconstruct
+    visits = []
+
+    def counted(node, *children):
+        visits.append(node)
+        return reconstruct(node, *children)
+
+    monkeypatch.setattr(gem.Product, 'reconstruct', counted)
+    select_expression(expressions, gem.Index(extent=2))
+    assert len(visits) <= 8

@@ -797,16 +797,11 @@ class Indexed(Scalar):
                 C, = B.children
                 kk = B.multiindex
                 ff = C.free_indices
-                # An index reached only through a VariableIndex is not a key
-                # of kk, so the rewrite below would drop its replacement and
-                # leave the old index behind, bound by nothing.  Those belong
-                # to replace_indices, which does substitute inside the lookup.
-                nested = set(chain.from_iterable(
+                # Substitution inside indirect lookups needs replace_indices.
+                hh = frozenset(chain.from_iterable(
                     k.expression.free_indices
                     for k in kk if isinstance(k, VariableIndex)))
-                safe = not set(jj).intersection(set(ff) | nested)
-                if safe:
-                    # Only replace indices that are not present in C
+                if not any((j in ff or j in hh) for j in jj):
                     rep = dict(zip(jj, ii))
                     ll = tuple(rep.get(k, k) for k in kk)
                     aggregate = C
@@ -1325,15 +1320,10 @@ class OrientationVariableIndex(VariableIndex, FIATOrientation):
 def unique(indices):
     """Sorts free indices and eliminates duplicates.
 
-    Indices are ordered by creation, not by :func:`id`.  Object addresses
-    depend on what else the process has allocated, so an address ordering
-    would make every ``free_indices`` tuple, and hence the loop order
-    chosen downstream, depend on which forms were compiled beforehand.
-
     :arg indices: iterable of indices
     :returns: sorted tuple of unique free indices
     """
-    return tuple(sorted(set(indices), key=attrgetter("count")))
+    return tuple(sorted(set(indices), key=lambda index: index.count))
 
 
 def index_sum(expression, indices):

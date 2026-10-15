@@ -17,7 +17,7 @@ from gem.gem import (ComponentTensor, Delta, FlattenedTensor, Indexed,
                      IndexSum, ListTensor, Node, Product)
 from gem.jagged import unflatten_free_indices, unflatten
 from gem.node import MemoizerArg, traversal
-from gem.optimise import (cancel_nested_deltas, delta_elimination,
+from gem.optimise import (cancel_indirect_deltas, delta_elimination,
                           filtered_replace_indices,
                           pull_back_indirect_delta, repeated_contractions,
                           sum_factorise, traverse_product)
@@ -176,7 +176,7 @@ def unflatten_returns(
 
     result = []
     for variable, expression in pairs:
-        expression = cancel_nested_deltas(expression)
+        expression = cancel_indirect_deltas(expression)
         joint_outputs, changed = unflatten_free_indices(
             variable, expression, split_separable_sums=False)
         refactored = _refactor_unflattened_outputs(

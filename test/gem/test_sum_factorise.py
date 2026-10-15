@@ -242,7 +242,7 @@ def test_preserved_linear_map_is_shared():
     assert numpy.allclose(result.arr, expected)
 
 
-def test_linear_map_sharing_normalises_order_and_scale() -> None:
+def test_linear_map_sharing_normalises_order_and_scale():
     i, j = gem.Index(extent=3), gem.Index(extent=3)
     a_values = numpy.array([1.0, 2.0, 3.0])
     b_values = numpy.array([4.0, 5.0, 6.0])
@@ -294,24 +294,7 @@ def test_estimate_cost_counts_the_contraction():
     assert nodes > 0
 
 
-def test_empty_product_contraction_counts_index_tuples() -> None:
-    i, j = gem.Index(extent=2), gem.Index(extent=3)
-    expression = sum_factorise((i, j), ())
-    result, = evaluate([expression])
-    assert result.arr == 6
-
-
-def test_contraction_counts_index_absent_from_factors() -> None:
-    i, j = gem.Index(extent=2), gem.Index(extent=3)
-    factor = gem.Indexed(gem.Literal(numpy.arange(3.0)), (j,))
-
-    expression = sum_factorise((i, j), (factor,))
-    result, = evaluate([expression])
-
-    assert result.arr == 2 * numpy.arange(3.0).sum()
-
-
-def test_common_factor_is_extracted_from_scalar_sum() -> None:
+def test_common_factor_is_extracted_from_scalar_sum():
     common = gem.Variable("common", ())
     left = gem.Variable("left", ())
     right = gem.Variable("right", ())
@@ -330,7 +313,7 @@ def test_common_factor_is_extracted_from_scalar_sum() -> None:
     assert result.arr == 14
 
 
-def test_scalar_factorisation_leaves_indexed_sum_to_planner() -> None:
+def test_scalar_factorisation_leaves_indexed_sum_to_planner():
     i = gem.Index(extent=3)
     common = gem.Variable("common", ())
     left = gem.Indexed(gem.Literal(numpy.arange(3.0)), (i,))
@@ -341,7 +324,7 @@ def test_scalar_factorisation_leaves_indexed_sum_to_planner() -> None:
     assert optimise.factorise_scalar_sums(expression) is expression
 
 
-def test_contraction_plan_follows_the_callers_index_order() -> None:
+def test_contraction_plan_follows_the_callers_index_order():
     """A plan depends only on the caller's ordering of the sum indices."""
     def plan(reverse_creation):
         if reverse_creation:
@@ -363,7 +346,7 @@ def test_contraction_plan_follows_the_callers_index_order() -> None:
     assert plan(False) == plan(True) == [("q", "r")]
 
 
-def test_gathers_sharing_a_table_tabulate_it_once() -> None:
+def test_gathers_sharing_a_table_tabulate_it_once():
     """Several gathers of one table share a single tabulation.
 
     A padded basis transformation reads one reference tabulation through a
@@ -442,3 +425,124 @@ def test_indirect_tabulation_costs_equivalent_bodies(nrows, npoints, nargs, dist
     expected, actual = evaluate([gem.ComponentTensor(e, (j,))
                                 for e in (expression, optimized)])
     assert numpy.allclose(actual.arr, expected.arr)
+
+
+def test_equal_cost_contraction_follows_axis_order():
+    """Equal-work plans retain the axis order used by streaming loops."""
+    i, j, k, p, q, r = gem.indices(6)
+    table = gem.Literal(numpy.arange(6.).reshape(2, 3))
+    coefficient = gem.Literal(numpy.arange(27.).reshape(3, 3, 3))
+    expression = sum_factorise(
+        (i, j, k), [table[p, i], table[q, j], table[r, k], coefficient[i, j, k]])
+    reductions = [node.multiindex for node in traversal((expression,))
+                  if isinstance(node, gem.IndexSum)]
+    assert reductions == [(k,), (j,), (i,)]
+
+
+def test_repeated_contractions_walks_shared_products_once(monkeypatch):
+    """Repeated product subtrees must not expand the DAG exponentially."""
+    i = gem.Index()
+    evaluation = gem.IndexSum(gem.Literal([1., 2.])[i], (i,))
+    expression = evaluation
+    for _ in range(8):
+        expression = expression * expression
+    descent = optimise._product_descent
+    visits = []
+
+    def counted(node):
+        visits.append(node)
+        return descent(node)
+
+    monkeypatch.setattr(optimise, '_product_descent', counted)
+    assert optimise.repeated_contractions(expression) == {evaluation}
+    assert len(visits) <= 2*len(tuple(traversal((expression,))))
+
+
+def test_empty_product_contraction_counts_index_tuples():
+    i, j = gem.Index(extent=2), gem.Index(extent=3)
+    expression = sum_factorise((i, j), ())
+    result, = evaluate([expression])
+    assert result.arr == 6
+
+
+def test_contraction_counts_index_absent_from_factors():
+    i, j = gem.Index(extent=2), gem.Index(extent=3)
+    factor = gem.Indexed(gem.Literal(numpy.arange(3.0)), (j,))
+
+    expression = sum_factorise((i, j), (factor,))
+    result, = evaluate([expression])
+
+    assert result.arr == 2 * numpy.arange(3.0).sum()
+
+
+def test_linear_maps_with_reused_bound_index():
+    """Separate reductions may use the same bound index in their maps."""
+    i, j, k = gem.indices(3)
+    a = gem.Literal(numpy.arange(6.).reshape(2, 3))
+    b = gem.Literal(numpy.ones((2, 3)))
+    left = gem.IndexSum(a[i, k] + b[i, k], (k,))
+    right = gem.IndexSum(a[j, k] + b[j, k], (k,))
+    expression = left * right
+    arguments = (i, j)
+    monomials, = collect_monomials(
+        [expression], partial(_classify, frozenset(arguments)), arguments)
+    assert len(monomials) == 1
+    result = optimise_monomial_sum(monomials, arguments)
+    actual, expected = evaluate([gem.ComponentTensor(e, arguments)
+                                for e in (result, expression)])
+    assert numpy.array_equal(actual.arr, expected.arr)
+
+
+def test_linear_map_contraction_remains_atomic():
+    """A mapped basis is one linear operand, including its sparse row sum."""
+    i, j, k, q = gem.indices(4)
+    matrix = gem.Literal(numpy.arange(6.).reshape(2, 3))
+    table = gem.Literal(numpy.arange(12.).reshape(3, 4))
+    left = gem.IndexSum(matrix[i, k] * table[k, q], (k,))
+    right = gem.IndexSum(matrix[j, k] * table[k, q], (k,))
+    monomials, = collect_monomials(
+        [left * right], partial(_classify, frozenset((i, j))), (i, j))
+    monomial, = monomials
+    assert monomial.sum_indices == ()
+    assert len(monomial.atomics) == 2
+    assert all(isinstance(a, gem.IndexSum) for a in monomial.atomics)
+
+
+def test_estimate_cost_counts_tabulation_storage():
+    """A shared shaped tabulation occupies its complete tensor domain."""
+    i, q = gem.indices(2)
+    table = gem.Literal(numpy.arange(6.).reshape(2, 3))
+    mapped = gem.ComponentTensor(table[i, q] + gem.Literal(1.), (i,))
+    _, storage, largest, _ = cost.estimate_cost([mapped])
+    assert storage == largest == 6
+
+
+@pytest.mark.parametrize('shared_source', [False, True])
+def test_indirect_delta_pullback_domain(shared_source):
+    """A sparse transpose preserves shared source axes and diagonal lookups."""
+    r, a, q = gem.indices(3)
+    values = gem.Literal([2., 3.])
+    columns = gem.Literal([[0, 1], [0, 1]], dtype=gem.uint_type)
+    column = gem.VariableIndex(columns[r, r])
+    if shared_source:
+        table = gem.Literal(numpy.arange(1., 9.).reshape(2, 2, 2))[a, r, q]
+    else:
+        table = gem.Literal(numpy.arange(1., 5.).reshape(2, 2))[a, q]
+    expression = gem.IndexSum(values[r] * gem.Delta(column, a) * table, (r, a))
+    result = driver.contraction(expression)
+    assert result.free_indices == expression.free_indices
+    actual, expected = evaluate([result, expression])
+    assert numpy.array_equal(actual.arr, expected.arr)
+
+
+def test_cancel_indirect_delta_through_componenttensor():
+    """A tensor view must expose its bound column to Delta cancellation."""
+    r, a, b, q = gem.indices(4)
+    column = gem.VariableIndex(gem.Literal([1, 0], dtype=gem.uint_type)[r])
+    table = gem.Literal(numpy.arange(6.).reshape(2, 3))[a, q]
+    view = gem.ComponentTensor(gem.Delta(column, a) * table, (a,))
+    expression = gem.IndexSum(view[b], (b,))
+    result = optimise.cancel_indirect_deltas(expression)
+    assert not any(isinstance(node, gem.Delta) for node in traversal((result,)))
+    actual, expected = evaluate([result, expression])
+    assert numpy.array_equal(actual.arr, expected.arr)

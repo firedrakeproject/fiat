@@ -9,19 +9,18 @@ live here.
 """
 
 import math
-from collections.abc import Iterable
 from functools import singledispatch
 
 import numpy
 
-from gem.gem import (Comparison, Division, Index, IndexSum, Inverse, Literal,
-                     MathFunction, MaxValue, MinValue, Node, Power, Product,
+from gem.gem import (Comparison, ComponentTensor, Division, IndexSum, Inverse, Literal,
+                     MathFunction, MaxValue, MinValue, Power, Product,
                      Solve, Sum)
 from gem.node import traversal
 
 
 @singledispatch
-def node_cost(node: Node) -> int:
+def node_cost(node):
     """Scalar operations performed by one evaluation of a GEM node.
 
     The children are not included; a caller adds them, and weighs this by
@@ -77,7 +76,7 @@ def _(node):
     return 2 * n * m + 2 * n ** 3
 
 
-def iteration_count(indices: Iterable[Index]) -> int:
+def iteration_count(indices):
     """Count the points of a rectangular iteration space.
 
     :arg indices: indices an operation depends on
@@ -86,7 +85,7 @@ def iteration_count(indices: Iterable[Index]) -> int:
     return int(numpy.prod([index.extent for index in indices], dtype=int))
 
 
-def index_space_literal(indices: Iterable[Index]) -> Literal:
+def index_space_literal(indices):
     """The cardinality of a rectangular index space, as a scalar.
 
     The empty product is one, so contracting it counts the tuples in the
@@ -98,7 +97,7 @@ def index_space_literal(indices: Iterable[Index]) -> Literal:
     return Literal(float(iteration_count(indices)))
 
 
-def operation_count(node: Node) -> int:
+def operation_count(node):
     """Estimate the scalar operations performed by one GEM node.
 
     :arg node: scalar expression node
@@ -114,7 +113,7 @@ def operation_count(node: Node) -> int:
     return node_cost(node) * iteration_count(node.free_indices)
 
 
-def has_arithmetic(expressions: Iterable[Node]) -> bool:
+def has_arithmetic(expressions):
     """Does a GEM DAG perform any scalar arithmetic?
 
     Materialising a tabulation reference buys no arithmetic, so sharing one
@@ -126,7 +125,7 @@ def has_arithmetic(expressions: Iterable[Node]) -> bool:
     return any(map(operation_count, traversal(tuple(expressions))))
 
 
-def estimate_cost(expressions: Iterable[Node]) -> tuple[int, int, int, int]:
+def estimate_cost(expressions):
     """Estimate arithmetic work and contraction storage for a GEM DAG.
 
     Each structurally shared operation counts once over the domain its free
@@ -141,8 +140,8 @@ def estimate_cost(expressions: Iterable[Node]) -> tuple[int, int, int, int]:
               storage.
     """
     nodes = tuple(traversal(tuple(expressions)))
-    sizes = [iteration_count(node.free_indices)
-             for node in nodes if isinstance(node, IndexSum)]
+    sizes = [iteration_count(node.free_indices) * math.prod(node.shape)
+             for node in nodes if isinstance(node, (IndexSum, ComponentTensor))]
     return (sum(map(operation_count, nodes)),
             sum(sizes),
             max(sizes, default=0),
