@@ -165,6 +165,9 @@ double benchmark(long n, {declarations}) {{
     subprocess.run(['cc', '-O3', '-fPIC', '-shared', str(source), '-lm',
                     '-o', str(library)], check=True, capture_output=True)
     c_compile_seconds = time.perf_counter() - started
+    sections = subprocess.check_output(['size', '-A', str(library)], text=True)
+    text_bytes = sum(int(fields[1]) for line in sections.splitlines()
+                     if (fields := line.split()) and fields[0] == '.text')
     loaded = ctypes.CDLL(str(library))
     native = getattr(loaded, kernel.name)
     native.argtypes = [ctypes.c_void_p]*len(arrays)
@@ -191,6 +194,8 @@ double benchmark(long n, {declarations}) {{
                 loop_count=len(loops), iname_count=len(
                     kernel.ast.default_entrypoint.all_inames()), flops=flops, impero_flops=float(kernel.flop_count),
                 c_lines=len(code.splitlines()), c_bytes=len(code.encode()),
+                native_library_bytes=library.stat().st_size,
+                native_text_bytes=text_bytes,
                 temporary_scalars=storage, tsfc_seconds=compile_seconds,
                 cc_seconds=c_compile_seconds, native_seconds=min(samples),
                 batch_seconds=samples, repetitions=n)
