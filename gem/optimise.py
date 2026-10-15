@@ -228,12 +228,13 @@ def constant_fold_zero(exprs):
     return list(map(mapper, exprs))
 
 
-def _select_expression(expressions, index):
+def _select_expression(expressions, self, index):
     """Helper function to select an expression from a list of
     expressions with an index.  This function expect sanitised input,
     one should normally call :py:func:`select_expression` instead.
 
     :arg expressions: a list of expressions
+    :arg self: memoizer sharing selections of repeated subexpressions
     :arg index: an index (free, fixed or variable)
     :returns: an expression
     """
@@ -252,7 +253,7 @@ def _select_expression(expressions, index):
                 return expression.children[0]
             elif isinstance(expression, Zero):
                 return Zero(shape)
-        return Indexed(_select_expression(list(map(child, expressions)), index), multiindex)
+        return Indexed(self(tuple(map(child, expressions)), index), multiindex)
 
     if types <= {Literal, Zero, Failure}:
         return partial_indexed(ListTensor(expressions), (index,))
@@ -261,7 +262,7 @@ def _select_expression(expressions, index):
         shape, = set(e.shape for e in expressions)
         multiindex = tuple(Index(extent=d) for d in shape)
         children = remove_componenttensors([Indexed(e, multiindex) for e in expressions])
-        return ComponentTensor(_select_expression(children, index), multiindex)
+        return ComponentTensor(self(tuple(children), index), multiindex)
 
     if types == {Delta}:
         if all(e.i == k and e.j == expr.j for k, e in enumerate(expressions)):
@@ -276,7 +277,7 @@ def _select_expression(expressions, index):
             summands = [Indexed(ComponentTensor(e.children[0], e.multiindex),
                                 multiindex)
                         for e in expressions]
-            return IndexSum(_select_expression(summands, index), multiindex)
+            return IndexSum(self(tuple(summands), index), multiindex)
 
     if len(types) == 1:
         cls, = types
@@ -287,7 +288,7 @@ def _select_expression(expressions, index):
                         for name in attributes)
                 for e in expressions)):
             return expr.reconstruct(*(
-                _select_expression(nth_children, index)
+                self(nth_children, index)
                 for nth_children in zip(*(e.children for e in expressions))))
 
     # Different facet expressions can always be selected as tensor entries.
@@ -315,7 +316,7 @@ def select_expression(expressions, index):
     exprs = remove_componenttensors([Indexed(e, alpha) for e in expressions])
 
     # Factor the expressions recursively and convert result
-    selected = _select_expression(exprs, index)
+    selected = MemoizerArg(_select_expression)(tuple(exprs), index)
     return ComponentTensor(selected, alpha)
 
 
