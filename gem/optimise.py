@@ -591,9 +591,12 @@ def _plan_contraction(sum_indices, groups):
         reducible[subset] = frozenset(index for index in sum_indices
                                       if not incidence[index] & ~subset)
 
+    # Rank of each contraction index in the caller's ordering, to break ties.
+    position = {index: n for n, index in enumerate(sum_indices)}
+
     def order(indices):
         """Sum out the widest index first, breaking ties reproducibly."""
-        return tuple(sorted(indices, key=lambda i: (-i.extent, i.count)))
+        return tuple(sorted(indices, key=lambda i: (-i.extent, position[i])))
 
     def reduce_indices(free, indices):
         """Sum out indices, largest extent first, costing each reduction."""
@@ -1258,4 +1261,144 @@ def aggressive_unroll(expression):
     # Unroll summation
     expression, = unroll_indexsum((expression,), predicate=lambda index: True)
     expression, = remove_componenttensors((expression,))
+    return expression
+
+
+def factorise_scalar_sums(expression):
+    """Factor common products from scalar sums when this lowers GEM cost.
+
+    Scalar geometry and basis-transformation expressions are simplified below
+    the indexed contraction structure.  Contractions are indivisible factors:
+    their bound indices cannot move through an enclosing sum.  Sums carrying
+    free indices are left to the contraction planner, whose cost model
+    includes their iteration domains.
+
+    :arg expression: root of a GEM expression
+    :returns: the expression with profitable common product factors extracted
+    """
+    def choose(node):
+        if node.free_indices:
+            return node
+        summands = traverse_sum(node)
+        if len(summands) < 2:
+            return node
+
+        factorisations = []
+        for summand in summands:
+            _, factors = traverse_product(
+                summand,
+                stop_at=lambda factor: isinstance(factor, IndexSum),
+            )
+            factorisations.append(factors)
+
+        common = Counter(factorisations[0])
+        for factors in factorisations[1:]:
+            common &= Counter(factors)
+        if not common:
+            return node
+
+        common_factors = list(common.elements())
+        remainders = []
+        for factors in factorisations:
+            remaining_common = common.copy()
+            remaining = []
+            for factor in factors:
+                if remaining_common[factor]:
+                    remaining_common[factor] -= 1
+                else:
+                    remaining.append(factor)
+            remainders.append(make_product(remaining))
+
+        candidate = make_product(
+            (*common_factors, make_sum(remainders)))
+        if candidate.free_indices != node.free_indices:
+            return node
+        if estimate_cost((candidate,)) < estimate_cost((node,)):
+            return candidate
+        return node
+
+    def visit(node, self):
+        node = reuse_if_untouched(node, self)
+        if isinstance(node, Sum):
+            node = choose(node)
+        return node
+
+    return Memoizer(visit)(expression)
+
+
+def _indirect_gathers(expression):
+    """Find the maps that an expression reads tables through.
+
+    :arg expression: the root of a scalar GEM expression
+    :returns: an ordered mapping from each :class:`~.VariableIndex` that
+              indexes a table to the number of rows it selects from
+    """
+    gathers = OrderedDict()
+    for node in traversal((expression,)):
+        if isinstance(node, Indexed):
+            aggregate, = node.children
+            for index, extent in zip(node.multiindex, aggregate.shape):
+                if isinstance(index, VariableIndex) and index.expression.free_indices:
+                    gathers.setdefault(index, extent)
+    return gathers
+
+
+def tabulate_indirect_contractions(expression):
+    """Evaluate a contraction one time for each row of its table.
+
+    An expression can read a table through a map.  Each argument of the map
+    selects one row, and two arguments can select the same row.  A
+    contraction that reads the table through the map thus repeats work.
+
+    This function evaluates the contraction for each row, then reads those
+    results through the map.  The rewrite is correct only if the map does not
+    change with the contracted indices, and no other part of the contraction
+    uses the argument.  It is faster only when the gathers that share a
+    tabulation have more arguments between them than the table has rows.
+
+    :arg expression: the root of a scalar GEM expression
+    :returns: the expression with each such contraction evaluated one time
+              for each row
+    """
+    gathers = _indirect_gathers(expression)
+    if not gathers:
+        return expression
+
+    row_indices = {}
+    candidates = OrderedDict()
+
+    def rename(node, self, substitution):
+        target, replacement = substitution
+        if isinstance(node, Indexed):
+            aggregate, = node.children
+            multiindex = tuple(replacement if index == target else index
+                               for index in node.multiindex)
+            return Indexed(self(aggregate, substitution), multiindex)
+        return reuse_if_untouched_arg(node, self, substitution)
+
+    for node in traversal((expression,)):
+        if not isinstance(node, IndexSum):
+            continue
+        body, = node.children
+        free = frozenset(body.free_indices)
+        contracted = frozenset(node.multiindex)
+        for gather, nrows in gathers.items():
+            arguments = frozenset(gather.expression.free_indices)
+            if not (arguments <= free and arguments.isdisjoint(contracted)):
+                continue
+            row = row_indices.setdefault(nrows, Index(extent=nrows))
+            per_row = MemoizerArg(rename)(body, (gather, row))
+            if arguments.isdisjoint(per_row.free_indices):
+                table = ComponentTensor(IndexSum(per_row, node.multiindex), (row,))
+                candidates.setdefault(table, {})[node] = Indexed(table, (gather,))
+
+    for replacements in candidates.values():
+        def replace(node, self):
+            if node in replacements:
+                return replacements[node]
+            return reuse_if_untouched(node, self)
+
+        candidate = Memoizer(replace)(expression)
+        if estimate_cost((candidate,)) < estimate_cost((expression,)):
+            expression = candidate
     return expression
