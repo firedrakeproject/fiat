@@ -162,7 +162,7 @@ def make_index_orderer(index_ordering):
     return apply_ordering
 
 
-def _misread_views(ops):
+def _misread_views(expressions, ops):
     """Find the tensors that a statement cannot read through a view.
 
     A reduction view names no storage of its own, so a consumer of an
@@ -173,9 +173,15 @@ def _misread_views(ops):
     consumer may read the reduction directly, however many there are, as
     the reduction keeps its own temporary.
 
+    :arg expressions: a multi-root GEM expression DAG
     :arg ops: ordered list of Impero terminals
     :returns: the set of ComponentTensors that need their own storage
     """
+    misread = {child for node in traversal(expressions)
+               for child in node.children
+               if isinstance(child, gem.ComponentTensor)
+               and not isinstance(node, gem.Indexed)}
+
     statements = {}
     for op in ops:
         if isinstance(op, imp.Evaluate):
@@ -190,21 +196,20 @@ def _misread_views(ops):
         elif isinstance(op, imp.Return):
             statements[op.expression] = set(op.expression.free_indices)
 
-    misread = set()
     for root, loops in statements.items():
         seen = set()
-        stack = list(root.children)
+        stack = [root]
         while stack:
             node = stack.pop()
             if node in seen:
                 continue
             seen.add(node)
-            for child in node.children:
-                if isinstance(child, gem.ComponentTensor) and not (
-                        isinstance(node, gem.Indexed)
-                        and (node.multiindex == child.multiindex
-                             or loops.isdisjoint(child.multiindex))):
-                    misread.add(child)
+            if isinstance(node, gem.Indexed):
+                view, = node.children
+                if (isinstance(view, gem.ComponentTensor)
+                        and node.multiindex != view.multiindex
+                        and not loops.isdisjoint(view.multiindex)):
+                    misread.add(view)
             stack.extend(child for child in node.children
                          if child not in statements)
     return misread
@@ -223,7 +228,7 @@ def inline_temporaries(expressions, ops):
     refcount = collect_refcount(expressions)
 
     candidates = set()  # candidates for inlining
-    misread = _misread_views(ops)
+    misread = _misread_views(expressions, ops)
     for op in ops:
         if isinstance(op, imp.Evaluate):
             expr = op.expression
