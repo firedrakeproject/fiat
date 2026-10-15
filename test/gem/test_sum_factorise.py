@@ -583,3 +583,12 @@ def test_reduction_view_read_elsewhere_keeps_its_storage():
     value = gem.Product(gem.Indexed(gem.Variable('w', (3,)), (m,)),
                         gem.Indexed(view, (k,)))
     assert stored_tensors([(v, value)], (m, k))
+
+
+def test_reduction_view_read_whole_keeps_its_storage():
+    """A view read whole, as a FlexiblyIndexed reshape, keeps its storage."""
+    view, m = reduction_view()
+    i = gem.Index(extent=3)
+    u = gem.Indexed(gem.Variable('u', (3,)), (i,))
+    value = gem.FlexiblyIndexed(view, ((0, ((i, 1),)),))
+    assert stored_tensors([(u, value)], (i,))
