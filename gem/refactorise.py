@@ -7,12 +7,13 @@ from itertools import product
 from sys import intern
 
 from gem.node import Memoizer, MemoizerArg, traversal
+from gem.cost import index_space_literal
 from gem.gem import (Node, Conditional, IndexSum, Zero, Product, Sum,
                      Indexed, ListTensor, one, MathFunction)
-from gem.optimise import (delta_elimination, filtered_replace_indices, index_space_literal,
-                          remove_componenttensors, sum_factorise,
-                          traverse_product, traverse_sum, unroll_indexsum,
-                          make_rename_map, make_renamer)
+from gem.optimise import (delta_elimination, filtered_replace_indices,
+                          is_linear_map, remove_componenttensors,
+                          sum_factorise, traverse_product, traverse_sum,
+                          unroll_indexsum, make_rename_map, make_renamer)
 
 
 # Refactorisation labels
@@ -311,23 +312,27 @@ def _collect_monomials_conditional(expression, self):
     return result
 
 
-def collect_monomials(expressions, classifier):
-    """Refactorises expressions into a sum-of-products form, using
-    distributivity rules (i.e. a*(b + c) -> a*b + a*c).  Expansion
-    proceeds until all "compound" expressions are broken up.
+def collect_monomials(expressions, classifier, linear_indices=()):
+    """Collect expressions as sums of products using a node classifier.
 
     :arg expressions: GEM expressions to refactorise
-    :arg classifier: a function that can classify any GEM expression
-                     as ``ATOMIC``, ``COMPOUND``, or ``OTHER``.  This
-                     classification drives the factorisation.
+    :arg classifier: function labelling nodes ATOMIC, COMPOUND, or OTHER
+    :arg linear_indices: argument indices whose linear maps remain atomic
+    :returns: one :class:`MonomialSum` per expression
 
-    :returns: list of :py:class:`MonomialSum`s
-
-    :raises FactorisationError: Failed to break up some "compound"
-                                expressions with expansion.
+    A sum depending on one argument index is a linear map of that argument.
+    Keeping it atomic exposes equivalent test and trial tabulations to sharing.
+    Sums involving several arguments are distributed by the ordinary collector.
     """
-    # Get ComponentTensors out of the way
-    expressions = remove_componenttensors(expressions)
+    expressions = remove_componenttensors(tuple(expressions))
+    linear_indices = frozenset(linear_indices)
+    if linear_indices:
+        original_classifier = classifier
+
+        def classifier(node):
+            if is_linear_map(node, linear_indices):
+                return ATOMIC
+            return original_classifier(node)
 
     # Get ListTensors out of the way
     must_unroll = []  # indices to unroll
