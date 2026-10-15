@@ -26,6 +26,7 @@ from .christiansen_hu import ChristiansenHu                        # noqa: F401
 from .c2_elements import AlfeldC2, BrambleZlamalC2                 # noqa: F401
 from .alfeld_sorokina import AlfeldSorokina                        # noqa: F401
 from .guzman_neilan import GuzmanNeilanFirstKindH1, GuzmanNeilanSecondKindH1, GuzmanNeilanBubble, GuzmanNeilanH1div  # noqa: F401
+from .hu_zhang_zhang import HuZhangZhang                           # noqa: F401
 from .powell_sabin import QuadraticPowellSabin6, QuadraticPowellSabin12  # noqa: F401
 from .hermite import Hermite                                       # noqa: F401
 from .johnson_mercier import JohnsonMercier                        # noqa: F401
