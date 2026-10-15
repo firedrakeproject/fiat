@@ -280,3 +280,93 @@ def test_distributed_linear_map_preserves_multiplicity(extent):
     optimized = optimise_monomial_sum(monomials, arguments)
     actual, = evaluate([gem.ComponentTensor(optimized, arguments)])
     assert numpy.array_equal(actual.arr, numpy.full((2, 2), 3 * extent))
+
+
+def test_equal_cost_contraction_follows_axis_order():
+    """Equal-work plans retain the axis order used by streaming loops."""
+    i, j, k, p, q, r = gem.indices(6)
+    table = gem.Literal(numpy.arange(6.).reshape(2, 3))
+    coefficient = gem.Literal(numpy.arange(27.).reshape(3, 3, 3))
+    expression = sum_factorise(
+        (i, j, k), [table[p, i], table[q, j], table[r, k], coefficient[i, j, k]])
+    reductions = [node.multiindex for node in traversal((expression,))
+                  if isinstance(node, gem.IndexSum)]
+    assert reductions == [(k,), (j,), (i,)]
+
+
+def test_repeated_contractions_walks_shared_products_once(monkeypatch):
+    """Repeated product subtrees must not expand the DAG exponentially."""
+    i = gem.Index()
+    evaluation = gem.IndexSum(gem.Literal([1., 2.])[i], (i,))
+    expression = evaluation
+    for _ in range(8):
+        expression = expression * expression
+    descent = optimise._product_descent
+    visits = []
+
+    def counted(node):
+        visits.append(node)
+        return descent(node)
+
+    monkeypatch.setattr(optimise, '_product_descent', counted)
+    assert optimise.repeated_contractions(expression) == {evaluation}
+    assert len(visits) <= 2*len(tuple(traversal((expression,))))
+
+
+def test_empty_product_contraction_counts_index_tuples():
+    i, j = gem.Index(extent=2), gem.Index(extent=3)
+    expression = sum_factorise((i, j), ())
+    result, = evaluate([expression])
+    assert result.arr == 6
+
+
+def test_contraction_counts_index_absent_from_factors():
+    i, j = gem.Index(extent=2), gem.Index(extent=3)
+    factor = gem.Indexed(gem.Literal(numpy.arange(3.0)), (j,))
+
+    expression = sum_factorise((i, j), (factor,))
+    result, = evaluate([expression])
+
+    assert result.arr == 2 * numpy.arange(3.0).sum()
+
+
+def test_linear_maps_with_reused_bound_index():
+    """Separate reductions may use the same bound index in their maps."""
+    i, j, k = gem.indices(3)
+    a = gem.Literal(numpy.arange(6.).reshape(2, 3))
+    b = gem.Literal(numpy.ones((2, 3)))
+    left = gem.IndexSum(a[i, k] + b[i, k], (k,))
+    right = gem.IndexSum(a[j, k] + b[j, k], (k,))
+    expression = left * right
+    arguments = (i, j)
+    monomials, = collect_monomials(
+        [expression], partial(_classify, frozenset(arguments)), arguments)
+    assert len(monomials) == 1
+    result = optimise_monomial_sum(monomials, arguments)
+    actual, expected = evaluate([gem.ComponentTensor(e, arguments)
+                                for e in (result, expression)])
+    assert numpy.array_equal(actual.arr, expected.arr)
+
+
+def test_linear_map_contraction_remains_atomic():
+    """A mapped basis is one linear operand, including its sparse row sum."""
+    i, j, k, q = gem.indices(4)
+    matrix = gem.Literal(numpy.arange(6.).reshape(2, 3))
+    table = gem.Literal(numpy.arange(12.).reshape(3, 4))
+    left = gem.IndexSum(matrix[i, k] * table[k, q], (k,))
+    right = gem.IndexSum(matrix[j, k] * table[k, q], (k,))
+    monomials, = collect_monomials(
+        [left * right], partial(_classify, frozenset((i, j))), (i, j))
+    monomial, = monomials
+    assert monomial.sum_indices == ()
+    assert len(monomial.atomics) == 2
+    assert all(isinstance(a, gem.IndexSum) for a in monomial.atomics)
+
+
+def test_estimate_cost_counts_tabulation_storage():
+    """A shared shaped tabulation occupies its complete tensor domain."""
+    i, q = gem.indices(2)
+    table = gem.Literal(numpy.arange(6.).reshape(2, 3))
+    mapped = gem.ComponentTensor(table[i, q] + gem.Literal(1.), (i,))
+    _, storage, largest, _ = cost.estimate_cost([mapped])
+    assert storage == largest == 6

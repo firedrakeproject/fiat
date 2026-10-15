@@ -201,31 +201,15 @@ def factorise_atomics(monomials, optimal_atomics, linear_indices):
     return new_monomials
 
 
-def _share_linear_maps(
-        monomial_sum: MonomialSum,
-        linear_indices: tuple[Index, ...]) -> MonomialSum:
-    """Share isomorphic maps of distinct multilinear axes.
+def _share_linear_maps(monomial_sum, linear_indices):
+    """Share equivalent linear maps of distinct form arguments.
 
-    Parameters
-    ----------
-    monomial_sum
-        Sum-of-products representation of a multilinear expression.
-    linear_indices
-        Free indices identifying argument axes.
+    Test and trial tabulations use different argument indices. Replacing each
+    with a common index exposes equal maps, which can be tabulated once.
 
-    Returns
-    -------
-    MonomialSum
-        Representation whose repeated linear maps access one tensor.
-
-    Notes
-    -----
-    Test and trial axes use distinct indices even when they apply the same
-    finite element map.  Renaming each axis to a canonical index exposes
-    that isomorphism without inspecting the element family.  Materialising
-    the canonical map is generalised code motion: the basis transformation
-    is evaluated once and both axes index its result.
-
+    :arg monomial_sum: sum of products representing a multilinear expression
+    :arg linear_indices: argument indices
+    :returns: monomial sum whose equivalent maps index the same tensor
     """
     linear_indices = tuple(linear_indices)
     linear_set = frozenset(linear_indices)
