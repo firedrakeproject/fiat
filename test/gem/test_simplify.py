@@ -118,3 +118,22 @@ def test_select_facet_expression(kind):
     actual, = evaluate([selected], {x: numpy.asarray(9.)})
     expected = evaluate(expressions, {x: numpy.asarray(9.)})
     assert numpy.array_equal(actual.arr, [value.arr for value in expected])
+
+
+def test_select_shared_expression_dag(monkeypatch):
+    """Facet selection visits shared products without expanding the DAG."""
+    from gem.optimise import select_expression
+
+    expressions = [gem.Variable('a', ()), gem.Variable('b', ())]
+    for _ in range(8):
+        expressions = [e*e for e in expressions]
+    reconstruct = gem.Product.reconstruct
+    visits = []
+
+    def counted(node, *children):
+        visits.append(node)
+        return reconstruct(node, *children)
+
+    monkeypatch.setattr(gem.Product, 'reconstruct', counted)
+    select_expression(expressions, gem.Index(extent=2))
+    assert len(visits) <= 8
