@@ -8,13 +8,13 @@ from numbers import Integral
 
 import numpy
 
-from gem.cost import index_space_literal, iteration_count
+from gem.cost import estimate_cost, index_space_literal, iteration_count
 from gem.utils import groupby
 from gem.node import (Memoizer, MemoizerArg, reuse_if_untouched,
                       reuse_if_untouched_arg, traversal, traversal_children)
 from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
                      Product, Sum, Comparison, Conditional, Division,
-                     Index, IndexBase, VariableIndex, Indexed, FlexiblyIndexed,
+                     Index, VariableIndex, Indexed, FlexiblyIndexed,
                      IndexSum, ComponentTensor, ListTensor, Delta,
                      partial_indexed, one)
 
@@ -850,11 +850,11 @@ def repeated_contractions(expression):
                      if count > 1 and isinstance(expr, IndexSum))
 
 
-def _indirect_delta_axes(node: Node, self: Memoizer) -> frozenset:
+def _indirect_delta_axes(node, self):
     """The axes compared by the indirect Deltas below a node, including its own.
 
     An indirect Delta compares a :class:`~.VariableIndex`, and is the only
-    kind `cancel_nested_deltas` cancels.  Memoising this over the DAG keeps
+    kind `cancel_indirect_deltas` cancels.  Memoising this over the DAG keeps
     the search for one linear, rather than re-walking the subtree at every
     enclosing contraction.
 
@@ -869,20 +869,12 @@ def _indirect_delta_axes(node: Node, self: Memoizer) -> frozenset:
     return axes
 
 
-def _constant_map(index: IndexBase) -> tuple | None:
-    """The literal table behind a VariableIndex, and the indices addressing it.
+def _constant_map(index):
+    """Find a constant lookup table and its indexing axes.
 
-    Parameters
-    ----------
-    index
-        Index to inspect.
-
-    Returns
-    -------
-    tuple or None
-        ``(array, indices)`` when the index is a lookup into a Literal with a
-        plain multiindex, otherwise None.
-
+    :arg index: a plain or indirect index
+    :returns: (array, multiindex) for an indirect lookup into a Literal,
+              otherwise None
     """
     if not isinstance(index, VariableIndex):
         return None
@@ -897,19 +889,16 @@ def _constant_map(index: IndexBase) -> tuple | None:
     return table.array, expression.multiindex
 
 
-def pull_back_indirect_delta(
-        sum_indices: Iterable[Index],
-        factors: Iterable[Node],
-        replacer: MemoizerArg) -> tuple:
+def pull_back_indirect_delta(sum_indices, factors, replacer):
     """Contract an indirect Delta's own axes before its column axis.
 
     ``sum_a (sum_rk v(r,k) delta(c(r,k), a)) T(a, q)`` is cancelled by
     `delta_elimination` substituting ``a := c(r,k)``, which makes ``T``
     depend on ``r`` and ``k`` and so forces that contraction inside the ``q``
     loop.  When ``r`` and ``k`` are contracted here and ``T`` carries indices
-    of its own, summing them first is cheaper: it yields a dense vector
-    indexed by ``a``.  Run this before `delta_elimination` to take that
-    cheaper route where it exists.
+    of its own, summing them first can be cheaper: it yields a dense vector
+    indexed by ``a``. Compare the gathered and dense contractions using the
+    same arithmetic and storage model as linear-map preservation.
 
     :arg sum_indices: indices contracted over the product
     :arg factors: product factors
@@ -937,6 +926,9 @@ def pull_back_indirect_delta(
         pulled = [f for f in others if column not in f.free_indices]
         if not spanning or not pulled:
             continue
+        # A factor depending on a source axis must remain inside its sum.
+        if any(sources.intersection(f.free_indices) for f in spanning):
+            continue
         # Cancelling couples the spanning factors to the source indices.  That
         # only costs anything when they carry indices of their own.
         if not any(set(f.free_indices) - sources - {column} for f in spanning):
@@ -944,9 +936,11 @@ def pull_back_indirect_delta(
 
         vector = numpy.empty(column.extent, dtype=object)
         contributions = defaultdict(list)
-        for position in numpy.ndindex(table.shape):
-            substitution = tuple(zip(source_indices, (int(p) for p in position)))
-            contributions[int(table[position])].append(substitution)
+        axes = tuple(dict.fromkeys(source_indices))
+        for position in numpy.ndindex(*(i.extent for i in axes)):
+            substitution = tuple(zip(axes, position))
+            lookup_position = tuple(position[axes.index(i)] for i in source_indices)
+            contributions[int(table[lookup_position])].append(substitution)
         for value in range(column.extent):
             terms = [make_product([replacer(f, substitution) for f in pulled])
                      for substitution in contributions.get(value, ())]
@@ -955,28 +949,37 @@ def pull_back_indirect_delta(
             vector[value] = make_sum(terms) if terms else Zero()
 
         rest = tuple(i for i in sum_indices if i not in sources)
-        return rest, [Indexed(ListTensor(vector), (column,)), *spanning]
+        dense_factors = [Indexed(ListTensor(vector), (column,)), *spanning]
+        # Compare the two ordinary contractions after cancelling the Delta.
+        # Restrictions can make gathering cheaper than a dense pullback.
+        gathered_indices, gathered_factors = delta_elimination(
+            sum_indices, factors, index_replacer=replacer)
+        gathered_factors = [replacer(f, ()) for f in gathered_factors]
+        gathered = sum_factorise(gathered_indices, gathered_factors)
+        dense = sum_factorise(rest, dense_factors)
+        if estimate_cost((dense,)) < estimate_cost((gathered,)):
+            return rest, dense_factors
 
     return sum_indices, factors
 
 
-def cancel_nested_deltas(expression: Node) -> Node:
-    """Cancel the indirect Deltas at every contraction of a whole DAG.
+def cancel_indirect_deltas(expression):
+    """Cancel indirect Deltas throughout a GEM expression DAG.
 
     `delta_elimination` only inspects top-level product factors, so a Delta
     inside a preserved linear map is invisible to it.  Flattening the product
     tree first exposes it, and hoists the contractions it sits under so that
     substituting the Delta's variable index cannot capture them.
 
-    A Delta comparing a :class:`~.VariableIndex` is the only kind handled
-    here.  It is the only kind that has to be: nothing downstream can lower
-    one.  A Delta between two plain indices is left to monomial collection,
-    which cancels it knowing what the substitution costs there.
+    Only Deltas comparing a :class:`~.VariableIndex` are handled here.
+    Cancelling them avoids materialising an identity tensor for an indirect
+    lookup. Plain-index Deltas remain available to monomial collection.
 
     :arg expression: root of a scalar GEM expression
     :returns: the expression with those Deltas cancelled
     """
     replacer = MemoizerArg(filtered_replace_indices)
+    expression = replacer(expression, ())
     delta_axes = Memoizer(_indirect_delta_axes)
 
     def visit(node, self):

@@ -727,8 +727,9 @@ class Indexed(Scalar):
                 C, = B.children
                 kk = B.multiindex
                 ff = C.free_indices
-                if not any((j in ff) for j in jj):
-                    # Only replace indices that are not present in C
+                if not any((j in ff) for j in jj) and not B.indirect_children:
+                    # Renaming indirect lookups requires substituting inside
+                    # their expressions, which replace_indices handles.
                     rep = dict(zip(jj, ii))
                     ll = tuple(rep.get(k, k) for k in kk)
                     aggregate = C
