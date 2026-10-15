@@ -95,3 +95,16 @@ def test_rename_indirect_componenttensor():
     expression, = remove_componenttensors([expression])
     result, = evaluate([expression])
     assert numpy.array_equal(result.arr, [6., 4., 5.])
+
+
+def test_index_ordering_follows_indirect_lookup():
+    """A lookup orders its running indices as it indexes them."""
+    k, r = gem.indices(2)
+    columns = gem.Literal(numpy.zeros((3, 2)), dtype=gem.uint_type)
+    lookup = gem.VariableIndex(gem.Indexed(columns, (r, k)))
+    j = gem.Index(extent=4)
+    indexed = gem.Indexed(gem.Variable('A', (5, 4)), (lookup, j))
+    assert indexed.index_ordering() == (r, k, j)
+    flexibly_indexed = gem.FlexiblyIndexed(
+        gem.Variable('B', (20,)), ((0, ((lookup, 4), (j, 1))),))
+    assert flexibly_indexed.index_ordering() == (r, k, j)

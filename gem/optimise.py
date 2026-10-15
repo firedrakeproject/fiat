@@ -2,7 +2,7 @@
 expressions."""
 
 from collections import Counter, OrderedDict, defaultdict
-from functools import singledispatch, partial
+from functools import lru_cache, singledispatch, partial
 from itertools import combinations, permutations, zip_longest
 from numbers import Integral
 
@@ -183,6 +183,37 @@ def filtered_replace_indices(node, self, subst):
         raise NotImplementedError("Can not replace VariableIndex (will need inverse)")
     filtered_subst = tuple((k, v) for k, v in subst if k in node.free_indices)
     return replace_indices(node, self, filtered_subst)
+
+
+@lru_cache(maxsize=None)
+def _canonical_index(depth, extent):
+    """The bound index at a binding depth in every canonical form."""
+    return Index(extent=extent)
+
+
+def canonical_bound_indices(expression):
+    """Rename the bound indices of an expression by their binding depth.
+
+    Expressions that differ only in the names of their bound indices have
+    equal canonical forms, so the canonical form can identify an expression.
+    All canonical forms share their bound indices, so they are not meant for
+    code generation.
+
+    :arg expression: a GEM expression
+    :returns: the expression with canonically named bound indices
+    """
+    replacer = MemoizerArg(filtered_replace_indices)
+
+    def canonicalise(node, self, depth):
+        if isinstance(node, (ComponentTensor, IndexSum)):
+            multiindex = tuple(_canonical_index(depth + position, index.extent)
+                               for position, index in enumerate(node.multiindex))
+            child, = node.children
+            child = replacer(child, tuple(zip(node.multiindex, multiindex)))
+            return type(node)(self(child, depth + len(multiindex)), multiindex)
+        return reuse_if_untouched_arg(node, self, depth)
+
+    return MemoizerArg(canonicalise)(expression, 0)
 
 
 def remove_componenttensors(expressions, subst=()):

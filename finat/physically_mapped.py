@@ -1,9 +1,10 @@
 from abc import ABCMeta, abstractmethod
 from collections.abc import Mapping
-from functools import cached_property
 
 import gem
 import numpy
+
+from gem.optimise import canonical_bound_indices
 
 from finat.citations import cite
 
@@ -20,68 +21,43 @@ class NeedsCoordinateMappingElement(metaclass=ABCMeta):
         raise NotImplementedError(f"Dual evaluation for {type(self).__name__} is not implemented.")
 
 
-class MappedTabulation(Mapping):
-    """Apply a sparse basis transformation to reference tabulations.
+class SparseRows:
+    """Rows of a sparse basis transformation, padded to a common width.
 
-    Rows are padded to a common width. Constant tables select the reference
-    columns and symbolic coefficients; equal coefficients share one slot.
+    A constant table holds the reference column of each padded entry, and a
+    tensor holds the matching coefficients, with zeros in the padding.
 
     :arg M: basis transformation as a gem.ListTensor
-    :arg ref_tabulation: reference tabulations indexed by derivative order
-    :arg indices: optional rows retained by an element restriction
+    :arg rows: optional rows retained by an element restriction
     """
 
-    def __init__(self, M, ref_tabulation, indices=None):
-        self.ref_tabulation = ref_tabulation
-        if indices is None:
-            indices = range(M.shape[0])
-        self.indices = tuple(indices)
-        self._space_dimension = len(self.indices)
-        self._reference_dimension = M.shape[1]
-
+    def __init__(self, M, rows=None):
+        if rows is None:
+            rows = range(M.shape[0])
         nonzero_rows = []
-        for source_row in self.indices:
-            row = []
+        for row in rows:
+            entries = []
             for column in range(M.shape[1]):
-                value = M.array[source_row, column]
+                value = M.array[row, column]
                 if not isinstance(value, gem.Zero):
-                    row.append((column, value))
-            nonzero_rows.append(row)
-        width = max((len(row) for row in nonzero_rows), default=0)
-        nrows = len(self.indices)
-        columns = numpy.zeros((nrows, width), dtype=gem.uint_type)
-        data = numpy.full((nrows, width), zero, dtype=object)
-        for index, row in enumerate(nonzero_rows):
-            columns[index, :len(row)] = tuple(column for column, _ in row)
-            data[index, :len(row)] = tuple(gem.as_gem(value) for _, value in row)
-        self._width = width
-        self._columns = gem.Literal(columns, dtype=gem.uint_type)
-        values = []
-        value_numbers = {}
-        value_indices = numpy.empty(data.shape, dtype=gem.uint_type)
-        for multiindex, value in numpy.ndenumerate(data):
-            try:
-                number = value_numbers[value]
-            except KeyError:
-                number = len(values)
-                value_numbers[value] = number
-                values.append(value)
-            value_indices[multiindex] = number
-        self._value_indices = gem.Literal(value_indices, dtype=gem.uint_type)
-        self._values = gem.ListTensor(values)
-        self._tabulation_cache = {}
+                    entries.append((column, value))
+            nonzero_rows.append(entries)
+        width = max((len(entries) for entries in nonzero_rows), default=0)
+        columns = numpy.zeros((len(rows), width), dtype=gem.uint_type)
+        coefficients = numpy.full((len(rows), width), zero, dtype=object)
+        for row, entries in enumerate(nonzero_rows):
+            columns[row, :len(entries)] = tuple(column for column, _ in entries)
+            coefficients[row, :len(entries)] = tuple(
+                gem.as_gem(value) for _, value in entries)
+        self.columns = gem.Literal(columns, dtype=gem.uint_type)
+        self.coefficients = gem.ListTensor(coefficients)
+        # Every tabulation mapped by these rows binds the same indices, so
+        # equal mappings of different tabulations share their loops.
+        self.row_index = gem.Index(extent=len(rows))
+        self.entry_index = gem.Index(extent=width)
+        self.reference_index = gem.Index(extent=M.shape[1])
 
-    @cached_property
-    def _reference_index(self):
-        """Index over the reference basis, shared by all tabulations."""
-        return gem.Index(extent=self._reference_dimension)
-
-    @cached_property
-    def _entry_index(self):
-        """Index over the padded entries of a matrix row."""
-        return gem.Index(extent=self._width)
-
-    def _entry(self, r, a):
+    def entry(self, r, a):
         """Entry M[r, a] of the sparse basis transformation.
 
         Sum over the padded row, using a Delta to select each reference column.
@@ -91,27 +67,38 @@ class MappedTabulation(Mapping):
         :arg a: index over the reference basis
         :returns: scalar GEM expression for the matrix entry
         """
-        k = self._entry_index
-        entry = gem.Indexed(
-            self._values,
-            (gem.VariableIndex(gem.Indexed(self._value_indices, (r, k))),))
-        column = gem.VariableIndex(gem.Indexed(self._columns, (r, k)))
-        return gem.IndexSum(gem.Product(entry, gem.Delta(column, a)), (k,))
+        k = self.entry_index
+        coefficient = gem.Indexed(self.coefficients, (r, k))
+        column = gem.VariableIndex(gem.Indexed(self.columns, (r, k)))
+        return gem.IndexSum(gem.Product(coefficient, gem.Delta(column, a)), (k,))
 
     def matmul(self, table):
         """Apply the basis transformation to a reference tabulation."""
-        r = gem.Index(extent=self._space_dimension)
-        a = self._reference_index
+        r = self.row_index
+        a = self.reference_index
         tail = gem.indices(len(table.shape) - 1)
         mapped = gem.IndexSum(
-            gem.Product(self._entry(r, a), gem.Indexed(table, (a, *tail))), (a,))
+            gem.Product(self.entry(r, a), gem.Indexed(table, (a, *tail))), (a,))
         return gem.ComponentTensor(mapped, (r, *tail))
+
+
+class MappedTabulation(Mapping):
+    """Apply a sparse basis transformation to reference tabulations.
+
+    :arg rows: rows of the basis transformation as a SparseRows
+    :arg ref_tabulation: reference tabulations indexed by derivative order
+    """
+
+    def __init__(self, rows, ref_tabulation):
+        self.rows = rows
+        self.ref_tabulation = ref_tabulation
+        self._tabulation_cache = {}
 
     def __getitem__(self, alpha):
         try:
             return self._tabulation_cache[alpha]
         except KeyError:
-            result = self.matmul(self.ref_tabulation[alpha])
+            result = self.rows.matmul(self.ref_tabulation[alpha])
             return self._tabulation_cache.setdefault(alpha, result)
 
     def __iter__(self):
@@ -130,6 +117,8 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         cite("Kirby2018zany")
         cite("Kirby2019zany")
         self.restriction_indices = None
+        # Sparse rows by canonical transformation, see map_tabulation.
+        self._sparse_rows = {}
 
     @abstractmethod
     def basis_transformation(self, coordinate_mapping):
@@ -141,7 +130,16 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
     def map_tabulation(self, ref_tabulation, coordinate_mapping):
         assert coordinate_mapping is not None
         M = self.basis_transformation(coordinate_mapping)
-        return MappedTabulation(M, ref_tabulation, indices=self.restriction_indices)
+        # Every call translates the geometry afresh.  Reusing the rows of the
+        # first equal transformation lets tabulations of all derivative orders
+        # share one sparse map, and so its loops.
+        key = canonical_bound_indices(M)
+        try:
+            rows = self._sparse_rows[key]
+        except KeyError:
+            rows = self._sparse_rows.setdefault(
+                key, SparseRows(M, self.restriction_indices))
+        return MappedTabulation(rows, ref_tabulation)
 
     def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
         result = super().basis_evaluation(order, ps, entity=entity)
@@ -161,7 +159,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         M_dual = gem.ListTensor(M_dual)
 
         key = None
-        return MappedTabulation(M_dual, {key: Q})[key]
+        return MappedTabulation(SparseRows(M_dual), {key: Q})[key]
 
 
 class DirectlyDefinedElement(NeedsCoordinateMappingElement):

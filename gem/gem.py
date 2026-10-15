@@ -690,6 +690,14 @@ def _index_free_indices(index):
     return ()
 
 
+def _index_ordering(index):
+    """Return the running indices of an index expression in indexing order."""
+    if isinstance(index, VariableIndex) and isinstance(
+            index.expression, (Indexed, FlexiblyIndexed)):
+        return index.expression.index_ordering()
+    return _index_free_indices(index)
+
+
 class Indexed(Scalar):
     __slots__ = ('children', 'multiindex', 'indirect_children')
     __back__ = ('multiindex',)
@@ -764,7 +772,7 @@ class Indexed(Scalar):
             if isinstance(i, Index):
                 free_indices.append(i)
             elif isinstance(i, VariableIndex):
-                free_indices.extend(i.expression.free_indices)
+                free_indices.extend(_index_ordering(i))
         return tuple(free_indices)
 
 
@@ -856,7 +864,7 @@ class FlexiblyIndexed(Scalar):
                 if isinstance(index, Index):
                     free_indices.append(index)
                 elif isinstance(index, VariableIndex):
-                    free_indices.extend(index.expression.free_indices)
+                    free_indices.extend(_index_ordering(index))
                 if isinstance(stride, Node):
                     free_indices.extend(stride.free_indices)
         return tuple(free_indices)
