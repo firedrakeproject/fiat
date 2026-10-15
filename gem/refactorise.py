@@ -2,16 +2,16 @@
 refactorisation."""
 
 from collections import Counter, OrderedDict, defaultdict, namedtuple
-from collections.abc import Callable, Iterable
 from functools import singledispatch
 from itertools import product
 from sys import intern
 
 from gem.node import Memoizer, MemoizerArg, traversal
-from gem.gem import (Node, Conditional, Index, IndexSum, Zero, Product, Sum,
+from gem.cost import index_space_literal
+from gem.gem import (Node, Conditional, IndexSum, Zero, Product, Sum,
                      Indexed, ListTensor, one, MathFunction)
 from gem.optimise import (delta_elimination, filtered_replace_indices,
-                          preserve_linear_maps, remove_componenttensors,
+                          is_linear_map, remove_componenttensors,
                           sum_factorise, traverse_product, traverse_sum,
                           unroll_indexsum, make_rename_map, make_renamer)
 
@@ -233,6 +233,12 @@ def _collect_monomials(expression, self):
         other_indices = {index for factor in rest_factors
                          for index in factor.free_indices}
 
+        # A distributed summand may be constant along a contracted axis.
+        # Its sum still contributes the cardinality of that axis.
+        missing = tuple(index for index in all_indices
+                        if index not in atomic_indices | other_indices)
+        rest_factors.append(index_space_literal(missing))
+
         # Sum indices that appear in atomic terms
         # (will go to the result :py:class:`Monomial`)
         sum_indices = tuple(index for index in all_indices
@@ -306,36 +312,27 @@ def _collect_monomials_conditional(expression, self):
     return result
 
 
-def _collect_monomial_sums(
-        expressions: Iterable[Node],
-        classifier: Callable[[Node], str]) -> list[MonomialSum]:
-    """Collect monomial sums using the supplied node classifier.
+def collect_monomials(expressions, classifier, linear_indices=()):
+    """Collect expressions as sums of products using a node classifier.
 
-    Parameters
-    ----------
-    expressions : iterable of Node
-        GEM expressions to refactorise.
-    classifier : callable
-        Function labelling each node as ``ATOMIC``, ``COMPOUND``, or
-        ``OTHER``.
+    :arg expressions: GEM expressions to refactorise
+    :arg classifier: function labelling nodes ATOMIC, COMPOUND, or OTHER
+    :arg linear_indices: argument indices whose linear maps remain atomic
+    :returns: one :class:`MonomialSum` per expression
 
-    Returns
-    -------
-    list of MonomialSum
-        Polynomial representations of the expressions.
-
-    Raises
-    ------
-    FactorisationError
-        If a compound expression cannot be expanded.
-
-    Notes
-    -----
-    ``expressions`` must already have had its ComponentTensors removed, so
-    that a caller identifying nodes to classify sees the nodes this
-    collector will visit.
-
+    A sum depending on one argument index is a linear map of that argument.
+    Keeping it atomic exposes equivalent test and trial tabulations to sharing.
+    Sums involving several arguments are distributed by the ordinary collector.
     """
+    expressions = remove_componenttensors(tuple(expressions))
+    linear_indices = frozenset(linear_indices)
+    if linear_indices:
+        original_classifier = classifier
+
+        def classifier(node):
+            if is_linear_map(node, linear_indices):
+                return ATOMIC
+            return original_classifier(node)
 
     # Get ListTensors out of the way
     must_unroll = []  # indices to unroll
@@ -356,64 +353,3 @@ def _collect_monomial_sums(
     mapper.rename_map = make_rename_map()
     mapper.index_replacer = MemoizerArg(filtered_replace_indices)
     return list(map(mapper, expressions))
-
-
-def collect_monomials(
-        expressions: Iterable[Node],
-        classifier: Callable[[Node], str],
-        linear_indices: Iterable[Index] = ()) -> list[MonomialSum]:
-    """Collect structure-preserving sum-of-products representations.
-
-    Parameters
-    ----------
-    expressions
-        GEM expressions to refactorise.
-    classifier
-        Function that labels GEM nodes for polynomial collection.
-    linear_indices
-        Free indices identifying the multilinear axes.  Sums depending on
-        exactly one such axis represent linear maps and remain atomic.
-
-    Returns
-    -------
-    list of MonomialSum
-        One polynomial representation for each input expression.
-
-    Notes
-    -----
-    A one-axis sum is a finite element linear operand: examples include a
-    sparse basis transformation and a tensor-product tabulation factor.
-    Preserving it keeps domain-specific basis structure available for
-    contraction optimisation.  This does not make the map opaque: its GEM
-    expression remains available for scalar simplification and code motion.
-
-    Sums involving several linear axes separate form monomials and are
-    distributed.  COFFEE subsequently chooses scalar factorisations across
-    the resulting operands.  Keeping these two stages distinct avoids a
-    Cartesian expansion of basis-map entries before loop placement.
-
-    """
-    # Remove ComponentTensors here, not in the collector.  Removing them
-    # rebuilds nodes, and the maps found below must be the very nodes that
-    # the collector classifies.
-    expressions = remove_componenttensors(tuple(expressions))
-    linear_indices = tuple(linear_indices)
-    if not linear_indices:
-        return _collect_monomial_sums(expressions, classifier)
-
-    result = []
-    for expression in expressions:
-        terms, linear_maps = preserve_linear_maps(expression, linear_indices)
-        if not linear_maps:
-            monomial_sum, = _collect_monomial_sums((expression,), classifier)
-            result.append(monomial_sum)
-            continue
-
-        map_ids = frozenset(map(id, linear_maps))
-
-        def preserve_map(node: Node, map_ids=map_ids) -> str:
-            return ATOMIC if id(node) in map_ids else classifier(node)
-
-        result.append(MonomialSum.sum(
-            *_collect_monomial_sums(terms, preserve_map)))
-    return result
