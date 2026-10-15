@@ -1060,6 +1060,46 @@ def cancel_indirect_deltas(expression):
     return Memoizer(visit)(expression)
 
 
+def _contract_listtensor(expression):
+    """Collect geometry before tabulation in a contraction of tensor entries.
+
+    Contracting a tensor assembled from local basis blocks can hide a common
+    reference tabulation. Expand the contracted tensor axis and constant
+    gathers, then collect equal point-dependent factors. The remaining
+    coefficient expressions can be evaluated independently of the points.
+
+    :arg expression: contraction with ComponentTensors removed
+    :returns: a refactorised expression, or the input when no tensor is contracted
+    """
+    nodes = tuple(traversal((expression,)))
+    bound = {i for node in nodes if isinstance(node, IndexSum) for i in node.multiindex}
+    axes = {i for node in nodes if isinstance(node, Indexed)
+            and isinstance(node.children[0], ListTensor)
+            for i in node.multiindex if i in bound}
+    if not axes:
+        return expression
+    for node in nodes:
+        if isinstance(node, Indexed):
+            for index in node.multiindex:
+                lookup = _constant_map(index)
+                if lookup is not None:
+                    axes.update(i for i in lookup[1] if i in bound)
+    expanded, = unroll_indexsum((expression,), predicate=lambda i: i in axes)
+    # Import locally because refactorise uses the contraction primitives.
+    from gem.refactorise import ATOMIC, COMPOUND, OTHER, FactorisationError, collect_monomials
+
+    def classify(node):
+        if not set(node.free_indices).intersection(expression.free_indices):
+            return OTHER
+        return ATOMIC if isinstance(node, (Indexed, FlexiblyIndexed)) else COMPOUND
+
+    try:
+        monomials, = collect_monomials((expanded,), classify)
+    except FactorisationError:
+        return expression
+    return make_sum(sum_factorise(m.sum_indices, (*m.atomics, m.rest)) for m in monomials)
+
+
 def contraction(expression):
     """Optimise the contractions of the tensor product at the root of
     the expression, including:
@@ -1091,7 +1131,14 @@ def contraction(expression):
         sum_indices, factors = delta_elimination(
             sum_indices, factors, index_replacer=index_replacer)
         factors = [index_replacer(f, ()) for f in factors]
-        return sum_factorise(sum_indices, factors)
+        result = sum_factorise(sum_indices, factors)
+        expanded = _contract_listtensor(root)
+        # Expanding tables trades loops for scalar expressions. Limit both
+        # storage and expression growth when reducing the arithmetic.
+        old_cost, new_cost = estimate_cost((result,)), estimate_cost((expanded,))
+        if all(new <= old for new, old in zip(new_cost, old_cost)):
+            return expanded
+        return result
 
     # Sometimes the value shape is composed as a ListTensor, which
     # could get in the way of decomposing factors.  In particular,
