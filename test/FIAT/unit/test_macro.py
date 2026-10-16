@@ -375,11 +375,15 @@ def test_macro_expansion(cell, split, variant, degree):
 @pytest.mark.parametrize("order", (0, 1))
 @pytest.mark.parametrize("variant", (None, "bubble"))
 @pytest.mark.parametrize("degree", (1, 4))
-def test_Ck_basis(cell, order, degree, variant):
+@pytest.mark.parametrize("split", (AlfeldSplit, IsoSplit))
+@pytest.mark.parametrize("dtype", (numpy.float64, numpy.float32),
+                         ids=("float64", "float32"))
+def test_Ck_basis(cell, order, degree, variant, split, dtype):
     # Test that we can correctly tabulate on points on facets.
     # This breaks if we were binning points into more than one cell without a partition of unity.
     # It suffices to tabulate on the vertices of the simplicial complex.
-    A = AlfeldSplit(cell)
+    cell = ufc_simplex(cell.get_spatial_dimension(), dtype=dtype)
+    A = split(cell)
     Ck = CkPolynomialSet(A, degree, order=order, variant=variant)
     U = Ck.get_expansion_set()
     cell_node_map = U.get_cell_node_map(degree)
@@ -397,11 +401,12 @@ def test_Ck_basis(cell, order, degree, variant):
         assert numpy.allclose(local_phis, phis[:, ipts])
 
 
-def test_C2_double_alfeld():
+@pytest.mark.parametrize("dtype", (numpy.float64, numpy.float32))
+def test_C2_double_alfeld(dtype):
     from FIAT.c2_elements import AlfeldC2Space
     # Construct the quintic C2 spline on the double Alfeld split
     # See Section 7.5 of Lai & Schumacher
-    K = ufc_simplex(2)
+    K = ufc_simplex(2, dtype=dtype)
     degree = 5
     P = AlfeldC2Space(K, degree)
     assert P.get_num_members() == 27
