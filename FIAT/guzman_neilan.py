@@ -15,6 +15,7 @@ from FIAT.alfeld_sorokina import AlfeldSorokina
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini
 from FIAT.macro import AlfeldSplit
 from FIAT.quadrature_schemes import create_quadrature
+from FIAT.rational import RationalExpansionSet, barycentric_gradients, rational_derivative, rational_union
 from FIAT.restricted import RestrictedElement
 from FIAT.nodal_enriched import NodalEnrichedElement
 
@@ -57,14 +58,76 @@ def GuzmanNeilanSpace(ref_el, order, kind=1, reduced=False):
     return GN
 
 
+def RationalGuzmanNeilanSpace(ref_el, degree=1):
+    r"""Return a basis for the rational Guzman-Neilan H1 space on a triangle.
+
+    The space is P1^2 + curl span{lambda_j^2 lambda_{j+1} - lambda_{j+1}^2 lambda_j}
+    + curl span{B_j}, with the rational edge bubbles
+    B_j = lambda_0 lambda_1 lambda_2 lambda_{j+1} lambda_{j+2} / ((1-lambda_{j+1}) (1-lambda_{j+2})),
+    see (Diening, Storn, and Tscherpel, 2025, Sec. 2.2).
+
+    :arg ref_el: a triangle.
+    :kwarg degree: the polynomial degree, only degree 1 is implemented.
+
+    :returns: a PolynomialSet basis over a :class:`RationalExpansionSet`.
+    """
+    if degree != 1:
+        raise ValueError("The rational Guzman-Neilan space is only implemented for degree 1")
+    sd = ref_el.get_spatial_dimension()
+    if sd != 2:
+        raise ValueError("The rational Guzman-Neilan space is only defined on triangles")
+    e = numpy.eye(sd+1, dtype=int)
+    zero = numpy.zeros(sd+1, dtype=int)
+    one = numpy.ones(sd+1, dtype=int)
+
+    # Stream functions: symmetric cubics followed by rational bubbles
+    exponents = []
+    for j in range(sd+1):
+        k = (j + 1) % (sd+1)
+        exponents.append(numpy.concatenate((2*e[j] + e[k], zero)))
+        exponents.append(numpy.concatenate((e[j] + 2*e[k], zero)))
+    for j in range(sd+1):
+        exponents.append(numpy.concatenate((2*one - e[j], one - e[j])))
+    stream = numpy.array(exponents)
+    grad_lambda = barycentric_gradients(ref_el)
+    num_stream = 2 * (sd+1)
+    stream_coeffs = numpy.zeros((num_stream, len(exponents)))
+    for j in range(sd+1):
+        stream_coeffs[j, 2*j:2*j+2] = (1, -1)
+        stream_coeffs[sd+1+j, 2*(sd+1)+j] = 1
+
+    # curl = (d/dy, -d/dx)
+    dx, dy = (rational_derivative(stream, stream_coeffs, grad_lambda[:, k])
+              for k in range(sd))
+    linear = numpy.hstack((e, numpy.zeros_like(e)))
+    exponents, (ilinear, idx, idy) = rational_union(linear, dx[0], dy[0])
+
+    num_linear = len(linear)
+    coeffs = numpy.zeros((sd*num_linear + num_stream, sd, len(exponents)))
+    for i in range(sd):
+        coeffs[i*num_linear:(i+1)*num_linear, i, ilinear] = numpy.eye(num_linear)
+    coeffs[sd*num_linear:, 0, idy] = dy[1]
+    coeffs[sd*num_linear:, 1, idx] = -dx[1]
+
+    expansion_set = RationalExpansionSet(ref_el, exponents)
+    return polynomial_set.PolynomialSet(ref_el, sd, sd, expansion_set, coeffs)
+
+
 class GuzmanNeilanH1(finite_element.CiarletElement):
     """The Guzman-Neilan H1-conforming (extended) macroelement."""
-    def __init__(self, ref_el, order=1, kind=1, quad_scheme=None):
+    def __init__(self, ref_el, order=1, kind=1, quad_scheme=None, variant=None):
         sd = ref_el.get_spatial_dimension()
         if order >= sd:
             raise ValueError(f"{type(self).__name__} is only defined for order < dim")
         degree = sd
-        poly_set = GuzmanNeilanSpace(ref_el, order, kind=kind)
+        if variant == "rational":
+            if kind != 1:
+                raise ValueError("The rational Guzman-Neilan variant is only defined for kind=1")
+            poly_set = RationalGuzmanNeilanSpace(ref_el, degree=order)
+        elif variant is None:
+            poly_set = GuzmanNeilanSpace(ref_el, order, kind=kind)
+        else:
+            raise ValueError(f"Unsupported variant {variant}")
         ref_complex = poly_set.get_reference_element() if kind == 2 else ref_el
         dual = BernardiRaugelDualSet(ref_complex, order, degree=degree, quad_scheme=quad_scheme)
         formdegree = sd - 1  # (n-1)-form
@@ -79,9 +142,13 @@ class GuzmanNeilanFirstKindH1(GuzmanNeilanH1):
     Degrees of freedom: evaluation at Pk lattice points, and normal moments on faces.
 
     This element belongs to a Stokes complex, and is paired with unsplit DG_{k-1}.
+
+    With variant="rational", the macroelement bubbles are replaced by the curl
+    of rational bubbles on the unsplit triangle (Guzman and Neilan, 2014),
+    using the symmetric basis of (Diening, Storn, and Tscherpel, 2025).
     """
-    def __init__(self, ref_el, order=1, quad_scheme=None):
-        super().__init__(ref_el, order=order, kind=1, quad_scheme=quad_scheme)
+    def __init__(self, ref_el, order=1, quad_scheme=None, variant=None):
+        super().__init__(ref_el, order=order, kind=1, quad_scheme=quad_scheme, variant=variant)
 
 
 class GuzmanNeilanSecondKindH1(GuzmanNeilanH1):

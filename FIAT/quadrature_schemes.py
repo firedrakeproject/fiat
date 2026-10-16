@@ -9,6 +9,9 @@ Scheme options are:
 
   scheme="canonical" (collapsed Gauss scheme)
 
+  scheme="rational" (moment-fitted scheme for rational functions of
+                     barycentric coordinates on triangles)
+
 Background on the schemes:
 
   Keast rules for tetrahedra:
@@ -33,6 +36,7 @@ Background on the schemes:
 # Last changed: 2011-04-19
 
 import numpy
+import scipy.optimize
 
 from FIAT.quadrature import (FacetQuadratureRule,
                              GaussLobattoLegendreQuadratureLineRule,
@@ -41,6 +45,7 @@ from FIAT.quadrature import (FacetQuadratureRule,
 from FIAT.reference_element import (HEXAHEDRON, QUADRILATERAL, TENSORPRODUCT,
                                     TETRAHEDRON, TRIANGLE, symmetric_simplex, ufc_simplex)
 from FIAT.macro import MacroQuadratureRule
+from FIAT.rational import integrable_rational_monomials, rational_evaluate, rational_integral
 
 
 def create_quadrature(ref_el, degree, scheme="default", entity=None):
@@ -58,7 +63,10 @@ def create_quadrature(ref_el, degree, scheme="default", entity=None):
     :kwarg scheme: The quadrature scheme, can be choosen from ["default", "canonical", "KMV"]
         "default" -> hard-coded scheme for low degree and collapsed Gauss scheme for high degree,
         "canonical" -> collapsed Gauss scheme,
-        "KMV" -> spectral lumped scheme for low degree (<=6 on triangles, <=3 on tetrahedra).
+        "KMV" -> spectral lumped scheme for low degree (<=6 on triangles, <=3 on tetrahedra),
+        "rational" -> moment-fitted scheme on triangles that integrates exactly the
+        rational functions lambda^alpha / (1 - lambda)^beta, where degree is a tuple
+        bounding |alpha| and |beta|, or an int bounding both.
     :kwarg entity: A tuple of entity dimension and entity id specifying the
         integration domain. If not provided, the domain is the entire cell.
     """
@@ -88,6 +96,9 @@ def create_quadrature(ref_el, degree, scheme="default", entity=None):
     if ref_el.get_shape() in [QUADRILATERAL, HEXAHEDRON]:
         return create_quadrature(ref_el.product, degree, scheme)
 
+    if scheme == "rational":
+        return _rational_scheme(ref_el, degree)
+
     if degree < 0:
         raise ValueError("Need positive degree, not %d" % degree)
 
@@ -114,6 +125,70 @@ def _fiat_scheme(ref_el, degree):
 
     # Create and return FIAT quadrature rule
     return make_quadrature(ref_el, num_points_per_axis)
+
+
+def _rational_scheme(ref_el, degree):
+    """Moment-fitted scheme for rational functions on a triangle.
+
+    The rule integrates exactly every integrable rational monomial
+    lambda^alpha / (1 - lambda)^beta with |alpha| <= numerator degree and
+    |beta| <= denominator degree, see
+    :func:`FIAT.rational.integrable_rational_monomials`.
+
+    :arg ref_el: a triangle.
+    :arg degree: a tuple with the numerator and denominator degrees,
+        or an int for equal degrees.
+    """
+    if ref_el.get_shape() != TRIANGLE:
+        raise ValueError("The rational quadrature scheme is only defined on triangles")
+    try:
+        numerator_degree, denominator_degree = degree
+    except TypeError:
+        numerator_degree = denominator_degree = degree
+    exponents = integrable_rational_monomials(numerator_degree, denominator_degree)
+    return rational_quadrature(ref_el, exponents)
+
+
+def rational_quadrature(ref_el, exponents, coeffs=None):
+    """Return a quadrature rule that integrates exactly a span of rational
+    functions on a triangle.
+
+    Non-negative weights are fitted on Xiao-Gimbutas points to the exact
+    integrals of (Diening, Storn, and Tscherpel, 2025). Non-negative least
+    squares keeps at most as many points as the dimension of the span.
+
+    :arg ref_el: a triangle.
+    :arg exponents: an array of exponents of rational monomials.
+    :kwarg coeffs: an array whose rows hold the coefficients of the functions
+        to integrate in terms of the rational monomials, defaults to the
+        rational monomials themselves.
+    :returns: a :class:`QuadratureRule` with non-negative weights.
+    """
+    exponents = numpy.asarray(exponents)
+    if coeffs is not None:
+        coeffs = numpy.reshape(coeffs, (-1, len(exponents)))
+        used = numpy.any(coeffs != 0, axis=0)
+        exponents, coeffs = exponents[used], coeffs[:, used]
+        coeffs = coeffs[numpy.any(coeffs != 0, axis=1)]
+
+    moments = rational_integral(ref_el, exponents)
+    if not numpy.isfinite(moments).all():
+        raise ValueError("Expecting integrable rational monomials")
+    if coeffs is not None:
+        moments = numpy.dot(coeffs, moments)
+
+    numerator_degree = int(exponents[:, :3].sum(axis=1).max())
+    for xg_degree in range(max(numerator_degree, 1), 51):
+        pts = numpy.asarray(xg_scheme(ref_el, xg_degree).get_points())
+        A = rational_evaluate(exponents, ref_el.compute_barycentric_coordinates(pts))
+        if coeffs is not None:
+            A = numpy.dot(coeffs, A)
+        scale = numpy.linalg.norm(A, axis=1)
+        wts, _ = scipy.optimize.nnls(A / scale[:, None], moments / scale, maxiter=20*len(pts))
+        if numpy.allclose(numpy.dot(A, wts) / scale, moments / scale, rtol=1E-12, atol=1E-14):
+            keep = wts > 0
+            return QuadratureRule(ref_el, pts[keep], wts[keep])
+    raise ValueError("Could not fit a rational quadrature rule on Xiao-Gimbutas points")
 
 
 def _kmv_lump_scheme(ref_el, degree):

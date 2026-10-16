@@ -186,6 +186,10 @@ def test_piola(ref_to_phys, element, dimension):
     check_zany_mapping(element, ref_to_phys[dimension])
 
 
+def test_piola_rational_guzman_neilan(ref_to_phys):
+    check_zany_mapping(finat.GuzmanNeilanFirstKindH1, ref_to_phys[2], variant="rational")
+
+
 @pytest.mark.parametrize("dimension, element, degree", [
     (3, finat.MardalTaiWinther, 2),
     (3, finat.GuzmanNeilanFirstKindH1, 2),
