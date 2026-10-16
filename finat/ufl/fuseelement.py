@@ -5,6 +5,9 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 from finat.ufl.finiteelementbase import FiniteElementBase
+from ufl.sobolevspace import H1, HCurl, HDiv, L2
+
+_SOBOLEV_SPACES = {"H1": H1, "HCurl": HCurl, "HDiv": HDiv, "L2": L2}
 
 
 class FuseElement(FiniteElementBase):
@@ -39,11 +42,10 @@ class FuseElement(FiniteElementBase):
 
     @property
     def sobolev_space(self):
-        return self.triple.spaces[2].ufl_sobolev_space(self.triple.form_degree,
-                                                       self.triple.cell.dim())
+        return _SOBOLEV_SPACES[self.triple.sobolev_space()]
 
     def mapping(self):
-        return self.triple.spaces[2].mapping()
+        return self.triple.pullback()
 
     def reconstruct(self, family=None, cell=None, degree=None, quad_scheme=None, variant=None):
         return FuseElement(self.triple, cell=cell)
