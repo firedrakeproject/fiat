@@ -282,37 +282,35 @@ class DualSet:
             return tuple(self._node_mapping)
         sd = self.ref_el.get_spatial_dimension()
         mappings = [None] * len(self.nodes)
-        for i, (dim, entity) in enumerate(self.node_entities):
-            node = self.nodes[i]
-            order = node.max_deriv_order
-            rank = len(node.target_shape)
-            if order == rank == 0 or (dim == sd and _is_integral(node) and order == 0):
-                mappings[i] = "invariant"
-            elif dim == sd - 1 and (_is_integral(node) or order > 0 or rank > 1):
-                mappings[i] = "frame"
-            else:
-                mappings[i] = "cartesian"
+        for dim, entities in self.entity_ids.items():
+            for dofs in entities.values():
+                for i in dofs:
+                    node = self.nodes[i]
+                    order = node.max_deriv_order
+                    rank = len(node.target_shape)
+                    if order == rank == 0 or (dim == sd and _is_integral(node) and order == 0):
+                        mappings[i] = "invariant"
+                    elif dim == sd - 1 and (_is_integral(node) or order > 0 or rank > 1):
+                        mappings[i] = "frame"
+                    else:
+                        mappings[i] = "cartesian"
         return tuple(mappings)
 
     @cached_property
-    def node_entities(self):
-        """The owning entity of each source functional."""
-        entities = [None] * len(self.nodes)
-        for dim, entity_dofs in self.entity_ids.items():
-            for entity, dofs in entity_dofs.items():
+    def entity_support_ids(self):
+        """Map supporting entities to source functional indices, as in entity_ids."""
+        support_ids = {}
+        for dim, entities in self.ref_el.get_topology().items():
+            support_ids[dim] = {entity: [] for entity in entities}
+        for entities in self.entity_ids.values():
+            for dofs in entities.values():
                 for i in dofs:
-                    entities[i] = (dim, entity)
-        return tuple(entities)
-
-    @cached_property
-    def node_support(self):
-        """The smallest entity containing each source functional's evaluation points."""
-        support = []
-        for node in self.nodes:
-            points = set(node.pt_dict)
-            points.update(node.deriv_dict)
-            support.append(_support_entity(self.ref_el, sorted(points)))
-        return tuple(support)
+                    node = self.nodes[i]
+                    points = set(node.pt_dict)
+                    points.update(node.deriv_dict)
+                    dim, entity = _support_entity(self.ref_el, sorted(points))
+                    support_ids[dim][entity].append(i)
+        return support_ids
 
     def is_integral_moment(self, i):
         """Whether source functional i is an integral moment."""
@@ -325,22 +323,24 @@ class DualSet:
         in source-node order. Component axes precede derivative axes; divergence
         axes are contracted. Recombination coefficients are kept separate.
         """
-        points = []
-        coefficients = []
-        axis_mappings = []
+        points = [None] * len(self.nodes)
+        coefficients = [None] * len(self.nodes)
+        axis_mappings = [None] * len(self.nodes)
         sd = self.ref_el.get_spatial_dimension()
-        for i, node in enumerate(self.nodes):
-            pts, W, axes = node.as_tensor(mappings[i], tol)
-            dim, entity = self.node_entities[i]
-            if 0 < dim < sd - 1:
-                t = self.ref_el.compute_edge_tangent(entity)
-                normal = numpy.eye(sd) - numpy.outer(t, t) / (t @ t)
-                if any(axis == "derivative" and _has_direction(W, k, normal, tol)
-                       for k, axis in enumerate(axes)):
-                    raise NotImplementedError("No physical convention for derivatives normal to an edge")
-            points.append(pts)
-            coefficients.append(W)
-            axis_mappings.append(axes)
+        for dim, entities in self.entity_ids.items():
+            for entity, dofs in entities.items():
+                if 0 < dim < sd - 1:
+                    t = self.ref_el.compute_edge_tangent(entity)
+                    normal = numpy.eye(sd) - numpy.outer(t, t) / (t @ t)
+                for i in dofs:
+                    pts, W, axes = self.nodes[i].as_tensor(mappings[i], tol)
+                    if 0 < dim < sd - 1:
+                        if any(axis == "derivative" and _has_direction(W, k, normal, tol)
+                               for k, axis in enumerate(axes)):
+                            raise NotImplementedError("No physical convention for derivatives normal to an edge")
+                    points[i] = pts
+                    coefficients[i] = W
+                    axis_mappings[i] = axes
         return tuple(points), tuple(coefficients), tuple(axis_mappings)
 
     def get_scaling_exponents(self, coefficients, axis_mappings, avg=True, tol=1e-10):
@@ -350,24 +350,27 @@ class DualSet:
         The avg flag selects physical averages for framed integral moments."""
         sd = self.ref_el.get_spatial_dimension()
         exponents = numpy.zeros(len(self.nodes), dtype=int)
-        for i, (W, axes) in enumerate(zip(coefficients, axis_mappings)):
-            mapping = self.node_mapping[i]
-            if mapping == "invariant":
-                continue
-            exponent = axes.count("derivative")
-            if mapping == "cartesian":
-                weights = {"covariant piola": 1, "contravariant piola": sd - 1, "divergence": sd}
-                exponent += sum(weights.get(axis, 0) for axis in axes)
-            else:
-                dim, entity = self.node_entities[i]
-                nu = self.ref_el.compute_scaled_normal(entity)
-                tangent = numpy.eye(sd) - numpy.outer(nu, nu) / (nu @ nu)
-                for k, axis in enumerate(axes):
-                    if axis == "contravariant piola" and _has_direction(W, k, tangent, tol):
-                        exponent += 2 - sd
-                if self.is_integral_moment(i) and not avg:
-                    exponent -= dim
-            exponents[i] = exponent
+        for dim, entities in self.entity_ids.items():
+            for entity, dofs in entities.items():
+                for i in dofs:
+                    W = coefficients[i]
+                    axes = axis_mappings[i]
+                    mapping = self.node_mapping[i]
+                    if mapping == "invariant":
+                        continue
+                    exponent = axes.count("derivative")
+                    if mapping == "cartesian":
+                        weights = {"covariant piola": 1, "contravariant piola": sd - 1, "divergence": sd}
+                        exponent += sum(weights.get(axis, 0) for axis in axes)
+                    else:
+                        nu = self.ref_el.compute_scaled_normal(entity)
+                        tangent = numpy.eye(sd) - numpy.outer(nu, nu) / (nu @ nu)
+                        for k, axis in enumerate(axes):
+                            if axis == "contravariant piola" and _has_direction(W, k, tangent, tol):
+                                exponent += 2 - sd
+                        if self.is_integral_moment(i) and not avg:
+                            exponent -= dim
+                    exponents[i] = exponent
         return exponents
 
     def get_indices(self, restriction_domain, take_closure=True):
