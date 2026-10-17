@@ -80,8 +80,8 @@ class Functional(object):
 
         points = tuple(entries)
         coefficients = numpy.zeros((len(points),) + (sd,) * (rank + order))
-        for q, pt in enumerate(points):
-            for w, alpha, comp in entries[pt]:
+        for q, weights in enumerate(entries.values()):
+            for w, alpha, comp in weights:
                 indices = set(permutations(sum(([k] * a for k, a in enumerate(alpha)), [])))
                 for index in indices:
                     coefficients[(q, *comp, *index)] += w / len(indices)

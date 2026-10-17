@@ -173,10 +173,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         """
         dual = self._element.get_dual_set()
         points, coefficients, axis_mappings = self._dual_tensors
-        indices = []
-        for entities in dual.get_entity_ids().values():
-            for dofs in entities.values():
-                indices.extend(i for i in dofs if dual.node_mapping[i] != "invariant")
+        indices = [i for i, mapping in enumerate(dual.node_mapping) if mapping != "invariant"]
         if not indices:
             return {}
         sd = self.cell.get_spatial_dimension()
@@ -229,8 +226,9 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
 
     def _physical_rows(self, coordinate_mapping):
         """Assemble nonidentity Vandermonde rows in numerator/denominator form."""
-        sd = self.cell.get_spatial_dimension()
-        bary, = self.cell.make_points(sd, 0, sd + 1)
+        ref_el = self.cell
+        sd = ref_el.get_spatial_dimension()
+        bary, = ref_el.make_points(sd, 0, sd + 1)
         J = (gem.ListTensor([[coordinate_mapping.detJ_at(bary)]]) if sd == 1
              else coordinate_mapping.jacobian_at(bary))
         J = numpy.array([[J[i, k] for k in range(J.shape[1])]
@@ -240,59 +238,59 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         frames = {}
         rows = {}
         dual = self._element.get_dual_set()
-        closures = dual.get_entity_closure_ids()
+        closures = self._element.entity_closure_dofs()
         _, coefficients, axis_mappings = self._dual_tensors
         riesz = self._reference_riesz
-        for dim, entities in dual.get_entity_ids().items():
-            for entity, dofs in entities.items():
-                owned_dofs = set(dofs)
-                for support_dim, support_entities in dual.entity_support_ids.items():
-                    for support_entity, support_dofs in support_entities.items():
-                        for i in sorted(owned_dofs.intersection(support_dofs)):
-                            if i not in riesz:
-                                continue
-                            support = (support_dim, support_entity)
-                            axes = axis_mappings[i]
-                            if dual.node_mapping[i] == "cartesian":
-                                for mapping in axes:
-                                    if mapping not in cartesian:
-                                        cartesian[mapping] = _cartesian_pullback(mapping, J, adjJ, detJ)
-                                pullbacks = [_pullback(numpy.eye(sd)) if 0 < dim < sd - 1 and mapping == "derivative"
-                                             else cartesian[mapping] for mapping in axes]
+        for dim, entities in closures.items():
+            for entity, closure_dofs in entities.items():
+                allowed = set(closure_dofs)
+                for support, dofs in dual.entity_support_ids[dim][entity].items():
+                    for i in dofs:
+                        if i not in riesz:
+                            continue
+                        axes = axis_mappings[i]
+                        if dual.node_mapping[i] == "cartesian":
+                            for mapping in axes:
+                                if mapping not in cartesian:
+                                    cartesian[mapping] = _cartesian_pullback(mapping, J, adjJ, detJ)
+                            pullbacks = [_pullback(numpy.eye(sd)) if 0 < dim < sd - 1 and mapping == "derivative"
+                                         else cartesian[mapping] for mapping in axes]
+                            measure = one
+                        else:
+                            key = (entity, support)
+                            if key not in frames:
+                                frames[key] = _frame_pullbacks(ref_el, *key, J, adjJ, detJ)
+                            frame, measure = frames[key]
+                            pullbacks = [frame[mapping] for mapping in axes]
+                            if self.avg or not dual.is_integral_moment(i):
                                 measure = one
-                            else:
-                                key = (entity, support)
-                                if key not in frames:
-                                    frames[key] = _frame_pullbacks(self.cell, *key, J, adjJ, detJ)
-                                frame, measure = frames[key]
-                                pullbacks = [frame[mapping] for mapping in axes]
-                                if self.avg or not dual.is_integral_moment(i):
-                                    measure = one
-                            W = coefficients[i]
-                            if measure == one and all(
-                                    numpy.abs(numpy.tensordot(W, numpy.eye(P.shape[0]) - P, axes=(1 + k, 1))).max()
-                                    <= self.tol * numpy.abs(W).max() for k, (P, _, _) in enumerate(pullbacks)):
-                                continue
-                            numerator, denominator = _physical_node_row(riesz[i], pullbacks, self.tol)
-                            numerator = numerator * measure
-                            outside = [j for j in range(self._element.space_dimension()) if j not in closures[dim][entity]
-                                       and not isinstance(numerator[j], gem.Zero)]
-                            if outside:
-                                raise NotImplementedError(f"Dof {i} on entity {(dim, entity)} couples outside its closure: {outside}")
-                            rows[i] = numerator, denominator
+                        W = coefficients[i]
+                        if measure == one and all(
+                                numpy.abs(numpy.tensordot(W, numpy.eye(P.shape[0]) - P, axes=(1 + k, 1))).max()
+                                <= self.tol * numpy.abs(W).max() for k, (P, _, _) in enumerate(pullbacks)):
+                            continue
+                        numerator, denominator = _physical_node_row(riesz[i], pullbacks, self.tol)
+                        numerator = numerator * measure
+                        outside = [j for j in range(self._element.space_dimension()) if j not in allowed
+                                   and not isinstance(numerator[j], gem.Zero)]
+                        if outside:
+                            raise NotImplementedError(f"Dof {i} on entity {(dim, entity)} couples outside its closure: {outside}")
+                        rows[i] = numerator, denominator
         return rows
 
     def _inverse_physical_vandermonde(self, rows):
         """Solve entity blocks in closure order, retaining completion functions."""
         nbf = self._element.space_dimension()
         closures = self._element.entity_closure_dofs()
+        entity_dofs = self._element.entity_dofs()
         V = identity(nbf)
         cache = {}
-        for dim, entities in sorted(self._element.entity_dofs().items()):
-            for entity, block in entities.items():
+        for dim, entities in sorted(closures.items()):
+            for entity, closure_dofs in entities.items():
+                block = entity_dofs[dim][entity]
                 if not any(i in rows for i in block):
                     continue
-                closure = [j for j in closures[dim][entity] if j not in block]
+                closure = [j for j in closure_dofs if j not in block]
                 n = len(block)
                 Bee = numpy.full((n, n), zero, dtype=object)
                 rhs = numpy.full((n, nbf), zero, dtype=object)

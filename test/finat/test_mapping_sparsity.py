@@ -116,10 +116,10 @@ def test_entity_closure_sparsity(sd, element, degree):
     element = element(FIAT.ufc_simplex(sd), degree)
     B, V = transformations(element, sd)
     closures = element._element.entity_closure_dofs()
-    for dim, entities in element._element.entity_dofs().items():
-        for entity, dofs in entities.items():
-            allowed = set(closures[dim][entity])
-            for i in dofs:
+    for entities in closures.values():
+        for closure_dofs in entities.values():
+            allowed = set(closure_dofs)
+            for i in closure_dofs:
                 assert nonzeros(B[i]) <= allowed
                 assert nonzeros(V[i]) <= allowed
 

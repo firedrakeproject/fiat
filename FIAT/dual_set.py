@@ -298,18 +298,19 @@ class DualSet:
 
     @cached_property
     def entity_support_ids(self):
-        """Map supporting entities to source functional indices, as in entity_ids."""
+        """Partition each entity_ids[dim][entity] by supporting entity."""
         support_ids = {}
-        for dim, entities in self.ref_el.get_topology().items():
-            support_ids[dim] = {entity: [] for entity in entities}
-        for entities in self.entity_ids.values():
-            for dofs in entities.values():
+        for dim, entities in self.entity_ids.items():
+            support_ids[dim] = {}
+            for entity, dofs in entities.items():
+                supports = defaultdict(list)
                 for i in dofs:
                     node = self.nodes[i]
                     points = set(node.pt_dict)
                     points.update(node.deriv_dict)
-                    dim, entity = _support_entity(self.ref_el, sorted(points))
-                    support_ids[dim][entity].append(i)
+                    support = _support_entity(self.ref_el, sorted(points))
+                    supports[support].append(i)
+                support_ids[dim][entity] = dict(supports)
         return support_ids
 
     def is_integral_moment(self, i):
@@ -523,9 +524,9 @@ def _support_entity(ref_el, points, tol=1e-12):
     # A nonzero barycentric coordinate requires its vertex in the entity.
     verts = set(numpy.flatnonzero(numpy.abs(bary).max(axis=0) > tol))
     top = ref_el.get_topology()
-    for dim in sorted(top):
-        for entity in sorted(top[dim]):
-            if verts <= set(top[dim][entity]):
+    for dim, entities in sorted(top.items()):
+        for entity, vertices in sorted(entities.items()):
+            if verts <= set(vertices):
                 return dim, entity
     raise ValueError("The evaluation points have no supporting entity.")
 
