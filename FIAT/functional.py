@@ -347,16 +347,13 @@ class IntegralMoment(Functional):
 
     def __call__(self, fn):
         """Evaluate the functional on the function fn."""
-        pts = list(self.pt_dict.keys())
-        wts = numpy.array([foo[0][0] for foo in list(self.pt_dict.values())])
-        result = numpy.dot([fn(p) for p in pts], wts)
-
-        if self.comp:
-            result = result[self.comp]
-        return result
+        if self.deriv_dict:
+            return Functional.__call__(self, fn)
+        return sum(w * numpy.asarray(fn(pt))[comp]
+                   for pt, weights in self.pt_dict.items() for w, comp in weights)
 
 
-class IntegralMomentOfDerivative(Functional):
+class IntegralMomentOfDerivative(IntegralMoment):
     """Functional giving multi-directional derivative integrated against some function.
 
     :arg ref_el: a :class:`Cell`.
@@ -393,7 +390,7 @@ class IntegralMomentOfDerivative(Functional):
         dpt_dict = {tuple(pt): [(wt*tau[alpha], alpha, comp) for alpha in tau]
                     for pt, wt in zip(points, weights)}
 
-        super().__init__(ref_el, shp, {}, dpt_dict, nm or "IntegralMomentOfDerivative")
+        Functional.__init__(self, ref_el, shp, {}, dpt_dict, nm or "IntegralMomentOfDerivative")
 
 
 class IntegralMomentOfNormalDerivative(IntegralMomentOfDerivative):
@@ -492,7 +489,7 @@ class IntegralLegendreTangentialTangentialMoment(IntegralLegendreBidirectionalMo
                          "IntegralTangentialTangentialLegendreMoment")
 
 
-class IntegralMomentOfDivergence(Functional):
+class IntegralMomentOfDivergence(IntegralMoment):
     """Functional representing integral of the divergence of the input
     against some tabulated function f."""
     def __init__(self, ref_el, Q, f_at_qpts):
@@ -510,11 +507,11 @@ class IntegralMomentOfDivergence(Functional):
         dpt_dict = {tuple(pt): [(wt, alphas[i], (i,)) for i in range(sd)]
                     for pt, wt in zip(points, weights)}
 
-        super().__init__(ref_el, shp, {}, dpt_dict,
-                         "IntegralMomentOfDivergence")
+        Functional.__init__(self, ref_el, shp, {}, dpt_dict,
+                            "IntegralMomentOfDivergence")
 
 
-class IntegralMomentOfTensorDivergence(Functional):
+class IntegralMomentOfTensorDivergence(IntegralMoment):
     """Like IntegralMomentOfDivergence, but on symmetric tensors."""
 
     def __init__(self, ref_el, Q, f_at_qpts):
@@ -534,7 +531,7 @@ class IntegralMomentOfTensorDivergence(Functional):
         dpt_dict = {tuple(pt): [(wt[i], alphas[j], (i, j)) for i, j in numpy.ndindex(shp)]
                     for pt, wt in zip(points, weights)}
 
-        super().__init__(ref_el, tuple(), {}, dpt_dict, "IntegralMomentOfDivergence")
+        Functional.__init__(self, ref_el, tuple(), {}, dpt_dict, "IntegralMomentOfDivergence")
 
 
 class PointNormalEvaluation(Functional):
@@ -565,7 +562,7 @@ class PointEdgeTangentEvaluation(Functional):
         return "(u.t)(%s)" % (','.join(x),)
 
 
-class IntegralMomentOfEdgeTangentEvaluation(Functional):
+class IntegralMomentOfEdgeTangentEvaluation(FrobeniusIntegralMoment):
     r"""
     \int_e v\cdot t p ds
 
@@ -578,14 +575,9 @@ class IntegralMomentOfEdgeTangentEvaluation(Functional):
     """
     def __init__(self, ref_el, Q, P_at_qpts, edge):
         t = ref_el.compute_edge_tangent(edge)
-        sd = ref_el.get_spatial_dimension()
-        transform = ref_el.get_entity_transform(1, edge)
-        points = transform(Q.get_points())
-        weights = numpy.multiply(P_at_qpts, Q.get_weights())
-        pt_dict = {tuple(pt): [(wt*t[i], (i,)) for i in range(sd)]
-                   for pt, wt in zip(points, weights)}
-        super().__init__(ref_el, (sd, ), pt_dict, {},
-                         "IntegralMomentOfEdgeTangentEvaluation")
+        Q = quadrature.FacetQuadratureRule(ref_el, 1, edge, Q, avg=True)
+        f_at_qpts = t[:, None] * P_at_qpts
+        super().__init__(ref_el, Q, f_at_qpts, "IntegralMomentOfEdgeTangentEvaluation")
 
 
 class PointFaceTangentEvaluation(Functional):
@@ -606,7 +598,7 @@ class PointFaceTangentEvaluation(Functional):
         return "(u.t%d)(%s)" % (self.tno, ','.join(x),)
 
 
-class IntegralMomentOfFaceTangentEvaluation(Functional):
+class IntegralMomentOfFaceTangentEvaluation(FrobeniusIntegralMoment):
     r"""
     \int_F v \times n \cdot p ds
 
@@ -618,23 +610,11 @@ class IntegralMomentOfFaceTangentEvaluation(Functional):
     :arg facet: which facet.
     """
     def __init__(self, ref_el, Q, P_at_qpts, facet):
-        P_at_qpts = [[P_at_qpts[0][i], P_at_qpts[1][i], P_at_qpts[2][i]]
-                     for i in range(P_at_qpts.shape[1])]
         n = ref_el.compute_scaled_normal(facet)
         sd = ref_el.get_spatial_dimension()
-        transform = ref_el.get_entity_transform(sd-1, facet)
-        pts = tuple(map(tuple, transform(Q.get_points())))
-        weights = Q.get_weights()
-        pt_dict = {}
-        for pt, wgt, phi in zip(pts, weights, P_at_qpts):
-            phixn = [phi[1]*n[2] - phi[2]*n[1],
-                     phi[2]*n[0] - phi[0]*n[2],
-                     phi[0]*n[1] - phi[1]*n[0]]
-            pt_dict[pt] = [(wgt*(-n[2]*phixn[1]+n[1]*phixn[2]), (0, )),
-                           (wgt*(n[2]*phixn[0]-n[0]*phixn[2]), (1, )),
-                           (wgt*(-n[1]*phixn[0]+n[0]*phixn[1]), (2, ))]
-        super().__init__(ref_el, (sd, ), pt_dict, {},
-                         "IntegralMomentOfFaceTangentEvaluation")
+        Q = quadrature.FacetQuadratureRule(ref_el, sd - 1, facet, Q, avg=True)
+        f_at_qpts = numpy.cross(n, numpy.cross(P_at_qpts.T, n)).T
+        super().__init__(ref_el, Q, f_at_qpts, "IntegralMomentOfFaceTangentEvaluation")
 
 
 class PointScaledNormalEvaluation(Functional):
@@ -655,7 +635,7 @@ class PointScaledNormalEvaluation(Functional):
         return "(u.n)(%s)" % (','.join(x),)
 
 
-class IntegralMomentOfScaledNormalEvaluation(Functional):
+class IntegralMomentOfScaledNormalEvaluation(FrobeniusIntegralMoment):
     r"""
     \int_F v\cdot n p ds
 
@@ -669,12 +649,9 @@ class IntegralMomentOfScaledNormalEvaluation(Functional):
     def __init__(self, ref_el, Q, P_at_qpts, facet):
         n = ref_el.compute_scaled_normal(facet)
         sd = ref_el.get_spatial_dimension()
-        transform = ref_el.get_entity_transform(sd - 1, facet)
-        pts = transform(Q.get_points())
-        weights = Q.get_weights() * P_at_qpts
-        pt_dict = {tuple(pt): [(wt*n[i], (i, )) for i in range(sd)]
-                   for pt, wt in zip(pts, weights)}
-        super().__init__(ref_el, (sd, ), pt_dict, {}, "IntegralMomentOfScaledNormalEvaluation")
+        Q = quadrature.FacetQuadratureRule(ref_el, sd - 1, facet, Q, avg=True)
+        f_at_qpts = n[:, None] * P_at_qpts
+        super().__init__(ref_el, Q, f_at_qpts, "IntegralMomentOfScaledNormalEvaluation")
 
 
 class PointwiseInnerProductEvaluation(Functional):
@@ -713,7 +690,7 @@ class TensorBidirectionalIntegralMoment(FrobeniusIntegralMoment):
         super().__init__(ref_el, Q, F_at_qpts, "TensorBidirectionalMomentInnerProductEvaluation")
 
 
-class IntegralMomentOfNormalEvaluation(Functional):
+class IntegralMomentOfNormalEvaluation(FrobeniusIntegralMoment):
     r"""
     \int_F v\cdot n p ds
     p \in Polynomials
@@ -723,19 +700,14 @@ class IntegralMomentOfNormalEvaluation(Functional):
     :arg facet: which facet.
     """
     def __init__(self, ref_el, Q, P_at_qpts, facet):
-        # scaling on the normal is ok because edge length then weights
-        # the reference element quadrature appropriately
         n = ref_el.compute_scaled_normal(facet)
         sd = ref_el.get_spatial_dimension()
-        transform = ref_el.get_entity_transform(sd - 1, facet)
-        pts = transform(Q.get_points())
-        weights = numpy.multiply(P_at_qpts, Q.get_weights())
-        pt_dict = {tuple(pt): [(wt*n[i], (i, )) for i in range(sd)]
-                   for pt, wt in zip(pts, weights)}
-        super().__init__(ref_el, (sd, ), pt_dict, {}, "IntegralMomentOfNormalEvaluation")
+        Q = quadrature.FacetQuadratureRule(ref_el, sd - 1, facet, Q, avg=True)
+        f_at_qpts = n[:, None] * P_at_qpts
+        super().__init__(ref_el, Q, f_at_qpts, "IntegralMomentOfNormalEvaluation")
 
 
-class IntegralMomentOfTangentialEvaluation(Functional):
+class IntegralMomentOfTangentialEvaluation(FrobeniusIntegralMoment):
     r"""
     \int_F v\cdot n p ds
     p \in Polynomials
@@ -745,17 +717,12 @@ class IntegralMomentOfTangentialEvaluation(Functional):
     :arg facet: which facet.
     """
     def __init__(self, ref_el, Q, P_at_qpts, facet):
-        # scaling on the tangent is ok because edge length then weights
-        # the reference element quadrature appropriately
         sd = ref_el.get_spatial_dimension()
         assert sd == 2
         t = ref_el.compute_edge_tangent(facet)
-        transform = ref_el.get_entity_transform(sd - 1, facet)
-        points = transform(Q.get_points())
-        weights = numpy.multiply(P_at_qpts, Q.get_weights())
-        pt_dict = {tuple(pt): [(wt*t[i], (i, )) for i in range(sd)]
-                   for pt, wt in zip(points, weights)}
-        super().__init__(ref_el, (sd, ), pt_dict, {}, "IntegralMomentOfScaledTangentialEvaluation")
+        Q = quadrature.FacetQuadratureRule(ref_el, sd - 1, facet, Q, avg=True)
+        f_at_qpts = t[:, None] * P_at_qpts
+        super().__init__(ref_el, Q, f_at_qpts, "IntegralMomentOfScaledTangentialEvaluation")
 
 
 def contravariant_piola_dual(J, values):

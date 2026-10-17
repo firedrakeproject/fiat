@@ -58,7 +58,7 @@ def test_single_point_moment(avg):
     points, coefficients, axes = dual.as_tensor(["affine"])
     assert len(points[0]) == 1
     assert dual.node_mapping[0] == "frame"
-    assert dual.is_integral_moment(0)
+    assert isinstance(node, FIAT.functional.IntegralMoment)
     assert dual.get_scaling_exponents(coefficients, axes, avg=avg)[0] == int(avg)
 
 

@@ -184,12 +184,13 @@ class DualSet:
 
         def map_quadratures_to_points(nodes, deriv=False):
             Qs_to_ells = defaultdict(list)
+            moment_type = functional.IntegralMomentOfDerivative if deriv else functional.IntegralMoment
             for i, ell in enumerate(nodes):
                 if deriv and len(ell.deriv_dict) == 0:
                     continue
                 elif not deriv and len(ell.pt_dict) == 0:
                     continue
-                if isinstance(ell, (functional.IntegralMoment, functional.IntegralMomentOfDerivative)):
+                if isinstance(ell, moment_type):
                     Q = ell.Q
                 else:
                     Q = None
@@ -288,9 +289,9 @@ class DualSet:
                     node = self.nodes[i]
                     order = node.max_deriv_order
                     rank = len(node.target_shape)
-                    if order == rank == 0 or (dim == sd and _is_integral(node) and order == 0):
+                    if order == rank == 0 or (dim == sd and isinstance(node, functional.IntegralMoment) and order == 0):
                         mappings[i] = "invariant"
-                    elif dim == sd - 1 and (_is_integral(node) or order > 0 or rank > 1):
+                    elif dim == sd - 1 and (isinstance(node, functional.IntegralMoment) or order > 0 or rank > 1):
                         mappings[i] = "frame"
                     else:
                         mappings[i] = "cartesian"
@@ -312,10 +313,6 @@ class DualSet:
                     supports[support].append(i)
                 support_ids[dim][entity] = dict(supports)
         return support_ids
-
-    def is_integral_moment(self, i):
-        """Whether source functional i is an integral moment."""
-        return _is_integral(self.nodes[i])
 
     def as_tensor(self, mappings, tol=1e-10):
         r"""Write source functionals as :math:`n_i(u)=\sum_q W_{i,q}:D_i u(x_{i,q})`.
@@ -369,7 +366,7 @@ class DualSet:
                         for k, axis in enumerate(axes):
                             if axis == "contravariant piola" and _has_direction(W, k, tangent, tol):
                                 exponent += 2 - sd
-                        if self.is_integral_moment(i) and not avg:
+                        if isinstance(self.nodes[i], functional.IntegralMoment) and not avg:
                             exponent -= dim
                     exponents[i] = exponent
         return exponents
@@ -534,13 +531,3 @@ def _support_entity(ref_el, points, tol=1e-12):
 def _has_direction(W, axis, projector, tol):
     residual = numpy.tensordot(W, projector, axes=(1 + axis, 1))
     return numpy.abs(residual).max() > tol * numpy.abs(W).max()
-
-
-def _is_integral(node):
-    return isinstance(node, (functional.IntegralMoment, functional.IntegralMomentOfDerivative,
-                             functional.IntegralMomentOfDivergence, functional.IntegralMomentOfTensorDivergence,
-                             functional.IntegralMomentOfEdgeTangentEvaluation,
-                             functional.IntegralMomentOfFaceTangentEvaluation,
-                             functional.IntegralMomentOfScaledNormalEvaluation,
-                             functional.IntegralMomentOfNormalEvaluation,
-                             functional.IntegralMomentOfTangentialEvaluation))

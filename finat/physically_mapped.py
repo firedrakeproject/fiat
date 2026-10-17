@@ -16,6 +16,7 @@ from math import prod
 import gem
 import numpy
 
+from FIAT.functional import IntegralMoment
 from finat.citations import cite
 
 zero = gem.Zero()
@@ -246,7 +247,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
                             continue
                         axis_pullbacks = pullbacks.select(node_mapping, axis_mappings[i], (dim, entity), support)
                         measure = one
-                        if node_mapping == "frame" and not self.avg and dual.is_integral_moment(i):
+                        if node_mapping == "frame" and not self.avg and isinstance(dual.nodes[i], IntegralMoment):
                             measure = pullbacks.measure(entity)
                         if measure == one and _is_invariant(coefficients[i], axis_pullbacks, self.tol):
                             continue
