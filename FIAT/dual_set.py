@@ -9,7 +9,6 @@
 import numpy
 from itertools import chain
 from functools import cached_property
-from math import prod
 from collections import defaultdict
 
 from FIAT import polynomial_set, functional
@@ -292,7 +291,8 @@ class DualSet:
                         sources = (i,)
                     for j in sources:
                         node = self.nodes[j]
-                        order, rank = node.max_deriv_order, len(node.target_shape)
+                        order = node.max_deriv_order
+                        rank = len(node.target_shape)
                         if order == rank == 0 or (dim == sd and _is_integral(node) and order == 0):
                             mapping = "invariant"
                         elif dim == sd - 1 and (_is_integral(node) or order > 0 or rank > 1):
@@ -304,104 +304,113 @@ class DualSet:
                         mappings[j] = mapping
         return tuple(mappings)
 
-    def mapping_data(self, poly_set, mappings, avg=True, tol=1e-10):
-        """Prepare reference contractions and conditioning for physical nodes.
+    def _source_indices(self, i):
+        if self.coeffs is None:
+            return (i,)
+        return numpy.flatnonzero(self.coeffs[i])
 
-        Parameters
-        ----------
-        poly_set : PolynomialSet
-            Reference nodal basis, including completion functions.
-        mappings : sequence of str
-            Function mapping for each resulting degree of freedom.
-        avg : bool
-            Use physical averages for framed moments.
-        tol : float
-            Relative tolerance for numeric identities.
-
-        Returns
-        -------
-        dict
-            Numeric node data in degree-of-freedom order: entity, support,
-            convention, axis mappings, Riesz tensor, and dilation exponent.
-        """
-        sd = self.ref_el.get_spatial_dimension()
-        data, frames = {}, {}
-        for dim, entities in self.entity_ids.items():
-            for entity, dofs in entities.items():
+    @cached_property
+    def node_entities(self):
+        """The owning entity of each functional in degree-of-freedom order."""
+        entities = [None] * len(self)
+        for dim, entity_dofs in self.entity_ids.items():
+            for entity, dofs in entity_dofs.items():
                 for i in dofs:
-                    sources = ((i, 1),) if self.coeffs is None else enumerate(self.coeffs[i])
-                    terms = []
-                    for j, weight in sources:
-                        if not weight:
-                            continue
-                        node = self.nodes[j]
-                        convention = self.node_mapping[j]
-                        if convention == "invariant":
-                            continue
-                        points, W, axes = node.as_tensor(mappings[i], tol)
-                        terms.append((points, weight * W, axes, convention, _is_integral(node)))
-                    if not terms:
-                        continue
-                    axes, convention, integral = terms[0][2:]
-                    if any(term[2:] != (axes, convention, integral) for term in terms):
-                        raise NotImplementedError("Recombined nodes require compatible physical conventions")
-                    if self.coeffs is not None and any(
-                            self.node_mapping[j] == "invariant" for j in numpy.flatnonzero(self.coeffs[i])):
-                        raise NotImplementedError("Cannot mix invariant and transformed nodes")
-                    points = sorted({pt for pts, *_ in terms for pt in pts})
-                    columns = {pt: q for q, pt in enumerate(points)}
-                    W = numpy.zeros((len(points), *terms[0][1].shape[1:]))
-                    for pts, weights, *_ in terms:
-                        W[[columns[pt] for pt in pts]] += weights
-                    support = _support_entity(self.ref_el, points)
-                    order = sum(axis in ("derivative", "divergence") for axis in axes)
-                    if 0 < dim < sd - 1 and order:
-                        t = self.ref_el.compute_edge_tangent(entity)
-                        normal = numpy.eye(sd) - numpy.outer(t, t) / (t @ t)
-                        if any(axis == "derivative" and _has_direction(W, k, normal, tol)
-                               for k, axis in enumerate(axes)):
-                            raise NotImplementedError("No physical convention for derivatives normal to an edge")
-                    exponent = sum(axis == "derivative" for axis in axes)
-                    if convention == "cartesian":
-                        weights = {"covariant piola": 1, "contravariant piola": sd - 1, "divergence": sd}
-                        exponent += sum(weights.get(axis, 0) for axis in axes)
-                    else:
-                        key = (entity, support)
-                        if key not in frames:
-                            tangents = numpy.linalg.qr(self.ref_el.compute_tangents(sd - 1, entity).T)[0].T
-                            edge = self.ref_el.compute_edge_tangent(support[1]) if support[0] == sd - 2 >= 1 else None
-                            frames[key] = (tangents, self.ref_el.compute_scaled_normal(entity), edge,
-                                           self.ref_el.volume_of_subcomplex(sd - 1, entity))
-                        nu = frames[key][1]
-                        tangent = numpy.eye(sd) - numpy.outer(nu, nu) / (nu @ nu)
-                        exponent += sum(2 - sd for k, axis in enumerate(axes)
-                                        if axis == "contravariant piola" and _has_direction(W, k, tangent, tol))
-                        if integral and not avg:
-                            exponent -= dim
-                    data[i] = dict(entity=(dim, entity), support=support, convention=convention,
-                                   mappings=axes, order=order, coefficients=W, points=points,
-                                   measure=integral and not avg and convention == "frame", exponent=exponent,
-                                   frame=frames.get((entity, support)))
-        if not data:
-            return data
-        points = sorted({pt for node in data.values() for pt in node["points"]})
-        columns = {pt: q for q, pt in enumerate(points)}
-        tabulation = poly_set.tabulate(points, max(node["order"] for node in data.values()))
-        for node in data.values():
-            cols = [columns[pt] for pt in node.pop("points")]
-            values = tabulation[(0,) * sd][..., cols]
-            T = numpy.zeros(values.shape[:-1] + (sd,) * node["order"] + values.shape[-1:])
-            prefix = (slice(None),) * (values.ndim - 1)
-            for index in numpy.ndindex((sd,) * node["order"]):
-                alpha = tuple(numpy.bincount(index, minlength=sd))
-                T[prefix + index] = tabulation[alpha][..., cols]
-            if "divergence" in node["mappings"]:
-                T = numpy.trace(T, axis1=values.ndim - 2, axis2=-2)[..., None, :]
-            W = node["coefficients"]
-            N = numpy.tensordot(W, T, axes=(0, -1))
-            size = prod(W.shape[1:])
-            node["riesz"] = N.reshape(size, T.shape[0], size).transpose(0, 2, 1).reshape(size * size, T.shape[0])
-        return data
+                    entities[i] = (dim, entity)
+        return tuple(entities)
+
+    @cached_property
+    def node_support(self):
+        """The smallest entity containing each functional's evaluation points."""
+        support = []
+        for i in range(len(self)):
+            points = set()
+            for j in self._source_indices(i):
+                points.update(self.nodes[j].pt_dict)
+                points.update(self.nodes[j].deriv_dict)
+            support.append(_support_entity(self.ref_el, sorted(points)))
+        return tuple(support)
+
+    def get_node_mapping(self, i):
+        r"""Physical convention of functional i, including recombination."""
+        mappings = {self.node_mapping[j] for j in self._source_indices(i)}
+        if len(mappings) != 1:
+            raise NotImplementedError("Recombination requires a common physical node convention")
+        return mappings.pop()
+
+    def is_integral_moment(self, i):
+        r"""Whether functional i is a linear combination of integral moments."""
+        return all(_is_integral(self.nodes[j]) for j in self._source_indices(i))
+
+    def as_tensor(self, mappings, tol=1e-10):
+        r"""Write :math:`n_i(u)=\sum_q W_{i,q}:D_i u(x_{i,q})`.
+
+        Return evaluation points, coefficient tensors W, and axis pullback laws,
+        in dof order. Component axes precede derivative axes; divergence axes
+        are contracted. The tolerance controls divergence and tangency checks."""
+        points = []
+        coefficients = []
+        axis_mappings = []
+        tensors = {}
+        sd = self.ref_el.get_spatial_dimension()
+        for i in range(len(self)):
+            indices = self._source_indices(i)
+            for j in indices:
+                key = (j, mappings[i])
+                if key not in tensors:
+                    tensors[key] = self.nodes[j].as_tensor(mappings[i], tol)
+            _, first_weights, axes = tensors[indices[0], mappings[i]]
+            evaluation_points = set()
+            for j in indices:
+                source_points, _, source_axes = tensors[j, mappings[i]]
+                if source_axes != axes:
+                    raise NotImplementedError("A coefficient tensor requires a common derivative order and axis mapping")
+                evaluation_points.update(source_points)
+            pts = sorted(evaluation_points)
+            columns = {pt: q for q, pt in enumerate(pts)}
+            W = numpy.zeros((len(pts), *first_weights.shape[1:]))
+            for j in indices:
+                source_points, source_weights, _ = tensors[j, mappings[i]]
+                weight = 1 if self.coeffs is None else self.coeffs[i, j]
+                W[[columns[pt] for pt in source_points]] += weight * source_weights
+            dim, entity = self.node_entities[i]
+            if 0 < dim < sd - 1:
+                t = self.ref_el.compute_edge_tangent(entity)
+                normal = numpy.eye(sd) - numpy.outer(t, t) / (t @ t)
+                if any(axis == "derivative" and _has_direction(W, k, normal, tol)
+                       for k, axis in enumerate(axes)):
+                    raise NotImplementedError("No physical convention for derivatives normal to an edge")
+            points.append(tuple(pts))
+            coefficients.append(W)
+            axis_mappings.append(axes)
+        return tuple(points), tuple(coefficients), tuple(axis_mappings)
+
+    def get_scaling_exponents(self, coefficients, axis_mappings, avg=True, tol=1e-10):
+        r"""Return :math:`p_i` for physical nodes that dilate as :math:`h^{-p_i}`.
+
+        Use the coefficient tensors and axis mappings from as_tensor.
+        The avg flag selects physical averages for framed integral moments."""
+        sd = self.ref_el.get_spatial_dimension()
+        exponents = numpy.zeros(len(self), dtype=int)
+        for i, (W, axes) in enumerate(zip(coefficients, axis_mappings)):
+            mapping = self.get_node_mapping(i)
+            if mapping == "invariant":
+                continue
+            exponent = axes.count("derivative")
+            if mapping == "cartesian":
+                weights = {"covariant piola": 1, "contravariant piola": sd - 1, "divergence": sd}
+                exponent += sum(weights.get(axis, 0) for axis in axes)
+            else:
+                dim, entity = self.node_entities[i]
+                nu = self.ref_el.compute_scaled_normal(entity)
+                tangent = numpy.eye(sd) - numpy.outer(nu, nu) / (nu @ nu)
+                for k, axis in enumerate(axes):
+                    if axis == "contravariant piola" and _has_direction(W, k, tangent, tol):
+                        exponent += 2 - sd
+                if self.is_integral_moment(i) and not avg:
+                    exponent -= dim
+            exponents[i] = exponent
+        return exponents
 
     def get_indices(self, restriction_domain, take_closure=True):
         """Returns the list of dofs with support on a given restriction domain.

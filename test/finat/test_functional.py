@@ -1,9 +1,15 @@
 import FIAT
-import finat
+import gem
 import numpy as np
 import pytest
 
 from gem.interpreter import evaluate
+from finat.fiat_elements import FiatElement
+from finat.physically_mapped import PhysicallyMappedElement
+
+
+class MappedElement(PhysicallyMappedElement, FiatElement):
+    pass
 
 
 def test_divergence_detection_respects_tolerance():
@@ -27,12 +33,12 @@ def test_recombined_physical_dual(ref_to_phys):
         C[np.ix_(dofs[1:], dofs[1:])] = [[2, 1], [1, 3]]
     recombined = FIAT.finite_element.CiarletElement(
         element.get_nodal_basis(), element.get_dual_set().recombine(C), 3)
-    indices = range(element.space_dimension())
-    original = finat.PhysicallyMappedDualSet(element, indices)
-    transformed = finat.PhysicallyMappedDualSet(recombined, indices)
+    original = MappedElement(element)
+    transformed = MappedElement(recombined)
     mapping = ref_to_phys[2]
+    Q = gem.Literal(np.eye(len(C)))
     B, BC, M = [result.arr for result in evaluate([
-        original.dual_transformation(mapping), transformed.dual_transformation(mapping),
+        original.dual_transformation(Q, mapping), transformed.dual_transformation(Q, mapping),
         transformed.basis_transformation(mapping)])]
     assert np.allclose(BC, C @ B @ np.linalg.inv(C))
     assert np.allclose(BC @ M.T, np.eye(len(C)))
@@ -46,11 +52,11 @@ def test_single_point_moment(avg):
     ids = {0: {v: [] for v in cell.get_topology()[0]},
            1: {e: [0] if e == 0 else [] for e in cell.get_topology()[1]}, 2: {0: []}}
     dual = FIAT.dual_set.DualSet([node], cell, ids)
-    basis = FIAT.polynomial_set.ONPolynomialSet(cell, 1)
-    data = dual.mapping_data(basis, ["affine"], avg=avg)[0]
-    assert data["convention"] == "frame"
-    assert data["measure"] == (not avg)
-    assert data["exponent"] == int(avg)
+    points, coefficients, axes = dual.as_tensor(["affine"])
+    assert len(points[0]) == 1
+    assert dual.get_node_mapping(0) == "frame"
+    assert dual.is_integral_moment(0)
+    assert dual.get_scaling_exponents(coefficients, axes, avg=avg)[0] == int(avg)
 
 
 def test_explicit_integral_convention(ref_to_phys):
@@ -59,9 +65,10 @@ def test_explicit_integral_convention(ref_to_phys):
     dual = FIAT.dual_set.DualSet(dual.nodes, dual.ref_el, dual.entity_ids,
                                  node_mapping=["frame"] * len(dual))
     element = FIAT.finite_element.CiarletElement(element.get_nodal_basis(), dual, 1)
-    processor = finat.PhysicallyMappedDualSet(element, range(3), avg=False)
+    mapped = MappedElement(element)
+    mapped.avg = False
     B, M = [result.arr for result in evaluate([
-        processor.dual_transformation(ref_to_phys[2]), processor.basis_transformation(ref_to_phys[2])])]
+        mapped.dual_transformation(gem.Literal(np.eye(3)), ref_to_phys[2]), mapped.basis_transformation(ref_to_phys[2])])]
     lengths = [ref_to_phys[2].phys_cell.volume_of_subcomplex(1, e) for e in range(3)]
     assert np.allclose(B, np.diag(lengths))
     assert np.allclose(B @ M.T, np.eye(3))

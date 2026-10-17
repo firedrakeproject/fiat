@@ -56,24 +56,10 @@ class Functional(object):
             self.max_deriv_order = 0
 
     def as_tensor(self, mapping="affine", tol=1e-12):
-        """Return symmetric coefficient tensors and their axis mappings.
+        r"""Return points, symmetric coefficient tensors, and axis pullback laws.
 
-        Parameters
-        ----------
-        mapping : str
-            Reference-to-physical function mapping.
-        tol : float
-            Relative tolerance for recognizing a divergence.
-
-        Returns
-        -------
-        points : tuple
-            Evaluation points.
-        coefficients : numpy.ndarray
-            Point weights with component axes followed by derivative axes.
-        mappings : tuple of str
-            Pullback law for each axis; divergence axes have extent one.
-        """
+        Component axes precede derivative axes; divergence axes have extent one.
+        The tolerance controls recognition of divergence contractions."""
         if self.pt_dict and self.deriv_dict:
             raise NotImplementedError(f"{type(self).__name__} mixes values and derivatives.")
         sd = self.ref_el.get_spatial_dimension()
@@ -787,12 +773,7 @@ def contravariant_piola_dual(J, values):
 
 
 def _split_axis_mappings(mapping, rank):
-    """Split a FIAT mapping into one mapping per component axis.
-
-    :arg mapping: FIAT mapping, such as ``"double contravariant piola"``.
-    :arg rank: Number of component axes.
-    :returns: Mapping of each component axis.
-    """
+    r"""Split the function mapping into one pullback law per component axis."""
     words = mapping.split()
     if words == ["affine"]:
         return (mapping,) * rank
