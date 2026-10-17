@@ -26,16 +26,19 @@ def test_divergence_detection_respects_tolerance():
     assert mappings == ("contravariant piola", "derivative")
 
 
-def test_recombined_physical_dual(ref_to_phys):
+@pytest.mark.parametrize("scaled", [False, True])
+def test_recombined_physical_dual(ref_to_phys, scaled_ref_to_phys, scaled):
     element = FIAT.Hermite(FIAT.ufc_simplex(2), 3)
     C = np.eye(element.space_dimension())
     for dofs in element.entity_dofs()[0].values():
-        C[np.ix_(dofs[1:], dofs[1:])] = [[2, 1], [1, 3]]
+        C[np.ix_(dofs, dofs)] = [[2, 1, 0], [1, 3, 1], [0, 1, 2]]
+    basis = element.get_nodal_basis().recombine(np.linalg.inv(C).T)
     recombined = FIAT.finite_element.CiarletElement(
-        element.get_nodal_basis(), element.get_dual_set().recombine(C), 3)
+        basis, element.get_dual_set(), 3, recombine_dual=True)
+    assert np.allclose(recombined.get_dual_set().get_coeffs(), C)
     original = MappedElement(element)
     transformed = MappedElement(recombined)
-    mapping = ref_to_phys[2]
+    mapping = scaled_ref_to_phys[2][1] if scaled else ref_to_phys[2]
     Q = gem.Literal(np.eye(len(C)))
     B, BC, M = [result.arr for result in evaluate([
         original.dual_transformation(Q, mapping), transformed.dual_transformation(Q, mapping),
@@ -54,7 +57,7 @@ def test_single_point_moment(avg):
     dual = FIAT.dual_set.DualSet([node], cell, ids)
     points, coefficients, axes = dual.as_tensor(["affine"])
     assert len(points[0]) == 1
-    assert dual.get_node_mapping(0) == "frame"
+    assert dual.node_mapping[0] == "frame"
     assert dual.is_integral_moment(0)
     assert dual.get_scaling_exponents(coefficients, axes, avg=avg)[0] == int(avg)
 

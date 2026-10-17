@@ -106,6 +106,9 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         V = self._inverse_physical_vandermonde(self._physical_rows(coordinate_mapping))
         for i, scale in self._dof_scales(coordinate_mapping):
             V[:, i] = V[:, i] * scale
+        C = self._element.get_dual_set().get_coeffs()
+        if C is not None:
+            V = C @ V @ self._inverse_dual_coeffs
         return gem.ListTensor(V[:, self._physical_indices].T)
 
     def dual_transformation(self, Q, coordinate_mapping=None):
@@ -127,6 +130,9 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
             B[i] = numerator / denominator
         for i, scale in self._dof_scales(coordinate_mapping):
             B[i] = B[i] / scale
+        C = self._element.get_dual_set().get_coeffs()
+        if C is not None:
+            B = C @ B @ self._inverse_dual_coeffs
         indices = self._physical_indices
         B = gem.ListTensor(B[numpy.ix_(indices, indices)])
 
@@ -150,18 +156,24 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
                       for dofs in entities.values() for i in dofs)
 
     @cached_property
+    def _inverse_dual_coeffs(self):
+        r"""For :math:`n=Cn_0`, the Vandermonde transforms as :math:`B=CB_0C^{-1}`."""
+        return numpy.linalg.inv(self._element.get_dual_set().get_coeffs())
+
+    @cached_property
     def _dual_tensors(self):
         return self._element.get_dual_set().as_tensor(self._element.mapping(), self.tol)
 
     @cached_property
     def _reference_riesz(self):
-        r"""Pairings :math:`R_{i,a,b,j}=\sum_q W_{i,q,a}(D_i\hat\psi_j)(x_{i,q})_b`.
+        r"""Source pairings :math:`R_{i,a,b,j}=\sum_q W_{i,q,a}(D_i\hat\psi^0_j)(x_{i,q})_b`.
 
-        The indices a and b enumerate flattened coefficient and derivative tensors.
+        The basis psi^0 is nodal to n_0. Indices a and b enumerate flattened
+        coefficient and derivative tensors.
         """
         dual = self._element.get_dual_set()
         points, coefficients, axis_mappings = self._dual_tensors
-        indices = [i for i in range(len(dual)) if dual.get_node_mapping(i) != "invariant"]
+        indices = [i for i, mapping in enumerate(dual.node_mapping) if mapping != "invariant"]
         if not indices:
             return {}
         sd = self.cell.get_spatial_dimension()
@@ -169,6 +181,11 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         evaluation_points = sorted({pt for i in indices for pt in points[i]})
         columns = {pt: q for q, pt in enumerate(evaluation_points)}
         tabulation = self._element.tabulate(max(order[i] for i in indices), evaluation_points)
+        C = dual.get_coeffs()
+        if C is not None:
+            # The source nodal basis is C^T times the basis dual to C n_0.
+            tabulation = {alpha: numpy.tensordot(C.T, table, axes=(1, 0))
+                          for alpha, table in tabulation.items()}
         riesz = {}
         for i in indices:
             cols = [columns[pt] for pt in points[i]]
@@ -221,7 +238,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         for i, riesz in self._reference_riesz.items():
             dim, entity = dual.node_entities[i]
             axes = axis_mappings[i]
-            if dual.get_node_mapping(i) == "cartesian":
+            if dual.node_mapping[i] == "cartesian":
                 for mapping in axes:
                     if mapping not in cartesian:
                         cartesian[mapping] = _cartesian_pullback(mapping, J, adjJ, detJ)

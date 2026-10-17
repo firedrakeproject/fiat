@@ -107,7 +107,7 @@ class DualSet:
             coefficients = numpy.dot(coefficients, self.coeffs)
         return DualSet(self.nodes, self.ref_el, self.entity_ids,
                        self.entity_permutations, coeffs=coefficients,
-                       node_mapping=self.node_mapping)
+                       node_mapping=self._node_mapping)
 
     def get_entity_closure_ids(self):
         return self.entity_closure_ids
@@ -282,37 +282,22 @@ class DualSet:
             return tuple(self._node_mapping)
         sd = self.ref_el.get_spatial_dimension()
         mappings = [None] * len(self.nodes)
-        for dim, entities in self.entity_ids.items():
-            for dofs in entities.values():
-                for i in dofs:
-                    if self.coeffs is not None:
-                        sources = numpy.flatnonzero(self.coeffs[i])
-                    else:
-                        sources = (i,)
-                    for j in sources:
-                        node = self.nodes[j]
-                        order = node.max_deriv_order
-                        rank = len(node.target_shape)
-                        if order == rank == 0 or (dim == sd and _is_integral(node) and order == 0):
-                            mapping = "invariant"
-                        elif dim == sd - 1 and (_is_integral(node) or order > 0 or rank > 1):
-                            mapping = "frame"
-                        else:
-                            mapping = "cartesian"
-                        if mappings[j] is not None and mappings[j] != mapping:
-                            raise ValueError("Source node has incompatible entity conventions")
-                        mappings[j] = mapping
+        for i, (dim, entity) in enumerate(self.node_entities):
+            node = self.nodes[i]
+            order = node.max_deriv_order
+            rank = len(node.target_shape)
+            if order == rank == 0 or (dim == sd and _is_integral(node) and order == 0):
+                mappings[i] = "invariant"
+            elif dim == sd - 1 and (_is_integral(node) or order > 0 or rank > 1):
+                mappings[i] = "frame"
+            else:
+                mappings[i] = "cartesian"
         return tuple(mappings)
-
-    def _source_indices(self, i):
-        if self.coeffs is None:
-            return (i,)
-        return numpy.flatnonzero(self.coeffs[i])
 
     @cached_property
     def node_entities(self):
-        """The owning entity of each functional in degree-of-freedom order."""
-        entities = [None] * len(self)
+        """The owning entity of each source functional."""
+        entities = [None] * len(self.nodes)
         for dim, entity_dofs in self.entity_ids.items():
             for entity, dofs in entity_dofs.items():
                 for i in dofs:
@@ -321,58 +306,31 @@ class DualSet:
 
     @cached_property
     def node_support(self):
-        """The smallest entity containing each functional's evaluation points."""
+        """The smallest entity containing each source functional's evaluation points."""
         support = []
-        for i in range(len(self)):
-            points = set()
-            for j in self._source_indices(i):
-                points.update(self.nodes[j].pt_dict)
-                points.update(self.nodes[j].deriv_dict)
+        for node in self.nodes:
+            points = set(node.pt_dict)
+            points.update(node.deriv_dict)
             support.append(_support_entity(self.ref_el, sorted(points)))
         return tuple(support)
 
-    def get_node_mapping(self, i):
-        r"""Physical convention of functional i, including recombination."""
-        mappings = {self.node_mapping[j] for j in self._source_indices(i)}
-        if len(mappings) != 1:
-            raise NotImplementedError("Recombination requires a common physical node convention")
-        return mappings.pop()
-
     def is_integral_moment(self, i):
-        r"""Whether functional i is a linear combination of integral moments."""
-        return all(_is_integral(self.nodes[j]) for j in self._source_indices(i))
+        """Whether source functional i is an integral moment."""
+        return _is_integral(self.nodes[i])
 
     def as_tensor(self, mappings, tol=1e-10):
-        r"""Write :math:`n_i(u)=\sum_q W_{i,q}:D_i u(x_{i,q})`.
+        r"""Write source functionals as :math:`n_i(u)=\sum_q W_{i,q}:D_i u(x_{i,q})`.
 
         Return evaluation points, coefficient tensors W, and axis pullback laws,
-        in dof order. Component axes precede derivative axes; divergence axes
-        are contracted. The tolerance controls divergence and tangency checks."""
+        in source-node order. Component axes precede derivative axes; divergence
+        axes are contracted. Recombination coefficients are kept separate.
+        """
         points = []
         coefficients = []
         axis_mappings = []
-        tensors = {}
         sd = self.ref_el.get_spatial_dimension()
-        for i in range(len(self)):
-            indices = self._source_indices(i)
-            for j in indices:
-                key = (j, mappings[i])
-                if key not in tensors:
-                    tensors[key] = self.nodes[j].as_tensor(mappings[i], tol)
-            _, first_weights, axes = tensors[indices[0], mappings[i]]
-            evaluation_points = set()
-            for j in indices:
-                source_points, _, source_axes = tensors[j, mappings[i]]
-                if source_axes != axes:
-                    raise NotImplementedError("A coefficient tensor requires a common derivative order and axis mapping")
-                evaluation_points.update(source_points)
-            pts = sorted(evaluation_points)
-            columns = {pt: q for q, pt in enumerate(pts)}
-            W = numpy.zeros((len(pts), *first_weights.shape[1:]))
-            for j in indices:
-                source_points, source_weights, _ = tensors[j, mappings[i]]
-                weight = 1 if self.coeffs is None else self.coeffs[i, j]
-                W[[columns[pt] for pt in source_points]] += weight * source_weights
+        for i, node in enumerate(self.nodes):
+            pts, W, axes = node.as_tensor(mappings[i], tol)
             dim, entity = self.node_entities[i]
             if 0 < dim < sd - 1:
                 t = self.ref_el.compute_edge_tangent(entity)
@@ -380,20 +338,20 @@ class DualSet:
                 if any(axis == "derivative" and _has_direction(W, k, normal, tol)
                        for k, axis in enumerate(axes)):
                     raise NotImplementedError("No physical convention for derivatives normal to an edge")
-            points.append(tuple(pts))
+            points.append(pts)
             coefficients.append(W)
             axis_mappings.append(axes)
         return tuple(points), tuple(coefficients), tuple(axis_mappings)
 
     def get_scaling_exponents(self, coefficients, axis_mappings, avg=True, tol=1e-10):
-        r"""Return :math:`p_i` for physical nodes that dilate as :math:`h^{-p_i}`.
+        r"""Return :math:`p_i` for physical source nodes that dilate as :math:`h^{-p_i}`.
 
         Use the coefficient tensors and axis mappings from as_tensor.
         The avg flag selects physical averages for framed integral moments."""
         sd = self.ref_el.get_spatial_dimension()
-        exponents = numpy.zeros(len(self), dtype=int)
+        exponents = numpy.zeros(len(self.nodes), dtype=int)
         for i, (W, axes) in enumerate(zip(coefficients, axis_mappings)):
-            mapping = self.get_node_mapping(i)
+            mapping = self.node_mapping[i]
             if mapping == "invariant":
                 continue
             exponent = axes.count("derivative")
