@@ -8,6 +8,7 @@
 
 import numpy
 from itertools import chain
+from functools import cached_property
 from collections import defaultdict
 
 from FIAT import polynomial_set, functional
@@ -37,6 +38,10 @@ class DualSet:
         the coefficients for the recombined functionals, and its columns
         correspond to ``nodes``.
 
+    node_mapping : sequence of str, optional
+        Physical convention of each source node: ``cartesian``, ``frame``
+        or ``invariant``. Defaults follow point and moment conventions.
+
     Raises
     ------
     ValueError
@@ -44,7 +49,7 @@ class DualSet:
     """
 
     def __init__(self, nodes, ref_el, entity_ids, entity_permutations=None,
-                 coeffs=None):
+                 coeffs=None, node_mapping=None):
         if ref_el.get_dimension() != max(entity_ids):
             entity_ids = unflatten_entity_ids(ref_el, entity_ids)
         nodes, ref_el, entity_ids, entity_permutations, macro_entity_ids = merge_entities(
@@ -61,6 +66,7 @@ class DualSet:
         # The entity ids on the simplicial complex, numbered by the merged node ordering
         self._macro_entity_ids = macro_entity_ids
         self.entity_permutations = entity_permutations
+        self._node_mapping = node_mapping
 
         # Compute the nodes on the closure of each sub_entity.
         self.entity_closure_ids = {}
@@ -100,7 +106,8 @@ class DualSet:
         if self.coeffs is not None:
             coefficients = numpy.dot(coefficients, self.coeffs)
         return DualSet(self.nodes, self.ref_el, self.entity_ids,
-                       self.entity_permutations, coeffs=coefficients)
+                       self.entity_permutations, coeffs=coefficients,
+                       node_mapping=self._node_mapping)
 
     def get_entity_closure_ids(self):
         return self.entity_closure_ids
@@ -264,6 +271,109 @@ class DualSet:
             mat = numpy.tensordot(coeffs, mat, axes=(1, 0))
         return mat
 
+    @cached_property
+    def node_mapping(self):
+        """Physical conventions of the source nodes, in source-node order."""
+        if self._node_mapping is not None:
+            if len(self._node_mapping) != len(self.nodes):
+                raise ValueError("Expected one physical convention per source node")
+            if set(self._node_mapping) - {"cartesian", "frame", "invariant"}:
+                raise ValueError("Unknown physical node convention")
+            return tuple(self._node_mapping)
+        sd = self.ref_el.get_spatial_dimension()
+        mappings = [None] * len(self.nodes)
+        for dim, entities in self.entity_ids.items():
+            for dofs in entities.values():
+                for i in dofs:
+                    node = self.nodes[i]
+                    order = node.max_deriv_order
+                    rank = len(node.target_shape)
+                    if order == rank == 0 or (dim == sd and _is_integral(node) and order == 0):
+                        mappings[i] = "invariant"
+                    elif dim == sd - 1 and (_is_integral(node) or order > 0 or rank > 1):
+                        mappings[i] = "frame"
+                    else:
+                        mappings[i] = "cartesian"
+        return tuple(mappings)
+
+    @cached_property
+    def entity_support_ids(self):
+        """Partition each entity_ids[dim][entity] by supporting entity."""
+        support_ids = {}
+        for dim, entities in self.entity_ids.items():
+            support_ids[dim] = {}
+            for entity, dofs in entities.items():
+                supports = defaultdict(list)
+                for i in dofs:
+                    node = self.nodes[i]
+                    points = set(node.pt_dict)
+                    points.update(node.deriv_dict)
+                    support = _support_entity(self.ref_el, sorted(points))
+                    supports[support].append(i)
+                support_ids[dim][entity] = dict(supports)
+        return support_ids
+
+    def is_integral_moment(self, i):
+        """Whether source functional i is an integral moment."""
+        return _is_integral(self.nodes[i])
+
+    def as_tensor(self, mappings, tol=1e-10):
+        r"""Write source functionals as :math:`n_i(u)=\sum_q W_{i,q}:D_i u(x_{i,q})`.
+
+        Return evaluation points, coefficient tensors W, and axis pullback laws,
+        in source-node order. Component axes precede derivative axes; divergence
+        axes are contracted. Recombination coefficients are kept separate.
+        """
+        points = [None] * len(self.nodes)
+        coefficients = [None] * len(self.nodes)
+        axis_mappings = [None] * len(self.nodes)
+        sd = self.ref_el.get_spatial_dimension()
+        for dim, entities in self.entity_ids.items():
+            for entity, dofs in entities.items():
+                if 0 < dim < sd - 1:
+                    t = self.ref_el.compute_edge_tangent(entity)
+                    normal = numpy.eye(sd) - numpy.outer(t, t) / (t @ t)
+                for i in dofs:
+                    pts, W, axes = self.nodes[i].as_tensor(mappings[i], tol)
+                    if 0 < dim < sd - 1:
+                        if any(axis == "derivative" and _has_direction(W, k, normal, tol)
+                               for k, axis in enumerate(axes)):
+                            raise NotImplementedError("No physical convention for derivatives normal to an edge")
+                    points[i] = pts
+                    coefficients[i] = W
+                    axis_mappings[i] = axes
+        return tuple(points), tuple(coefficients), tuple(axis_mappings)
+
+    def get_scaling_exponents(self, coefficients, axis_mappings, avg=True, tol=1e-10):
+        r"""Return :math:`p_i` for physical source nodes that dilate as :math:`h^{-p_i}`.
+
+        Use the coefficient tensors and axis mappings from as_tensor.
+        The avg flag selects physical averages for framed integral moments."""
+        sd = self.ref_el.get_spatial_dimension()
+        exponents = numpy.zeros(len(self.nodes), dtype=int)
+        for dim, entities in self.entity_ids.items():
+            for entity, dofs in entities.items():
+                for i in dofs:
+                    W = coefficients[i]
+                    axes = axis_mappings[i]
+                    mapping = self.node_mapping[i]
+                    if mapping == "invariant":
+                        continue
+                    exponent = axes.count("derivative")
+                    if mapping == "cartesian":
+                        weights = {"covariant piola": 1, "contravariant piola": sd - 1, "divergence": sd}
+                        exponent += sum(weights.get(axis, 0) for axis in axes)
+                    else:
+                        nu = self.ref_el.compute_scaled_normal(entity)
+                        tangent = numpy.eye(sd) - numpy.outer(nu, nu) / (nu @ nu)
+                        for k, axis in enumerate(axes):
+                            if axis == "contravariant piola" and _has_direction(W, k, tangent, tol):
+                                exponent += 2 - sd
+                        if self.is_integral_moment(i) and not avg:
+                            exponent -= dim
+                    exponents[i] = exponent
+        return exponents
+
     def get_indices(self, restriction_domain, take_closure=True):
         """Returns the list of dofs with support on a given restriction domain.
 
@@ -400,3 +510,37 @@ def merge_entities(nodes, ref_el, entity_ids, entity_permutations):
                     parent_ids[dim][entity].extend(entity_ids[child_dim][child_entity])
 
     return parent_nodes, parent_cell, parent_ids, parent_permutations, child_ids
+
+
+def _support_entity(ref_el, points, tol=1e-12):
+    """Find the smallest simplex entity containing all evaluation points.
+
+    :arg ref_el: Reference simplex.
+    :arg points: Points in reference Cartesian coordinates.
+    :arg tol: Absolute tolerance for a zero barycentric coordinate.
+    :returns: Entity dimension and number.
+    """
+    bary = ref_el.compute_barycentric_coordinates(numpy.asarray(points))
+    # A nonzero barycentric coordinate requires its vertex in the entity.
+    verts = set(numpy.flatnonzero(numpy.abs(bary).max(axis=0) > tol))
+    top = ref_el.get_topology()
+    for dim, entities in sorted(top.items()):
+        for entity, vertices in sorted(entities.items()):
+            if verts <= set(vertices):
+                return dim, entity
+    raise ValueError("The evaluation points have no supporting entity.")
+
+
+def _has_direction(W, axis, projector, tol):
+    residual = numpy.tensordot(W, projector, axes=(1 + axis, 1))
+    return numpy.abs(residual).max() > tol * numpy.abs(W).max()
+
+
+def _is_integral(node):
+    return isinstance(node, (functional.IntegralMoment, functional.IntegralMomentOfDerivative,
+                             functional.IntegralMomentOfDivergence, functional.IntegralMomentOfTensorDivergence,
+                             functional.IntegralMomentOfEdgeTangentEvaluation,
+                             functional.IntegralMomentOfFaceTangentEvaluation,
+                             functional.IntegralMomentOfScaledNormalEvaluation,
+                             functional.IntegralMomentOfNormalEvaluation,
+                             functional.IntegralMomentOfTangentialEvaluation))

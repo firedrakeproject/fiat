@@ -12,7 +12,7 @@
 # - a reference element domain
 # - type information
 
-from itertools import chain
+from itertools import chain, permutations
 from collections import defaultdict
 import numpy
 
@@ -54,6 +54,47 @@ class Functional(object):
             self.max_deriv_order = max(sum(wac[1]) for wac in chain(*deriv_dict.values()))
         else:
             self.max_deriv_order = 0
+
+    def as_tensor(self, mapping="affine", tol=1e-12):
+        r"""Return points, symmetric coefficient tensors, and axis pullback laws.
+
+        Component axes precede derivative axes; divergence axes have extent one.
+        The tolerance controls recognition of divergence contractions."""
+        if self.pt_dict and self.deriv_dict:
+            raise NotImplementedError(f"{type(self).__name__} mixes values and derivatives.")
+        sd = self.ref_el.get_spatial_dimension()
+        if self.deriv_dict:
+            entries = {pt: [(w, tuple(alpha), tuple(comp)) for w, alpha, comp in wac]
+                       for pt, wac in self.deriv_dict.items()}
+        else:
+            alpha = (0,) * sd
+            entries = {pt: [(w, alpha, tuple(comp)) for w, comp in wc]
+                       for pt, wc in self.pt_dict.items()}
+        orders = {sum(alpha) for wac in entries.values() for _, alpha, _ in wac}
+        ranks = {len(comp) for wac in entries.values() for _, _, comp in wac}
+        if len(orders) > 1 or len(ranks) > 1:
+            raise NotImplementedError(f"{type(self).__name__} mixes derivative orders or ranks.")
+        order, = orders
+        rank, = ranks
+        mappings = _split_axis_mappings(mapping, rank) + ("derivative",) * order
+
+        points = tuple(entries)
+        coefficients = numpy.zeros((len(points),) + (sd,) * (rank + order))
+        for q, weights in enumerate(entries.values()):
+            for w, alpha, comp in weights:
+                indices = set(permutations(sum(([k] * a for k, a in enumerate(alpha)), [])))
+                for index in indices:
+                    coefficients[(q, *comp, *index)] += w / len(indices)
+
+        # W[..., i, k] = c delta_ik represents a divergence.
+        if order == 1 and rank > 0 and mappings[rank - 1] == "contravariant piola":
+            trace = numpy.trace(coefficients, axis1=-2, axis2=-1) / sd
+            if numpy.allclose(coefficients, trace[..., None, None] * numpy.eye(sd),
+                              rtol=0, atol=tol * numpy.abs(coefficients).max()):
+                coefficients = trace[..., None]
+                mappings = mappings[:rank - 1] + ("divergence",)
+
+        return points, coefficients, mappings
 
     def evaluate(self, f):
         """Obsolete and broken functional evaluation.
@@ -715,3 +756,31 @@ class IntegralMomentOfTangentialEvaluation(Functional):
         pt_dict = {tuple(pt): [(wt*t[i], (i, )) for i in range(sd)]
                    for pt, wt in zip(points, weights)}
         super().__init__(ref_el, (sd, ), pt_dict, {}, "IntegralMomentOfScaledTangentialEvaluation")
+
+
+def contravariant_piola_dual(J, values):
+    r"""Map test functions so their moments commute with contravariant Piola.
+
+    The factor :math:`\operatorname{sign}(\det J)J^{-T}` cancels both
+    :math:`J/\det J` on the field and :math:`|\det J|` in quadrature.
+
+    :arg J: Square Jacobian mapping reference to physical coordinates.
+    :arg values: Reference test functions, shaped ``(nbasis, dim, npoints)``.
+    :returns: Physical test functions with the same shape.
+    """
+    transform = numpy.sign(numpy.linalg.det(J)) * numpy.linalg.inv(J).T
+    return numpy.einsum("ij,bjq->biq", transform, values)
+
+
+def _split_axis_mappings(mapping, rank):
+    r"""Split the function mapping into one pullback law per component axis."""
+    words = mapping.split()
+    if words == ["affine"]:
+        return (mapping,) * rank
+    if words[0] == "double":
+        kinds = (f"{words[1]} piola",) * 2
+    else:
+        kinds = tuple(f"{word} piola" for word in words[:-1])
+    if len(kinds) != rank:
+        raise ValueError(f"A {mapping} functional must have rank {len(kinds)}, not {rank}.")
+    return kinds

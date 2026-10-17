@@ -23,7 +23,11 @@ class MyMapping(PhysicalGeometry):
         return gem.Literal(np.linalg.det(self.A))
 
     def jacobian_at(self, point):
-        return gem.Literal(self.A)
+        A = self.A
+        if self.ref_cell.get_spatial_dimension() == 1:
+            # The manifold tangent is unsigned; detJ_at carries orientation.
+            A = np.abs(A)
+        return gem.Literal(A)
 
     def normalized_reference_edge_tangents(self):
         top = self.ref_cell.get_topology()

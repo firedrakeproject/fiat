@@ -28,6 +28,7 @@ class RestrictedPhysicallyMappedElement(PhysicallyMappedElement, FiatElement):
         free_indices = set(chain.from_iterable(edofs[d][e] for d in edofs for e in edofs[d]))
         indices = [i for i in indices if i in free_indices]
         self.restriction_indices = indices
+        self.avg = element.avg
 
         # Restrict the entity_dofs dict
         rdofs = {d: {e: [indices.index(i) for i in edofs[d][e] if i in indices]

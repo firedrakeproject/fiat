@@ -11,7 +11,7 @@
 import numpy
 from FIAT import dual_set, expansions, finite_element, polynomial_set
 from FIAT.check_format_variant import parse_quadrature_scheme
-from FIAT.functional import FrobeniusIntegralMoment
+from FIAT.functional import FrobeniusIntegralMoment, contravariant_piola_dual
 from FIAT.nedelec import Nedelec
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
@@ -112,9 +112,12 @@ class MardalTaiWintherDual(dual_set.DualSet):
 
         # Interior nodes: moments against Nedelec(order-1)
         if order > 1:
-            Q = parse_quadrature_scheme(ref_el, degree+order-1, quad_scheme)
-            Ned = Nedelec(ref_el, order-1)
-            phis = Ned.tabulate(0, Q.get_points())[(0,) * sd]
+            cell = ref_el.construct_subelement(sd)
+            Q_ref = parse_quadrature_scheme(cell, degree+order-1, quad_scheme)
+            Ned = Nedelec(cell, order-1)
+            Ned_at_qpts = Ned.tabulate(0, Q_ref.get_points())[(0,) * sd]
+            Q = FacetQuadratureRule(ref_el, sd, 0, Q_ref)
+            phis = contravariant_piola_dual(Q.jacobian(), Ned_at_qpts)
             cur = len(nodes)
             nodes.extend(FrobeniusIntegralMoment(ref_el, Q, phi) for phi in phis)
             entity_ids[sd][0] = list(range(cur, len(nodes)))
