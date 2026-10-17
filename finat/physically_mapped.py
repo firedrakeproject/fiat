@@ -225,54 +225,35 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
                         yield i, havg**-exponents[i]
 
     def _physical_rows(self, coordinate_mapping):
-        """Assemble nonidentity Vandermonde rows in numerator/denominator form."""
-        ref_el = self.cell
-        sd = ref_el.get_spatial_dimension()
-        bary, = ref_el.make_points(sd, 0, sd + 1)
-        J = (gem.ListTensor([[coordinate_mapping.detJ_at(bary)]]) if sd == 1
-             else coordinate_mapping.jacobian_at(bary))
-        J = numpy.array([[J[i, k] for k in range(J.shape[1])]
-                         for i in range(J.shape[0])], dtype=object)
-        adjJ, detJ = adjugate_and_determinant(J)
-        cartesian = {}
-        frames = {}
-        rows = {}
+        """Assemble nonidentity Vandermonde rows in numerator/denominator form.
+
+        Contract the selected pullbacks with FIAT's reference pairings, then
+        check that each physical node couples only to its entity's closure.
+        """
+        pullbacks = PhysicalPullbacks(self.cell, coordinate_mapping)
         dual = self._element.get_dual_set()
         closures = self._element.entity_closure_dofs()
         _, coefficients, axis_mappings = self._dual_tensors
         riesz = self._reference_riesz
+        rows = {}
         for dim, entities in closures.items():
             for entity, closure_dofs in entities.items():
                 allowed = set(closure_dofs)
                 for support, dofs in dual.entity_support_ids[dim][entity].items():
                     for i in dofs:
-                        if i not in riesz:
+                        node_mapping = dual.node_mapping[i]
+                        if node_mapping == "invariant":
                             continue
-                        axes = axis_mappings[i]
-                        if dual.node_mapping[i] == "cartesian":
-                            for mapping in axes:
-                                if mapping not in cartesian:
-                                    cartesian[mapping] = _cartesian_pullback(mapping, J, adjJ, detJ)
-                            pullbacks = [_pullback(numpy.eye(sd)) if 0 < dim < sd - 1 and mapping == "derivative"
-                                         else cartesian[mapping] for mapping in axes]
-                            measure = one
-                        else:
-                            key = (entity, support)
-                            if key not in frames:
-                                frames[key] = _frame_pullbacks(ref_el, *key, J, adjJ, detJ)
-                            frame, measure = frames[key]
-                            pullbacks = [frame[mapping] for mapping in axes]
-                            if self.avg or not dual.is_integral_moment(i):
-                                measure = one
-                        W = coefficients[i]
-                        if measure == one and all(
-                                numpy.abs(numpy.tensordot(W, numpy.eye(P.shape[0]) - P, axes=(1 + k, 1))).max()
-                                <= self.tol * numpy.abs(W).max() for k, (P, _, _) in enumerate(pullbacks)):
+                        axis_pullbacks = pullbacks.select(node_mapping, axis_mappings[i], (dim, entity), support)
+                        measure = one
+                        if node_mapping == "frame" and not self.avg and dual.is_integral_moment(i):
+                            measure = pullbacks.measure(entity)
+                        if measure == one and _is_invariant(coefficients[i], axis_pullbacks, self.tol):
                             continue
-                        numerator, denominator = _physical_node_row(riesz[i], pullbacks, self.tol)
+                        numerator, denominator = _physical_node_row(riesz[i], axis_pullbacks, self.tol)
                         numerator = numerator * measure
-                        outside = [j for j in range(self._element.space_dimension()) if j not in allowed
-                                   and not isinstance(numerator[j], gem.Zero)]
+                        outside = [j for j, entry in enumerate(numerator)
+                                   if j not in allowed and not isinstance(entry, gem.Zero)]
                         if outside:
                             raise NotImplementedError(f"Dof {i} on entity {(dim, entity)} couples outside its closure: {outside}")
                         rows[i] = numerator, denominator
@@ -529,6 +510,57 @@ def solve(A, B, cache=None):
     return X
 
 
+class PhysicalPullbacks:
+    """Select axis pullbacks, sharing geometry across nodes on the same cell."""
+
+    def __init__(self, ref_el, coordinate_mapping):
+        self.ref_el = ref_el
+        self.sd = ref_el.get_spatial_dimension()
+        bary, = ref_el.make_points(self.sd, 0, self.sd + 1)
+        if self.sd == 1:
+            # The signed determinant carries the orientation of the tangent.
+            J = gem.ListTensor([[coordinate_mapping.detJ_at(bary)]])
+        else:
+            J = coordinate_mapping.jacobian_at(bary)
+        self.J = numpy.array([[J[i, k] for k in range(J.shape[1])]
+                              for i in range(J.shape[0])], dtype=object)
+        self.adjJ, self.detJ = adjugate_and_determinant(self.J)
+        self._cartesian = {}
+        self._frames = {}
+        self._measures = {}
+
+    def select(self, node_mapping, axis_mappings, entity, support):
+        """Select Cartesian or physical frame pullbacks for the node's tensor axes."""
+        dim, entity_id = entity
+        if node_mapping == "cartesian":
+            pullbacks = []
+            for mapping in axis_mappings:
+                if 0 < dim < self.sd - 1 and mapping == "derivative":
+                    # Edge tangent derivatives are already fixed by the trace.
+                    pullbacks.append(_pullback(numpy.eye(self.sd)))
+                else:
+                    if mapping not in self._cartesian:
+                        self._cartesian[mapping] = _cartesian_pullback(mapping, self.J, self.adjJ, self.detJ)
+                    pullbacks.append(self._cartesian[mapping])
+            return pullbacks
+        if node_mapping == "frame":
+            key = (entity_id, support)
+            if key not in self._frames:
+                self._frames[key] = _frame_pullbacks(self.ref_el, entity_id, support, self.J, self.adjJ, self.detJ)
+            frame = self._frames[key]
+            return [frame[mapping] for mapping in axis_mappings]
+        raise NotImplementedError(f"No pullback for node mapping {node_mapping}")
+
+    def measure(self, facet):
+        """Return the physical facet measure induced by the cofactor map."""
+        if facet not in self._measures:
+            nu = self.ref_el.compute_scaled_normal(facet)
+            Knu = self.adjJ.T @ nu
+            reference_measure = self.ref_el.volume_of_subcomplex(self.sd - 1, facet)
+            self._measures[facet] = (reference_measure / numpy.linalg.norm(nu)) * (Knu @ Knu)**0.5
+        return self._measures[facet]
+
+
 def _pullback(invariant, terms=(), denominator=one):
     r"""Represent :math:`G=P+\sum_t g_t C_t/d` by P, numerator terms, and d."""
     invariant = numpy.asarray(invariant)
@@ -590,10 +622,21 @@ def _frame_pullbacks(ref_el, facet, support, J, adjJ, detJ):
     terms = [(Knu @ Knu, numpy.eye(sd) - P)]
     terms.extend((KtKnu @ -tau, numpy.outer(nu, tau)) for tau in tangents)
     contravariant = _pullback(P, terms, detJ * nn)
-    measure = (ref_el.volume_of_subcomplex(sd - 1, facet) / numpy.linalg.norm(nu)) * (Knu @ Knu)**0.5
     return {"affine": _pullback(numpy.eye(sd)), "covariant piola": covariant,
             "derivative": covariant, "contravariant piola": contravariant,
-            "divergence": _cartesian_pullback("divergence", J, adjJ, detJ)}, measure
+            "divergence": _cartesian_pullback("divergence", J, adjJ, detJ)}
+
+
+def _is_invariant(coefficients, pullbacks, tol):
+    """Check whether the node weights lie in every axis's invariant subspace."""
+    cutoff = tol * numpy.abs(coefficients).max()
+    for axis, (projector, _, _) in enumerate(pullbacks, start=1):
+        # Axis zero indexes quadrature points; the remaining axes transform.
+        complement = numpy.eye(projector.shape[0]) - projector
+        residual = numpy.tensordot(coefficients, complement, axes=(axis, 1))
+        if numpy.abs(residual).max() > cutoff:
+            return False
+    return True
 
 
 def _physical_node_row(riesz, pullbacks, tol):
