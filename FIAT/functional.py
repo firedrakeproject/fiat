@@ -358,38 +358,43 @@ class IntegralMomentOfDerivative(IntegralMoment):
 
     :arg ref_el: a :class:`Cell`.
     :arg Q: a :class:`QuadratureRule`.
-    :arg f_at_qpts: an array tabulating the function f at the quadrature
-         points.
-    :arg *directions: a list of vectors of directions of differentiation.
+    :arg f_at_qpts: Values of f at the quadrature points. If directions are
+         omitted, component axes precede derivative axes, with the quadrature
+         point axis last.
+    :arg *directions: Optional vectors of directions of differentiation.
     :arg comp: Optional argument indicating that only a particular
          component of the input function should be integrated against f
     :arg shp: Optional argument giving the value shape of input functions.
     """
 
     def __init__(self, ref_el, Q, f_at_qpts, *directions, comp=(), shp=(), nm=""):
+        sd = ref_el.get_spatial_dimension()
+        f_at_qpts = numpy.asarray(f_at_qpts)
+        if directions:
+            for direction in reversed(directions):
+                f_at_qpts = numpy.multiply.outer(direction, f_at_qpts)
+            coefficients = numpy.zeros(shp + f_at_qpts.shape)
+            coefficients[comp] = f_at_qpts
+            f_at_qpts = coefficients
+        order = f_at_qpts.ndim - len(shp) - 1
+        if order < 1 or f_at_qpts.shape != shp + (sd,) * order + (len(Q.pts),):
+            raise ValueError("Expected component axes, derivative axes, and quadrature points")
+
         self.Q = Q
         self.f_at_qpts = f_at_qpts
-        self.comp = comp
-
-        S = directions[0]
-        for dj in directions[1:]:
-            S = numpy.outer(S, dj)
-
-        sd = ref_el.get_spatial_dimension()
-        tau = defaultdict(float)
-        for index in numpy.ndindex(S.shape):
-            alpha = [0] * sd
-            for i in index:
-                alpha[i] += 1
-            tau[tuple(alpha)] += S[index]
-
-        points = Q.get_points()
+        self.comp = slice(None)
+        self.weights = {}
         weights = numpy.multiply(f_at_qpts, Q.get_weights())
-        self.weights = {alpha: weights*tau[alpha] for alpha in tau}
+        for index in numpy.ndindex((sd,) * order):
+            alpha = tuple(numpy.bincount(index, minlength=sd))
+            if alpha not in self.weights:
+                self.weights[alpha] = numpy.zeros(shp + (len(Q.pts),))
+            self.weights[alpha] += weights[..., *index, :]
 
-        dpt_dict = {tuple(pt): [(wt*tau[alpha], alpha, comp) for alpha in tau]
-                    for pt, wt in zip(points, weights)}
-
+        components = list(numpy.ndindex(shp))
+        dpt_dict = {tuple(pt): [(values[component + (q,)], alpha, component)
+                                for alpha, values in self.weights.items() for component in components]
+                    for q, pt in enumerate(Q.get_points())}
         Functional.__init__(self, ref_el, shp, {}, dpt_dict, nm or "IntegralMomentOfDerivative")
 
 
@@ -489,49 +494,22 @@ class IntegralLegendreTangentialTangentialMoment(IntegralLegendreBidirectionalMo
                          "IntegralTangentialTangentialLegendreMoment")
 
 
-class IntegralMomentOfDivergence(IntegralMoment):
+class IntegralMomentOfDivergence(IntegralMomentOfDerivative):
     """Functional representing integral of the divergence of the input
     against some tabulated function f."""
     def __init__(self, ref_el, Q, f_at_qpts):
-        self.f_at_qpts = f_at_qpts
-        self.Q = Q
-
         sd = ref_el.get_spatial_dimension()
-        shp = f_at_qpts.shape[1:-1] + (sd,)
-
-        points = Q.get_points()
-        self.dpts = points
-        weights = numpy.multiply(f_at_qpts, Q.get_weights())
-
-        alphas = tuple(map(tuple, numpy.eye(sd, dtype=int)))
-        dpt_dict = {tuple(pt): [(wt, alphas[i], (i,)) for i in range(sd)]
-                    for pt, wt in zip(points, weights)}
-
-        Functional.__init__(self, ref_el, shp, {}, dpt_dict,
-                            "IntegralMomentOfDivergence")
+        coefficients = numpy.eye(sd)[..., None] * f_at_qpts
+        super().__init__(ref_el, Q, coefficients, shp=(sd,), nm="IntegralMomentOfDivergence")
 
 
-class IntegralMomentOfTensorDivergence(IntegralMoment):
+class IntegralMomentOfTensorDivergence(IntegralMomentOfDerivative):
     """Like IntegralMomentOfDivergence, but on symmetric tensors."""
 
     def __init__(self, ref_el, Q, f_at_qpts):
-        self.f_at_qpts = f_at_qpts
-        self.Q = Q
-        points = Q.get_points()
-        self.dpts = points
         sd = ref_el.get_spatial_dimension()
-        shp = (sd, sd)
-
-        assert len(f_at_qpts.shape) == 2
-        assert f_at_qpts.shape[0] == sd
-        assert f_at_qpts.shape[1] == len(points)
-        weights = numpy.multiply(f_at_qpts, Q.get_weights()).T
-
-        alphas = tuple(map(tuple, numpy.eye(sd, dtype=int)))
-        dpt_dict = {tuple(pt): [(wt[i], alphas[j], (i, j)) for i, j in numpy.ndindex(shp)]
-                    for pt, wt in zip(points, weights)}
-
-        Functional.__init__(self, ref_el, tuple(), {}, dpt_dict, "IntegralMomentOfDivergence")
+        coefficients = numpy.einsum("iq,jk->ijkq", f_at_qpts, numpy.eye(sd))
+        super().__init__(ref_el, Q, coefficients, shp=(sd, sd), nm="IntegralMomentOfTensorDivergence")
 
 
 class PointNormalEvaluation(Functional):

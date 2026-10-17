@@ -184,13 +184,12 @@ class DualSet:
 
         def map_quadratures_to_points(nodes, deriv=False):
             Qs_to_ells = defaultdict(list)
-            moment_type = functional.IntegralMomentOfDerivative if deriv else functional.IntegralMoment
             for i, ell in enumerate(nodes):
                 if deriv and len(ell.deriv_dict) == 0:
                     continue
                 elif not deriv and len(ell.pt_dict) == 0:
                     continue
-                if isinstance(ell, moment_type):
+                if isinstance(ell, functional.IntegralMoment):
                     Q = ell.Q
                 else:
                     Q = None
