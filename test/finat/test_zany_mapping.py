@@ -6,7 +6,8 @@ import pytest
 import pprint
 
 from gem.interpreter import evaluate
-from finat.physically_mapped import PhysicallyMappedElement, adjugate_and_determinant
+from finat.physically_mapped import PhysicallyMappedElement
+from finat.physically_mapped import adjugate_and_determinant
 
 
 def test_rectangular_adjugate_and_determinant():

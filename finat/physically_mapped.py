@@ -8,15 +8,14 @@ where :math:`B_{ij} = n_i(\mathcal{P}\hat\psi_j)` and :math:`M = B^{-T}`
 
 from abc import ABCMeta, abstractmethod
 from collections.abc import Mapping
-from functools import cached_property
+from functools import cached_property, reduce
+from itertools import product
+from operator import mul
 
 import gem
 import numpy
 
 from finat.citations import cite
-from finat.functional import (DERIVATIVE, Functional, PhysicalEntityFrame,
-                              cartesian_pullback, identity_pullback, physical_node_row,
-                              to_riesz, one, zero)
 
 
 class NeedsCoordinateMappingElement(metaclass=ABCMeta):
@@ -97,16 +96,10 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
 
         :arg coordinate_mapping: Object providing the physical geometry
             as GEM expressions.
-        :returns: A ``gem.ListTensor`` of shape ``(space_dimension(),
-            nbf)``, with the trailing constraint columns of an extended
-            element truncated.
+        :returns: A ``gem.ListTensor`` with exposed physical dofs as rows
+            and the complete reference basis as columns.
         """
-        V = self.physical_vandermonde(coordinate_mapping).inverse()
-        for i, scale in enumerate(self.dof_scales(coordinate_mapping)):
-            if scale is not None:
-                V[:, i] = V[:, i] * scale
-        ndof = self.space_dimension()
-        return gem.ListTensor(V[:, :ndof].T)
+        return self.physically_mapped_dual.basis_transformation(coordinate_mapping)
 
     def dual_transformation(self, Q, coordinate_mapping=None):
         r"""Transforms reference dual evaluation into physical dual evaluation.
@@ -122,14 +115,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
             as GEM expressions.
         :returns: The physical dual evaluation gem weight tensor.
         """
-        B = self.physical_vandermonde(coordinate_mapping).matrix()
-        for i, scale in enumerate(self.dof_scales(coordinate_mapping)):
-            if scale is not None:
-                B[i] = B[i] / scale
-        indices = self.restriction_indices
-        if indices is None:
-            indices = list(range(self.space_dimension()))
-        B = gem.ListTensor(B[numpy.ix_(indices, indices)])
+        B = self.physically_mapped_dual.dual_transformation(coordinate_mapping)
 
         key = None
         return MappedTabulation(B, {key: Q})[key]
@@ -143,69 +129,14 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         result = super().basis_evaluation(order, ps, entity=entity)
         return self.map_tabulation(result, coordinate_mapping)
 
-    def physical_vandermonde(self, coordinate_mapping):
-        """The physical Vandermonde matrix of the element.
-
-        :arg coordinate_mapping: Object providing the physical geometry
-            as GEM expressions.
-        :returns: The :class:`PhysicalVandermondeMatrix`.
-        """
-        ref_el = self._element.get_reference_element()
-        sd = ref_el.get_spatial_dimension()
-        bary, = ref_el.make_points(sd, 0, sd + 1)
-        if sd == 1:
-            # The tangent derivative on a one-dimensional manifold carries
-            # the orientation in the signed Jacobian determinant.
-            J = gem.ListTensor([[coordinate_mapping.detJ_at(bary)]])
-        else:
-            J = coordinate_mapping.jacobian_at(bary)
-        J = numpy.array([[J[i, k] for k in range(J.shape[1])]
-                         for i in range(J.shape[0])], dtype=object)
-        return PhysicalVandermondeMatrix(self._element, self.functionals, self.reference_riesz,
-                                         J, self.tol, avg=self.avg)
-
     @cached_property
-    def functionals(self):
-        """The degrees of freedom as coefficient tensors.
-
-        Unparsed constraint nodes retain identity rows in the extended
-        element (Kirby 2017, section 5).  Every exposed dof must be parsed.
-
-        :returns: A list with a :class:`~finat.functional.Functional` per
-            dof, or None for a dof keeping an identity row.
-        """
-        fiat_element = self._element
-        fiat_nodes = fiat_element.dual_basis()
-        mappings = fiat_element.mapping()
-        ndof = self.space_dimension()
-        functionals = [None] * len(fiat_nodes)
-        for dim, entities in fiat_element.entity_dofs().items():
-            for entity, dofs in entities.items():
-                for i in dofs:
-                    try:
-                        functionals[i] = Functional(fiat_nodes[i], (dim, entity), mappings[i])
-                    except NotImplementedError:
-                        if i < ndof:
-                            raise
-        return functionals
-
-    @cached_property
-    def reference_riesz(self):
-        """Numeric reference pairings for the physical Vandermonde rows.
-
-        :returns: A dict mapping dofs to their Riesz representations.
-        """
-        return to_riesz(self.functionals, self._element)
-
-    def dof_scales(self, coordinate_mapping):
-        """Return the conditioning scales inferred from the physical nodes.
-
-        :arg coordinate_mapping: Object providing the cell size at each vertex.
-        :returns: A scale per FIAT dof, or None for no rescaling.
-        """
-        h = coordinate_mapping.cell_size()
-        return [node.dof_scale(h, avg=self.avg, tol=self.tol) if node is not None else None
-                for node in self.functionals]
+    def physically_mapped_dual(self):
+        """The processor for the complete FIAT dual set."""
+        indices = self.restriction_indices
+        if indices is None:
+            indices = sorted(i for entities in self.entity_dofs().values()
+                             for dofs in entities.values() for i in dofs)
+        return PhysicallyMappedDualSet(self._element, indices, avg=self.avg, tol=self.tol)
 
 
 class DirectlyDefinedElement(NeedsCoordinateMappingElement):
@@ -296,6 +227,10 @@ class PhysicalGeometry(metaclass=ABCMeta):
 
         :returns: a GEM expression for the physical vertices, shape
                 (gdim, )."""
+
+
+zero = gem.Zero()
+one = gem.Literal(1.0)
 
 
 def identity(*shape):
@@ -428,123 +363,128 @@ def solve(A, B, cache=None):
     return X
 
 
-class PhysicalVandermondeMatrix:
-    r"""The generalized Vandermonde matrix of the physical nodes.
+class PhysicallyMappedDualSet:
+    """Process a FIAT dual set into symbolic physical transformations.
 
-    :math:`B_{ij} = n_i(\mathcal{P}\hat\psi_j)` pairs physical nodes with
-    mapped reference basis functions.  Closure compatibility makes :math:`B`
-    block lower triangular over entities.  Row assembly checks this property;
-    it requires more than conformity for nodes involving normal derivatives.
-
-    :arg fiat_element: The FIAT element.
-    :arg functionals: A :class:`~finat.functional.Functional` per dof, or
-        None for a dof whose physical node is the push-forward of the
-        reference one.
-    :arg reference_riesz: Numeric reference pairings from :func:`~finat.functional.to_riesz`.
-    :arg J: The Jacobian as an object array of GEM scalars.
-    :arg tol: Relative tolerance below which numeric couplings are dropped.
-    :arg avg: Whether physical facet moments are integral averages, as
-        the reference nodes are; if not, they carry the physical facet
-        measure.
+    Parameters
+    ----------
+    element : FIAT.finite_element.CiarletElement
+        Reference element, including its completion functions.
+    indices : sequence of int
+        Exposed physical degrees of freedom in reference numbering.
+    avg : bool
+        Use physical averages for framed moments.
+    tol : float
+        Relative tolerance for numeric reference identities.
     """
-    def __init__(self, fiat_element, functionals, reference_riesz, J, tol, avg=True):
-        self.fiat_element = fiat_element
-        self.functionals = functionals
-        self.J = J
-        self.adjJ, self.detJ = adjugate_and_determinant(J)
+
+    def __init__(self, element, indices, avg=True, tol=1e-10):
+        self.dual = element.get_dual_set()
+        self.ref_el = self.dual.get_reference_element()
+        self.indices = list(indices)
         self.tol = tol
-        self.avg = avg
-        self.reference_riesz = reference_riesz
+        self.data = self.dual.mapping_data(element.get_nodal_basis(), element.mapping(), avg, tol)
 
-    @cached_property
-    def rows(self):
-        r"""Assembles the rows of :math:`B` that are not rows of the identity.
+    def basis_transformation(self, coordinate_mapping):
+        """Return the conditioned inverse transpose of the physical Vandermonde.
 
-        Each row is kept in numerator/denominator form, and is checked
-        to be supported on the closure of its entity.
+        Parameters
+        ----------
+        coordinate_mapping : PhysicalGeometry
+            Geometry expressed in GEM.
 
-        :returns: A dict mapping the dof to its ``(numerator, denominator)``
-            pair of an object array of GEM scalars and a GEM scalar.
+        Returns
+        -------
+        gem.ListTensor
+            Physical basis coefficients, including completion columns.
         """
-        fiat_element = self.fiat_element
-        nbf = fiat_element.space_dimension()
-        sd = self.J.shape[1]
-        closure_dofs = fiat_element.entity_closure_dofs()
-        cartesian = {}
-        frames = {}
-        rows = {}
-        for i, node in enumerate(self.functionals):
-            if node is None or node.transformation == "invariant":
-                continue
-            if node.transformation == "cartesian":
-                for mapping in node.mappings:
+        V = self._inverse(self._rows(coordinate_mapping))
+        for i, scale in self._scales(coordinate_mapping):
+            V[:, i] = V[:, i] * scale
+        return gem.ListTensor(V[:, self.indices].T)
+
+    def dual_transformation(self, coordinate_mapping):
+        """Return the conditioned physical Vandermonde on exposed degrees of freedom.
+
+        Parameters
+        ----------
+        coordinate_mapping : PhysicalGeometry
+            Geometry expressed in GEM.
+
+        Returns
+        -------
+        gem.ListTensor
+            Transformation of reference dual weights.
+        """
+        B = identity(len(self.dual))
+        for i, (numerator, denominator) in self._rows(coordinate_mapping).items():
+            B[i] = numerator / denominator
+        for i, scale in self._scales(coordinate_mapping):
+            B[i] = B[i] / scale
+        return gem.ListTensor(B[numpy.ix_(self.indices, self.indices)])
+
+    def _scales(self, coordinate_mapping):
+        h = coordinate_mapping.cell_size()
+        topology = self.ref_el.get_topology()
+        for i, node in self.data.items():
+            if node["exponent"]:
+                dim, entity = node["entity"]
+                vertices = topology[dim][entity]
+                havg = sum(h[v] for v in vertices) / len(vertices)
+                yield i, havg**-node["exponent"]
+
+    def _rows(self, coordinate_mapping):
+        sd = self.ref_el.get_spatial_dimension()
+        bary, = self.ref_el.make_points(sd, 0, sd + 1)
+        J = (gem.ListTensor([[coordinate_mapping.detJ_at(bary)]]) if sd == 1
+             else coordinate_mapping.jacobian_at(bary))
+        J = numpy.array([[J[i, k] for k in range(J.shape[1])]
+                         for i in range(J.shape[0])], dtype=object)
+        adjJ, detJ = adjugate_and_determinant(J)
+        cartesian, frames, rows = {}, {}, {}
+        closures = self.dual.get_entity_closure_ids()
+        for i, node in self.data.items():
+            dim, entity = node["entity"]
+            if node["convention"] == "cartesian":
+                for mapping in node["mappings"]:
                     if mapping not in cartesian:
-                        cartesian[mapping] = cartesian_pullback(mapping, self.J, self.adjJ, self.detJ)
-                on_edge = 0 < node.entity[0] < sd - 1
-                pullbacks = [identity_pullback(sd) if on_edge and mapping == DERIVATIVE
-                             else cartesian[mapping] for mapping in node.mappings]
+                        cartesian[mapping] = _cartesian_pullback(mapping, J, adjJ, detJ)
+                pullbacks = [_pullback(numpy.eye(sd)) if 0 < dim < sd - 1 and mapping == "derivative"
+                             else cartesian[mapping] for mapping in node["mappings"]]
                 measure = one
             else:
-                key = (node.entity[1], node.support)
+                key = (entity, node["support"])
                 if key not in frames:
-                    frames[key] = PhysicalEntityFrame(node.ref_el, *key, self.J, self.adjJ, self.detJ)
-                frame = frames[key]
-                pullbacks = [frame.pullback(mapping) for mapping in node.mappings]
-                measure = frame.measure if not self.avg and len(node.points) > 1 else one
-            if node.is_invariant(pullbacks, self.tol):
+                    frames[key] = _frame_pullbacks(node["frame"], J, adjJ, detJ)
+                frame, measure = frames[key]
+                pullbacks = [frame[mapping] for mapping in node["mappings"]]
+                if not node["measure"]:
+                    measure = one
+            W = node["coefficients"]
+            if not node["measure"] and all(
+                    numpy.abs(numpy.tensordot(W, numpy.eye(P.shape[0]) - P, axes=(1 + k, 1))).max()
+                    <= self.tol * numpy.abs(W).max() for k, (P, _, _) in enumerate(pullbacks)):
                 continue
-            numerator, denominator = physical_node_row(self.reference_riesz[i], pullbacks, self.tol)
+            numerator, denominator = _physical_node_row(node["riesz"], pullbacks, self.tol)
             numerator = numerator * measure
-            dim, entity = node.entity
-            allowed = set(closure_dofs[dim][entity])
-            outside = [j for j in range(nbf) if j not in allowed
+            outside = [j for j in range(len(self.dual)) if j not in closures[dim][entity]
                        and not isinstance(numerator[j], gem.Zero)]
             if outside:
-                raise NotImplementedError(
-                    f"Dof {i} on entity {node.entity} couples to dofs "
-                    f"{outside} outside the closure of its entity.")
-            rows[i] = (numerator, denominator)
+                raise NotImplementedError(f"Dof {i} on entity {(dim, entity)} couples outside its closure: {outside}")
+            rows[i] = numerator, denominator
         return rows
 
-    def matrix(self):
-        r"""Computes :math:`B`.
-
-        :returns: :math:`B` as an object array of GEM scalars.
-        """
-        B = identity(self.fiat_element.space_dimension())
-        for i, (numerator, denominator) in self.rows.items():
-            B[i] = numerator / denominator
-        return B
-
-    def inverse(self):
-        r"""Computes :math:`V = B^{-1}` by block back-substitution over the entities.
-
-        Entities are visited in order of increasing dimension, and for
-        each entity :math:`e` with closure dofs :math:`c`
-
-        .. math:: V_e = B_{ee}^{-1}(I_e - B_{ec} V_c).
-
-        Only entities with transformed nodes are solved.  Row denominators
-        move to the right-hand side, keeping divisions out of the blocks.
-
-        :returns: :math:`V` as an object array of GEM scalars.
-        """
-        fiat_element = self.fiat_element
-        nbf = fiat_element.space_dimension()
-        entity_dofs = fiat_element.entity_dofs()
-        closure_dofs = fiat_element.entity_closure_dofs()
-        rows = self.rows
-        V = identity(nbf)
+    def _inverse(self, rows):
+        V = identity(len(self.dual))
         cache = {}
-        for dim in sorted(entity_dofs):
-            for entity, block in entity_dofs[dim].items():
+        for dim, entities in sorted(self.dual.get_entity_ids().items()):
+            for entity, block in entities.items():
                 if not any(i in rows for i in block):
                     continue
-                closure = [j for j in closure_dofs[dim][entity] if j not in block]
-                # B_ee V_e = D_e - B_ec V_c, with B = diag(1/D) numerators
+                closure = [j for j in self.dual.get_entity_closure_ids()[dim][entity] if j not in block]
                 n = len(block)
                 Bee = numpy.full((n, n), zero, dtype=object)
-                rhs = numpy.full((n, nbf), zero, dtype=object)
+                rhs = numpy.full((n, len(self.dual)), zero, dtype=object)
                 for k, i in enumerate(block):
                     if i not in rows:
                         Bee[k, k] = one
@@ -555,7 +495,84 @@ class PhysicalVandermondeMatrix:
                     rhs[k, i] = denominator
                     for j in closure:
                         if not isinstance(numerator[j], gem.Zero):
-                            # Array first: GEM scalar multiplication otherwise broadcasts.
                             rhs[k] = rhs[k] - V[j] * numerator[j]
                 V[block] = solve(Bee, rhs, cache)
         return V
+
+
+def _pullback(invariant, terms=(), denominator=one):
+    invariant = numpy.asarray(invariant)
+    numerator = list(terms)
+    if invariant.any():
+        numerator.insert(0, (denominator, invariant))
+    return invariant, numerator, denominator
+
+
+def _cartesian_pullback(mapping, J, adjJ, detJ):
+    sd = J.shape[1]
+    if mapping == "affine":
+        return _pullback(numpy.eye(sd))
+    if mapping == "divergence":
+        return _pullback(numpy.zeros((1, 1)), [(one, numpy.ones((1, 1)))], detJ)
+    if mapping == "contravariant piola":
+        Q = J.T
+    elif mapping in {"covariant piola", "derivative"}:
+        Q = adjJ
+    else:
+        raise NotImplementedError(f"No pullback for {mapping}")
+    units = numpy.eye(sd * sd).reshape(sd, sd, sd, sd)
+    return _pullback(numpy.zeros((sd, sd)), [(Q[a, b], units[a, b]) for a, b in numpy.ndindex(sd, sd)], detJ)
+
+
+def _frame_pullbacks(frame, J, adjJ, detJ):
+    tangents, nu, edge, volume = frame
+    tangents = list(tangents)
+    sd = len(nu)
+    K = adjJ.T
+    n = nu / numpy.linalg.norm(nu)
+    Kn = K @ n
+    normals = []
+    if edge is not None:
+        t = edge
+        m = numpy.cross(t, n)
+        m /= numpy.linalg.norm(m)
+        edge_tangents = [t / numpy.linalg.norm(t)]
+        w = numpy.cross(J.T @ (J @ t), n)
+        Jw = J @ w
+        normals.append((m, w, (Jw @ Jw)**0.5, edge_tangents + [m]))
+    else:
+        edge_tangents = tangents
+    frame = edge_tangents + [m for m, *_ in normals] + [n]
+    normals.append((n, adjJ @ Kn, detJ * (Kn @ Kn)**0.5, frame))
+    P = numpy.eye(sd) - sum(numpy.outer(n, n) for n, *_ in normals)
+    dens = [d for _, _, d, _ in normals]
+    terms = []
+    for k, (n, u, _, frame) in enumerate(normals):
+        scale = reduce(mul, dens[:k] + dens[k+1:], one)
+        terms.extend(((u @ f) * scale, numpy.outer(f, n)) for f in frame)
+    covariant = _pullback(P, terms, reduce(mul, dens))
+    nn = nu @ nu
+    Knu = K @ nu
+    KtKnu = K.T @ Knu
+    P = numpy.outer(nu, nu) / nn
+    terms = [(Knu @ Knu, numpy.eye(sd) - P)]
+    terms.extend((KtKnu @ -tau, numpy.outer(nu, tau)) for tau in tangents)
+    contravariant = _pullback(P, terms, detJ * nn)
+    measure = (volume / numpy.linalg.norm(nu)) * (Knu @ Knu)**0.5
+    return {"affine": _pullback(numpy.eye(sd)), "covariant piola": covariant,
+            "derivative": covariant, "contravariant piola": contravariant,
+            "divergence": _cartesian_pullback("divergence", J, adjJ, detJ)}, measure
+
+
+def _physical_node_row(riesz, pullbacks, tol):
+    numerator = numpy.full(riesz.shape[1], zero, dtype=object)
+    cutoff = tol * numpy.abs(riesz).max()
+    for terms in product(*(terms for _, terms, _ in pullbacks)):
+        coefficients, matrices = zip(*terms) if terms else ((), ())
+        C = reduce(numpy.kron, matrices) if matrices else numpy.ones((1, 1))
+        reference_row = C.T.ravel() @ riesz
+        nonzeros = numpy.flatnonzero(numpy.abs(reference_row) > cutoff * numpy.abs(C).max())
+        coefficient = gem.Product(*coefficients)
+        for j in nonzeros:
+            numerator[j] += coefficient * reference_row[j]
+    return numerator, gem.Product(*(denominator for _, _, denominator in pullbacks))

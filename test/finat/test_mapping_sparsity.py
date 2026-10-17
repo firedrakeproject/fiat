@@ -21,6 +21,12 @@ class SymbolicMapping:
         return self.h
 
 
+def transformations(element, sd):
+    dual = finat.PhysicallyMappedDualSet(element._element, range(element._element.space_dimension()), avg=element.avg)
+    mapping = SymbolicMapping(sd)
+    return dual.dual_transformation(mapping).array, dual.basis_transformation(mapping).array.T
+
+
 def nonzeros(row):
     return {j for j, entry in enumerate(row) if not isinstance(entry, gem.Zero)}
 
@@ -37,9 +43,7 @@ def test_edge_moment_sparsity(element, degree, first_degree):
     """Integration by parts couples a normal moment to its endpoints and matching trace moment."""
     cell = FIAT.ufc_simplex(2)
     element = element(cell, degree, avg=True)
-    vandermonde = element.physical_vandermonde(SymbolicMapping(2))
-    B = vandermonde.matrix()
-    V = vandermonde.inverse()
+    B, V = transformations(element, 2)
     dofs = element._element.entity_dofs()
     k = degree - first_degree
     for edge, edge_dofs in dofs[1].items():
@@ -67,13 +71,11 @@ def test_edge_moment_sparsity(element, degree, first_degree):
 def test_vertex_jet_sparsity(sd, element, degree):
     """An affine chain rule mixes only derivatives of the same order at the same vertex."""
     element = element(FIAT.ufc_simplex(sd), degree)
-    vandermonde = element.physical_vandermonde(SymbolicMapping(sd))
-    B = vandermonde.matrix()
-    V = vandermonde.inverse()
+    B, V = transformations(element, sd)
     for dofs in element._element.entity_dofs()[0].values():
         for i in dofs:
-            order = element.functionals[i].order
-            expected = {j for j in dofs if element.functionals[j].order == order}
+            order = element._element.dual_basis()[i].max_deriv_order
+            expected = {j for j in dofs if element._element.dual_basis()[j].max_deriv_order == order}
             assert nonzeros(B[i]) == expected
             assert nonzeros(V[i]) == expected
 
@@ -82,9 +84,7 @@ def test_vertex_jet_sparsity(sd, element, degree):
 def test_piola_facet_sparsity(sd, order):
     """MTW normal moments are invariant; each tangential moment couples only to matching normal weights."""
     element = finat.MardalTaiWinther(FIAT.ufc_simplex(sd), order)
-    vandermonde = element.physical_vandermonde(SymbolicMapping(sd))
-    B = vandermonde.matrix()
-    V = vandermonde.inverse()
+    B, V = transformations(element, sd)
     nnormal = comb(order + sd - 1, sd - 1)
     for dofs in element._element.entity_dofs()[sd - 1].values():
         for i in dofs[:nnormal]:
@@ -110,9 +110,7 @@ def test_piola_facet_sparsity(sd, order):
 def test_entity_closure_sparsity(sd, element, degree):
     """Back-substitution introduces no couplings outside entity closures, including constraints."""
     element = element(FIAT.ufc_simplex(sd), degree)
-    vandermonde = element.physical_vandermonde(SymbolicMapping(sd))
-    B = vandermonde.matrix()
-    V = vandermonde.inverse()
+    B, V = transformations(element, sd)
     closures = element._element.entity_closure_dofs()
     for dim, entities in element._element.entity_dofs().items():
         for entity, dofs in entities.items():
