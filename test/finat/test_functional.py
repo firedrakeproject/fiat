@@ -1,3 +1,5 @@
+from itertools import chain
+
 import FIAT
 import gem
 import numpy as np
@@ -5,25 +7,50 @@ import pytest
 
 from gem.interpreter import evaluate
 from finat.fiat_elements import FiatElement
-from finat.physically_mapped import PhysicallyMappedElement
+from finat.physically_mapped import (PhysicallyMappedElement, _cartesian_pullbacks, _duality_projector,
+                                     _in_range, adjugate_and_determinant)
 
 
 class MappedElement(PhysicallyMappedElement, FiatElement):
     pass
 
 
-def test_divergence_detection_respects_tolerance():
-    """Near-divergence tensors are not classified using NumPy's default tolerance."""
+def test_duality_pairing_respects_tolerance():
+    """Near-divergence weights are not paired using NumPy's default tolerance."""
     ref_el = FIAT.ufc_simplex(2)
     node = FIAT.functional.Functional(
         ref_el, (2,), {},
         {(0.0, 0.0): [(1.0, (1, 0), (0,)),
                       (1.0 + 1.0e-6, (0, 1), (1,))]},
         "NearDivergence")
+    _, W = node.weight_tensors[1]
+    P = _duality_projector(2)
+    assert _in_range(np.eye(2)[..., None], (0, 1), P, 1.0e-12)
+    assert not _in_range(W, (0, 1), P, 1.0e-12)
 
-    _, _, mappings = node.as_tensor(mapping="contravariant piola", tol=1.0e-12)
 
-    assert mappings == ("contravariant piola", "derivative")
+def pullback_matrix(pullback):
+    coefficients, matrices = zip(*pullback.numerator())
+    coefficients, d = (result.arr for result in evaluate([gem.ListTensor(coefficients), pullback.denominator]))
+    return sum(c * C for c, C in zip(coefficients, matrices)) / d
+
+
+@pytest.mark.parametrize("sd", [2, 3])
+def test_duality_pullback(sd):
+    """Pairing a contravariant axis with a derivative axis only splits the Kronecker product."""
+    J = np.eye(sd) + np.random.default_rng(0).random((sd, sd))
+    adjJ, detJ = adjugate_and_determinant(np.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object))
+    J = np.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object)
+    pullbacks = _cartesian_pullbacks(J, adjJ, detJ)
+    contravariant, derivative, pair = (pullback_matrix(pullbacks[mapping])
+                                       for mapping in ("contravariant piola", "derivative", "duality"))
+    J, = evaluate([gem.ListTensor(J)])
+    J = J.arr
+    assert np.allclose(contravariant, J.T / np.linalg.det(J))
+    assert np.allclose(derivative, np.linalg.inv(J))
+    assert np.allclose(pair, np.kron(contravariant, derivative))
+    P = _duality_projector(sd)
+    assert np.allclose(pair @ P, P / np.linalg.det(J))
 
 
 @pytest.mark.parametrize("scaled", [False, True])
@@ -49,17 +76,16 @@ def test_recombined_physical_dual(ref_to_phys, scaled_ref_to_phys, scaled):
 
 @pytest.mark.parametrize("avg", [False, True])
 def test_single_point_moment(avg):
-    cell = FIAT.ufc_simplex(2)
-    Q = FIAT.quadrature_schemes.create_quadrature(cell.construct_subelement(1), 0)
-    node = FIAT.functional.IntegralMomentOfNormalDerivative(cell, 0, Q, np.ones(1))
-    ids = {0: {v: [] for v in cell.get_topology()[0]},
-           1: {e: [0] if e == 0 else [] for e in cell.get_topology()[1]}, 2: {0: []}}
-    dual = FIAT.dual_set.DualSet([node], cell, ids)
-    points, coefficients, axes = dual.as_tensor(["affine"])
-    assert len(points[0]) == 1
-    assert dual.node_mapping[0] == "frame"
-    assert isinstance(node, FIAT.functional.IntegralMoment)
-    assert dual.get_scaling_exponents(coefficients, axes, avg=avg)[0] == int(avg)
+    """A normal derivative moment at a single point is still an integral moment."""
+    element = MappedElement(FIAT.Morley(FIAT.ufc_simplex(2)))
+    element.avg = avg
+    dual = element._element.get_dual_set()
+    for i in chain.from_iterable(dual.entity_ids[1].values()):
+        points, _ = dual.nodes[i].weight_tensors[1]
+        assert len(points) == 1
+        assert dual.node_mapping[i] == "frame"
+        assert isinstance(dual.nodes[i], FIAT.functional.IntegralMoment)
+        assert element._scaling_exponents[i] == int(avg)
 
 
 def test_explicit_integral_convention(ref_to_phys):

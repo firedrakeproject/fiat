@@ -7,11 +7,11 @@ where :math:`B_{ij} = n_i(\mathcal{P}\hat\psi_j)` and :math:`M = B^{-T}`
 """
 
 from abc import ABCMeta, abstractmethod
+from collections import defaultdict
 from collections.abc import Mapping
 from functools import cached_property, reduce
-from itertools import product
+from itertools import chain, product
 from operator import mul
-from math import prod
 
 import gem
 import numpy
@@ -162,53 +162,147 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         return numpy.linalg.inv(self._element.get_dual_set().get_coeffs())
 
     @cached_property
-    def _dual_tensors(self):
-        return self._element.get_dual_set().as_tensor(self._element.mapping(), self.tol)
+    def _weights(self):
+        """The weight tensor of each node, see :attr:`FIAT.functional.Functional.weight_tensors`."""
+        weights = []
+        for node in self._element.get_dual_set().nodes:
+            if len(node.weight_tensors) > 1:
+                raise NotImplementedError(f"{type(node).__name__} mixes derivative orders.")
+            _, W = node.weight_tensors[node.max_deriv_order]
+            weights.append(W)
+        return weights
 
     @cached_property
-    def _reference_riesz(self):
-        r"""Source pairings :math:`R_{i,a,b,j}=\sum_q W_{i,q,a}(D_i\hat\psi^0_j)(x_{i,q})_b`.
+    def _axis_mappings(self):
+        """The mapping of each value and derivative axis of the weights of each node."""
+        axis_mappings = []
+        for node, mapping in zip(self._element.get_dual_set().nodes, self._element.mapping()):
+            rank = len(node.target_shape)
+            words = mapping.split()
+            if words == ["affine"]:
+                value_mappings = (mapping,) * rank
+            elif words[0] == "double":
+                value_mappings = (f"{words[1]} piola",) * 2
+            else:
+                value_mappings = tuple(f"{word} piola" for word in words[:-1])
+            if len(value_mappings) != rank:
+                raise ValueError(f"A {mapping} functional must have rank {len(value_mappings)}, not {rank}.")
+            axis_mappings.append(value_mappings + ("derivative",) * node.max_deriv_order)
+        return axis_mappings
 
-        The basis psi^0 is nodal to n_0. Indices a and b enumerate flattened
-        coefficient and derivative tensors.
+    @cached_property
+    def _axis_groups(self):
+        """Group the axes of the weights of each physical node by their pullback.
+
+        On Cartesian nodes, a contravariant axis paired with a covariant axis
+        through the identity is pulled back by duality, and derivatives along
+        an edge are fixed by its trace.
         """
         dual = self._element.get_dual_set()
-        points, coefficients, axis_mappings = self._dual_tensors
-        indices = [i for i, mapping in enumerate(dual.node_mapping) if mapping != "invariant"]
-        if not indices:
-            return {}
         sd = self.cell.get_spatial_dimension()
-        order = [sum(axis in ("derivative", "divergence") for axis in axes) for axes in axis_mappings]
-        evaluation_points = sorted({pt for i in indices for pt in points[i]})
-        columns = {pt: q for q, pt in enumerate(evaluation_points)}
-        tabulation = self._element.tabulate(max(order[i] for i in indices), evaluation_points)
+        groups = [None] * len(dual.nodes)
+        for dim, entities in dual.get_entity_ids().items():
+            for entity, dofs in entities.items():
+                for i in dofs:
+                    if dual.node_mapping[i] == "invariant":
+                        continue
+                    W = self._weights[i]
+                    axis_mappings = self._axis_mappings[i]
+                    cartesian = dual.node_mapping[i] == "cartesian"
+                    on_edge = cartesian and 0 < dim < sd - 1
+                    groups[i] = {}
+                    if cartesian:
+                        covectors = {"covariant piola"} if on_edge else {"covariant piola", "derivative"}
+                        for k, vector in enumerate(axis_mappings):
+                            for l, covector in enumerate(axis_mappings):
+                                if (vector == "contravariant piola" and covector in covectors
+                                        and not any(k in axes or l in axes for axes in groups[i])
+                                        and _in_range(W, (k, l), _duality_projector(sd), self.tol)):
+                                    groups[i][k, l] = "duality"
+                    for k, mapping in enumerate(axis_mappings):
+                        if any(k in axes for axes in groups[i]):
+                            continue
+                        if on_edge and mapping == "derivative":
+                            t = self.cell.compute_edge_tangent(entity)
+                            if not _in_range(W, (k,), numpy.outer(t, t) / (t @ t), self.tol):
+                                raise NotImplementedError("No physical convention for derivatives normal to an edge")
+                            mapping = "affine"
+                        groups[i][k,] = mapping
+        return groups
+
+    @cached_property
+    def _uncontracted_riesz(self):
+        r"""Uncontracted Riesz representation of each node in the source nodal basis.
+
+        :math:`R_{i,a,\beta,b,\gamma,j}=\sum_q W_{i,a,\beta,q}(\partial^\gamma\psi^0_j)_b(x_q)`,
+        where :math:`\psi^0` is the nodal basis of the nodes before
+        recombination. A pullback :math:`G` contracts it into the physical
+        Vandermonde row :math:`B_{ij}=\sum G_{b\gamma,a\beta}R_{i,a,\beta,b,\gamma,j}`.
+        """
+        dual = self._element.get_dual_set()
+        coeffs = self._element.get_coeffs()
         C = dual.get_coeffs()
         if C is not None:
             # The source nodal basis is C^T times the basis dual to C n_0.
-            tabulation = {alpha: numpy.tensordot(C.T, table, axes=(1, 0))
-                          for alpha, table in tabulation.items()}
-        riesz = {}
-        for i in indices:
-            cols = [columns[pt] for pt in points[i]]
-            values = tabulation[(0,) * sd][..., cols]
-            T = numpy.zeros(values.shape[:-1] + (sd,) * order[i] + values.shape[-1:])
-            prefix = (slice(None),) * (values.ndim - 1)
-            for index in numpy.ndindex((sd,) * order[i]):
-                alpha = tuple(numpy.bincount(index, minlength=sd))
-                T[prefix + index] = tabulation[alpha][..., cols]
-            if "divergence" in axis_mappings[i]:
-                T = numpy.trace(T, axis1=values.ndim - 2, axis2=-2)[..., None, :]
-            W = coefficients[i]
-            size = prod(W.shape[1:])
-            nbf = T.shape[0]
-            R = numpy.einsum("qa,jbq->abj", W.reshape(-1, size), T.reshape(nbf, size, -1))
-            riesz[i] = R.reshape(size * size, nbf)
-        return riesz
+            coeffs = numpy.tensordot(C.T, coeffs, axes=(1, 0))
+        riesz = dual.to_uncontracted_riesz(self._element.get_nodal_basis())
+        result = [None] * len(dual.nodes)
+        for i, (node, W) in enumerate(zip(dual.nodes, self._weights)):
+            if dual.node_mapping[i] == "invariant":
+                continue
+            rank = len(node.target_shape)
+            R = numpy.tensordot(riesz[node.max_deriv_order][i], coeffs, axes=(-1, -1))
+            # (a, beta, gamma, j, b) -> (a, beta, b, gamma, j)
+            result[i] = numpy.moveaxis(R, range(R.ndim - rank, R.ndim), range(W.ndim - 1, W.ndim - 1 + rank))
+        return result
+
+    @cached_property
+    def _entity_support_ids(self):
+        """Partition each entity_ids[dim][entity] by the smallest entity containing the points of each node."""
+        dual = self._element.get_dual_set()
+        top = dual.ref_el.get_topology()
+        support_ids = {}
+        for dim, entities in dual.get_entity_ids().items():
+            support_ids[dim] = {}
+            for entity, dofs in entities.items():
+                supports = defaultdict(list)
+                for i in dofs:
+                    node = dual.nodes[i]
+                    bary = dual.ref_el.compute_barycentric_coordinates(numpy.array([*node.pt_dict, *node.deriv_dict]))
+                    # A nonzero barycentric coordinate requires its vertex in the entity.
+                    verts = set(numpy.flatnonzero(numpy.abs(bary).max(axis=0) > 1e-12))
+                    support = next((d, e) for d in sorted(top) for e in sorted(top[d]) if verts <= set(top[d][e]))
+                    supports[support].append(i)
+                support_ids[dim][entity] = dict(supports)
+        return support_ids
 
     @cached_property
     def _scaling_exponents(self):
-        _, coefficients, axis_mappings = self._dual_tensors
-        return self._element.get_dual_set().get_scaling_exponents(coefficients, axis_mappings, self.avg, self.tol)
+        r"""The exponents :math:`p_i` such that each physical node dilates as :math:`h^{-p_i}`.
+
+        The avg flag selects physical averages for framed integral moments.
+        """
+        dual = self._element.get_dual_set()
+        sd = self.cell.get_spatial_dimension()
+        exponents = numpy.zeros(len(dual.nodes), dtype=int)
+        for dim, entities in dual.get_entity_ids().items():
+            for entity, dofs in entities.items():
+                for i in dofs:
+                    axis_mappings = self._axis_mappings[i]
+                    if dual.node_mapping[i] == "cartesian":
+                        weights = {"derivative": 1, "covariant piola": 1, "contravariant piola": sd - 1}
+                        exponents[i] = sum(weights.get(mapping, 0) for mapping in axis_mappings)
+                    elif dual.node_mapping[i] == "frame":
+                        exponents[i] = axis_mappings.count("derivative")
+                        nu = self.cell.compute_scaled_normal(entity)
+                        for k, mapping in enumerate(axis_mappings):
+                            # Tangential components of a contravariant axis
+                            if mapping == "contravariant piola" and not _in_range(
+                                    self._weights[i], (k,), numpy.outer(nu, nu) / (nu @ nu), self.tol):
+                                exponents[i] += 2 - sd
+                        if isinstance(dual.nodes[i], IntegralMoment) and not self.avg:
+                            exponents[i] -= dim
+        return exponents
 
     def _dof_scales(self, coordinate_mapping):
         h = coordinate_mapping.cell_size()
@@ -228,36 +322,49 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
     def _physical_rows(self, coordinate_mapping):
         """Assemble nonidentity Vandermonde rows in numerator/denominator form.
 
-        Contract the selected pullbacks with FIAT's reference pairings, then
-        check that each physical node couples only to its entity's closure.
+        Contract the pullback of each node with its uncontracted Riesz
+        representation, then check that each physical node couples only to
+        its entity's closure.
         """
-        pullbacks = PhysicalPullbacks(self.cell, coordinate_mapping)
+        sd = self.cell.get_spatial_dimension()
+        bary, = self.cell.make_points(sd, 0, sd + 1)
+        if sd == 1:
+            # The signed determinant carries the orientation of the tangent.
+            J = gem.ListTensor([[coordinate_mapping.detJ_at(bary)]])
+        else:
+            J = coordinate_mapping.jacobian_at(bary)
+        J = numpy.array([[J[i, k] for k in range(J.shape[1])] for i in range(J.shape[0])], dtype=object)
+        adjJ, detJ = adjugate_and_determinant(J)
+        cartesian = _cartesian_pullbacks(J, adjJ, detJ)
+
         dual = self._element.get_dual_set()
         closures = self._element.entity_closure_dofs()
-        _, coefficients, axis_mappings = self._dual_tensors
-        riesz = self._reference_riesz
         rows = {}
-        for dim, entities in closures.items():
-            for entity, closure_dofs in entities.items():
-                allowed = set(closure_dofs)
-                for support, dofs in dual.entity_support_ids[dim][entity].items():
+        for dim, entities in self._entity_support_ids.items():
+            for entity, supports in entities.items():
+                for support, dofs in supports.items():
+                    if any(dual.node_mapping[i] == "frame" for i in dofs):
+                        frame = _frame_pullbacks(self.cell, entity, support, J, adjJ, detJ)
                     for i in dofs:
-                        node_mapping = dual.node_mapping[i]
-                        if node_mapping == "invariant":
+                        if dual.node_mapping[i] == "invariant":
                             continue
-                        axis_pullbacks = pullbacks.select(node_mapping, axis_mappings[i], (dim, entity), support)
+                        pullbacks = frame if dual.node_mapping[i] == "frame" else cartesian
                         measure = one
-                        if node_mapping == "frame" and not self.avg and isinstance(dual.nodes[i], IntegralMoment):
-                            measure = pullbacks.measure(entity)
-                        if measure == one and _is_invariant(coefficients[i], axis_pullbacks, self.tol):
+                        if dual.node_mapping[i] == "frame" and not self.avg and isinstance(dual.nodes[i], IntegralMoment):
+                            # The physical facet measure induced by the cofactor map
+                            nu = self.cell.compute_scaled_normal(entity)
+                            Knu = adjJ.T @ nu
+                            measure = self.cell.volume_of_subcomplex(sd - 1, entity) / numpy.linalg.norm(nu) * (Knu @ Knu)**0.5
+                        row = _physical_row(self._uncontracted_riesz[i], self._weights[i],
+                                            {axes: pullbacks[mapping] for axes, mapping in self._axis_groups[i].items()},
+                                            measure, self.tol)
+                        if row is None:
                             continue
-                        numerator, denominator = _physical_node_row(riesz[i], axis_pullbacks, self.tol)
-                        numerator = numerator * measure
-                        outside = [j for j, entry in enumerate(numerator)
-                                   if j not in allowed and not isinstance(entry, gem.Zero)]
+                        outside = [j for j, entry in enumerate(row[0])
+                                   if j not in closures[dim][entity] and not isinstance(entry, gem.Zero)]
                         if outside:
                             raise NotImplementedError(f"Dof {i} on entity {(dim, entity)} couples outside its closure: {outside}")
-                        rows[i] = numerator, denominator
+                        rows[i] = row
         return rows
 
     def _inverse_physical_vandermonde(self, rows):
@@ -511,80 +618,47 @@ def solve(A, B, cache=None):
     return X
 
 
-class PhysicalPullbacks:
-    """Select axis pullbacks, sharing geometry across nodes on the same cell."""
+class Pullback:
+    r"""The pullback :math:`G=(sP+\sum_t g_t C_t)/d` of a group of tensor axes.
 
-    def __init__(self, ref_el, coordinate_mapping):
-        self.ref_el = ref_el
-        self.sd = ref_el.get_spatial_dimension()
-        bary, = ref_el.make_points(self.sd, 0, self.sd + 1)
-        if self.sd == 1:
-            # The signed determinant carries the orientation of the tangent.
-            J = gem.ListTensor([[coordinate_mapping.detJ_at(bary)]])
-        else:
-            J = coordinate_mapping.jacobian_at(bary)
-        self.J = numpy.array([[J[i, k] for k in range(J.shape[1])]
-                              for i in range(J.shape[0])], dtype=object)
-        self.adjJ, self.detJ = adjugate_and_determinant(self.J)
-        self._cartesian = {}
-        self._frames = {}
-        self._measures = {}
+    The terms :math:`C_t` vanish on the range of the projector :math:`P`,
+    where :math:`G` only scales by :math:`s/d`. By default :math:`s=d`.
+    """
 
-    def select(self, node_mapping, axis_mappings, entity, support):
-        """Select Cartesian or physical frame pullbacks for the node's tensor axes."""
-        dim, entity_id = entity
-        if node_mapping == "cartesian":
-            pullbacks = []
-            for mapping in axis_mappings:
-                if 0 < dim < self.sd - 1 and mapping == "derivative":
-                    # Edge tangent derivatives are already fixed by the trace.
-                    pullbacks.append(_pullback(numpy.eye(self.sd)))
-                else:
-                    if mapping not in self._cartesian:
-                        self._cartesian[mapping] = _cartesian_pullback(mapping, self.J, self.adjJ, self.detJ)
-                    pullbacks.append(self._cartesian[mapping])
-            return pullbacks
-        if node_mapping == "frame":
-            key = (entity_id, support)
-            if key not in self._frames:
-                self._frames[key] = _frame_pullbacks(self.ref_el, entity_id, support, self.J, self.adjJ, self.detJ)
-            frame = self._frames[key]
-            return [frame[mapping] for mapping in axis_mappings]
-        raise NotImplementedError(f"No pullback for node mapping {node_mapping}")
+    def __init__(self, projector, terms=(), denominator=one, scale=None):
+        self.projector = numpy.asarray(projector)
+        self.terms = list(terms)
+        self.denominator = denominator
+        self.scale = denominator if scale is None else scale
 
-    def measure(self, facet):
-        """Return the physical facet measure induced by the cofactor map."""
-        if facet not in self._measures:
-            nu = self.ref_el.compute_scaled_normal(facet)
-            Knu = self.adjJ.T @ nu
-            reference_measure = self.ref_el.volume_of_subcomplex(self.sd - 1, facet)
-            self._measures[facet] = (reference_measure / numpy.linalg.norm(nu)) * (Knu @ Knu)**0.5
-        return self._measures[facet]
+    def numerator(self, in_range=False):
+        """The numerator terms of G, restricted to the range of P if in_range."""
+        terms = [] if in_range else self.terms
+        if self.projector.any():
+            terms = [(self.scale, self.projector), *terms]
+        return terms
 
 
-def _pullback(invariant, terms=(), denominator=one):
-    r"""Represent :math:`G=P+\sum_t g_t C_t/d` by P, numerator terms, and d."""
-    invariant = numpy.asarray(invariant)
-    numerator = list(terms)
-    if invariant.any():
-        numerator.insert(0, (denominator, invariant))
-    return invariant, numerator, denominator
-
-
-def _cartesian_pullback(mapping, J, adjJ, detJ):
+def _cartesian_pullbacks(J, adjJ, detJ):
+    """Pull back each axis mapping in Cartesian components."""
     sd = J.shape[1]
-    if mapping == "affine":
-        return _pullback(numpy.eye(sd))
-    if mapping == "divergence":
-        return _pullback(numpy.zeros((1, 1)), [(one, numpy.ones((1, 1)))], detJ)
-    if mapping == "contravariant piola":
-        Q = J.T
-    elif mapping in {"covariant piola", "derivative"}:
-        Q = adjJ
-    else:
-        raise NotImplementedError(f"No pullback for {mapping}")
     units = numpy.eye(sd * sd).reshape(sd, sd, sd, sd)
-    return _pullback(numpy.zeros((sd, sd)), [(Q[a, b], units[a, b]) for a, b in numpy.ndindex(sd, sd)], detJ)
+    contravariant = Pullback(numpy.zeros((sd, sd)), [(J[b, a], units[a, b]) for a, b in numpy.ndindex(sd, sd)], detJ)
+    covariant = Pullback(numpy.zeros((sd, sd)), [(adjJ[a, b], units[a, b]) for a, b in numpy.ndindex(sd, sd)], detJ)
+    # The pairing of a contravariant axis with a covariant axis only scales by 1/detJ.
+    P = _duality_projector(sd)
+    complement = numpy.eye(sd * sd) - P
+    duality = Pullback(P, [(g * h, numpy.kron(C, D) @ complement)
+                           for (g, C), (h, D) in product(contravariant.terms, covariant.terms)],
+                       detJ * detJ, scale=detJ)
+    return {"affine": Pullback(numpy.eye(sd)), "contravariant piola": contravariant,
+            "covariant piola": covariant, "derivative": covariant, "duality": duality}
+
+
+def _duality_projector(sd):
+    """Projector onto the identity, the pairing of a contravariant axis with a covariant axis."""
+    delta = numpy.eye(sd).ravel()
+    return numpy.outer(delta, delta) / sd
 
 
 def _frame_pullbacks(ref_el, facet, support, J, adjJ, detJ):
@@ -615,41 +689,50 @@ def _frame_pullbacks(ref_el, facet, support, J, adjJ, detJ):
     for k, (n, u, _, frame) in enumerate(normals):
         scale = reduce(mul, dens[:k] + dens[k+1:], one)
         terms.extend(((u @ f) * scale, numpy.outer(f, n)) for f in frame)
-    covariant = _pullback(P, terms, reduce(mul, dens))
+    covariant = Pullback(P, terms, reduce(mul, dens))
     nn = nu @ nu
     Knu = K @ nu
     KtKnu = K.T @ Knu
     P = numpy.outer(nu, nu) / nn
     terms = [(Knu @ Knu, numpy.eye(sd) - P)]
     terms.extend((KtKnu @ -tau, numpy.outer(nu, tau)) for tau in tangents)
-    contravariant = _pullback(P, terms, detJ * nn)
-    return {"affine": _pullback(numpy.eye(sd)), "covariant piola": covariant,
-            "derivative": covariant, "contravariant piola": contravariant,
-            "divergence": _cartesian_pullback("divergence", J, adjJ, detJ)}
+    contravariant = Pullback(P, terms, detJ * nn)
+    return {"affine": Pullback(numpy.eye(sd)), "covariant piola": covariant,
+            "derivative": covariant, "contravariant piola": contravariant}
 
 
-def _is_invariant(coefficients, pullbacks, tol):
-    """Check whether the node weights lie in every axis's invariant subspace."""
-    cutoff = tol * numpy.abs(coefficients).max()
-    for axis, (projector, _, _) in enumerate(pullbacks, start=1):
-        # Axis zero indexes quadrature points; the remaining axes transform.
-        complement = numpy.eye(projector.shape[0]) - projector
-        residual = numpy.tensordot(coefficients, complement, axes=(axis, 1))
-        if numpy.abs(residual).max() > cutoff:
-            return False
-    return True
+def _in_range(weights, axes, projector, tol):
+    """Whether the weights lie in the range of the projector on the given axes."""
+    W = numpy.moveaxis(weights, axes, range(len(axes))).reshape(projector.shape[1], -1)
+    return numpy.abs(W - projector @ W).max() <= tol * numpy.abs(weights).max()
 
 
-def _physical_node_row(riesz, pullbacks, tol):
-    r"""Contract :math:`B_j=\sum_{a,b}G_{ba}R_{abj}` in numerator/denominator form."""
-    numerator = numpy.full(riesz.shape[1], zero, dtype=object)
-    cutoff = tol * numpy.abs(riesz).max()
-    for terms in product(*(terms for _, terms, _ in pullbacks)):
+def _physical_row(riesz, weights, pullbacks, measure, tol):
+    r"""Contract :math:`B_j=\sum_{a,b}G_{ba}R_{abj}` in numerator/denominator form.
+
+    Each group of axes contributes a Kronecker factor of G. Returns None
+    if the node is invariant.
+    """
+    numerators = {}
+    invariant = measure == one
+    for axes, pullback in pullbacks.items():
+        in_range = _in_range(weights, axes, pullback.projector, tol)
+        invariant = invariant and in_range and pullback.scale == pullback.denominator
+        numerators[axes] = pullback.numerator(in_range)
+    if invariant:
+        return None
+
+    n = (riesz.ndim - 1) // 2
+    axes = list(chain.from_iterable(pullbacks))
+    R = riesz.transpose(*axes, *(n + k for k in axes), riesz.ndim - 1).reshape(-1, riesz.shape[-1])
+    numerator = numpy.full(R.shape[1], zero, dtype=object)
+    cutoff = tol * numpy.abs(R).max()
+    for terms in product(*numerators.values()):
         coefficients, matrices = zip(*terms) if terms else ((), ())
         C = reduce(numpy.kron, matrices) if matrices else numpy.ones((1, 1))
-        reference_row = C.T.ravel() @ riesz
+        reference_row = C.T.ravel() @ R
         nonzeros = numpy.flatnonzero(numpy.abs(reference_row) > cutoff * numpy.abs(C).max())
         coefficient = gem.Product(*coefficients)
         for j in nonzeros:
             numerator[j] += coefficient * reference_row[j]
-    return numerator, gem.Product(*(denominator for _, _, denominator in pullbacks))
+    return numerator * measure, gem.Product(*(pullback.denominator for pullback in pullbacks.values()))
