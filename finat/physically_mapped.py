@@ -136,10 +136,9 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
     def node_mapping(self):
         """The physical convention of each node: ``cartesian``, ``frame`` or ``invariant``.
 
-        Scalar values and interior moments, without derivatives, are
-        invariant. Other facet moments, and facet nodes with derivatives or
-        matrix values, are posed on the facet frame. All other nodes map as
-        Cartesian tensors.
+        Scalar values and interior moments are invariant. Other facet
+        moments, and facet nodes with derivatives or matrix values, are
+        posed on the facet frame. All other nodes map as Cartesian tensors.
         """
         dual = self._element.get_dual_set()
         sd = self.cell.get_spatial_dimension()
@@ -150,7 +149,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
                     node = dual.nodes[i]
                     order = node.max_deriv_order
                     rank = len(node.target_shape)
-                    if order == rank == 0 or (dim == sd and isinstance(node, IntegralMoment) and order == 0):
+                    if order == rank == 0 or (dim == sd and isinstance(node, IntegralMoment)):
                         mappings[i] = "invariant"
                     elif dim == sd - 1 and (isinstance(node, IntegralMoment) or order > 0 or rank > 1):
                         mappings[i] = "frame"
