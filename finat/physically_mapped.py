@@ -37,18 +37,14 @@ class MappedTabulation(Mapping):
 
     :arg M: a gem.ListTensor with the basis transformation matrix.
     :arg ref_tabulation: a dict of tabulations on the reference cell.
-    :kwarg indices: an optional list of restriction indices on the basis functions.
     """
-    def __init__(self, M, ref_tabulation, indices=None):
+    def __init__(self, M, ref_tabulation):
         self.M = M
         self.ref_tabulation = ref_tabulation
-        if indices is None:
-            indices = list(range(M.shape[0]))
-        self.indices = indices
         # we expect M to be sparse with O(1) nonzeros per row
         # for each row, get the column index of each nonzero entry
         csr = [[j for j in range(M.shape[1]) if not isinstance(M.array[i, j], gem.Zero)]
-               for i in indices]
+               for i in range(M.shape[0])]
         self.csr = csr
         self._tabulation_cache = {}
 
@@ -58,7 +54,7 @@ class MappedTabulation(Mapping):
         phi = [gem.Indexed(table, (j, *ii)) for j in range(self.M.shape[1])]
         # the sum approach is faster than calling numpy.dot or gem.IndexSum
         exprs = [gem.ComponentTensor(gem.Sum(*(self.M.array[i, j] * phi[j] for j in js)), ii)
-                 for i, js in zip(self.indices, self.csr)]
+                 for i, js in enumerate(self.csr)]
 
         result = gem.ListTensor(exprs)
         result, = gem.optimise.unroll_indexsum((result,), lambda index: True)
@@ -94,7 +90,6 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         super().__init__(*args, **kwargs)
         cite("Kirby2018zany")
         cite("Kirby2019zany")
-        self.restriction_indices = None
 
     def basis_transformation(self, coordinate_mapping):
         r"""Transformation matrix for the basis functions.
@@ -104,12 +99,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         :returns: A ``gem.ListTensor`` with exposed physical dofs as rows
             and the complete reference basis as columns.
         """
-        V = self._inverse_physical_vandermonde(self._physical_rows(coordinate_mapping))
-        for i, scale in self._dof_scales(coordinate_mapping):
-            V[:, i] = V[:, i] * scale
-        C = self._element.get_dual_set().get_coeffs()
-        if C is not None:
-            V = C @ V @ self._inverse_dual_coeffs
+        V = self._inverse_physical_vandermonde(coordinate_mapping)
         return gem.ListTensor(V[:, self._physical_indices].T)
 
     def dual_transformation(self, Q, coordinate_mapping=None):
@@ -126,14 +116,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
             as GEM expressions.
         :returns: The physical dual evaluation gem weight tensor.
         """
-        B = identity(self._element.space_dimension())
-        for i, (numerator, denominator) in self._physical_rows(coordinate_mapping).items():
-            B[i] = numerator / denominator
-        for i, scale in self._dof_scales(coordinate_mapping):
-            B[i] = B[i] / scale
-        C = self._element.get_dual_set().get_coeffs()
-        if C is not None:
-            B = C @ B @ self._inverse_dual_coeffs
+        B = self._physical_vandermonde(coordinate_mapping)
         indices = self._physical_indices
         B = gem.ListTensor(B[numpy.ix_(indices, indices)])
 
@@ -143,7 +126,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
     def map_tabulation(self, ref_tabulation, coordinate_mapping):
         assert coordinate_mapping is not None
         M = self.basis_transformation(coordinate_mapping)
-        return MappedTabulation(M, ref_tabulation, indices=self.restriction_indices)
+        return MappedTabulation(M, ref_tabulation)
 
     def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
         result = super().basis_evaluation(order, ps, entity=entity)
@@ -151,8 +134,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
 
     @cached_property
     def _physical_indices(self):
-        if self.restriction_indices is not None:
-            return self.restriction_indices
+        """The reference dofs exposed as physical dofs, in local order."""
         return sorted(i for entities in self.entity_dofs().values()
                       for dofs in entities.values() for i in dofs)
 
@@ -367,8 +349,24 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
                         rows[i] = row
         return rows
 
-    def _inverse_physical_vandermonde(self, rows):
-        """Solve entity blocks in closure order, retaining completion functions."""
+    def _physical_vandermonde(self, coordinate_mapping):
+        """The physical Vandermonde matrix :math:`B` over all reference dofs."""
+        B = identity(self._element.space_dimension())
+        for i, (numerator, denominator) in self._physical_rows(coordinate_mapping).items():
+            B[i] = numerator / denominator
+        for i, scale in self._dof_scales(coordinate_mapping):
+            B[i] = B[i] / scale
+        C = self._element.get_dual_set().get_coeffs()
+        if C is not None:
+            B = C @ B @ self._inverse_dual_coeffs
+        return B
+
+    def _inverse_physical_vandermonde(self, coordinate_mapping):
+        """:math:`B^{-1}` over all reference dofs.
+
+        Solve entity blocks in closure order, retaining completion functions.
+        """
+        rows = self._physical_rows(coordinate_mapping)
         nbf = self._element.space_dimension()
         closures = self._element.entity_closure_dofs()
         entity_dofs = self._element.entity_dofs()
@@ -395,6 +393,11 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
                         if not isinstance(numerator[j], gem.Zero):
                             rhs[k] = rhs[k] - V[j] * numerator[j]
                 V[block] = solve(Bee, rhs, cache)
+        for i, scale in self._dof_scales(coordinate_mapping):
+            V[:, i] = V[:, i] * scale
+        C = self._element.get_dual_set().get_coeffs()
+        if C is not None:
+            V = C @ V @ self._inverse_dual_coeffs
         return V
 
 

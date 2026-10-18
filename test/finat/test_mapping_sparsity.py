@@ -8,8 +8,6 @@ import gem
 import numpy as np
 import pytest
 
-from finat.physically_mapped import identity
-
 
 class SymbolicMapping:
     def __init__(self, sd):
@@ -24,11 +22,8 @@ class SymbolicMapping:
 
 
 def transformations(element, sd):
-    rows = element._physical_rows(SymbolicMapping(sd))
-    B = identity(element._element.space_dimension())
-    for i, (numerator, denominator) in rows.items():
-        B[i] = numerator / denominator
-    return B, element._inverse_physical_vandermonde(rows)
+    mapping = SymbolicMapping(sd)
+    return element._physical_vandermonde(mapping), element._inverse_physical_vandermonde(mapping)
 
 
 def nonzeros(row):

@@ -16,41 +16,35 @@ null_element = object()
 class RestrictedPhysicallyMappedElement(PhysicallyMappedElement, FiatElement):
     """A restricted PhysicallyMappedElement.
 
-    :arg element: the finat.FiatElement to be restricted.
-    :arg indices: the indices of the degrees of freedom to be kept.
+    The physical transformation is that of the parent element over all
+    reference dofs; the restriction only selects which dofs are exposed.
+
+    :arg element: the PhysicallyMappedElement to be restricted.
+    :arg indices: the reference dofs to be kept.
     """
     def __init__(self, element, indices):
         super().__init__(element._element)
-        # First sanitise the restriction indices
-        # Some finat elements, e.g. Bell, are the restriction of a FIAT element.
-        # Therefore, we need to compose the restrictions.
+        self._parent = element
+        # Some finat elements, e.g. Bell, already expose a subset of the
+        # reference dofs. Therefore, we need to compose the restrictions.
+        parent_indices = element._physical_indices
+        self._physical_indices = [i for i in parent_indices if i in indices]
+        local = {i: k for k, i in enumerate(self._physical_indices)}
         edofs = element.entity_dofs()
-        free_indices = set(chain.from_iterable(edofs[d][e] for d in edofs for e in edofs[d]))
-        indices = [i for i in indices if i in free_indices]
-        self.restriction_indices = indices
-        self.avg = element.avg
+        self._entity_dofs = {d: {e: [local[parent_indices[k]] for k in edofs[d][e] if parent_indices[k] in local]
+                                 for e in edofs[d]} for d in edofs}
 
-        # Restrict the entity_dofs dict
-        rdofs = {d: {e: [indices.index(i) for i in edofs[d][e] if i in indices]
-                     for e in edofs[d]} for d in edofs}
-        self.restriction_entity_dofs = rdofs
+    def _physical_vandermonde(self, coordinate_mapping):
+        return self._parent._physical_vandermonde(coordinate_mapping)
 
-        # Grab the basis transformation matrix from the parent element
-        if isinstance(element, PhysicallyMappedElement):
-            self.full_basis_transformation = element.basis_transformation
-        else:
-            self.full_basis_transformation = None
-
-    def basis_transformation(self, coordinate_mapping):
-        if self.full_basis_transformation is None:
-            raise NotImplementedError("basis_transformation not implemented.")
-        return self.full_basis_transformation(coordinate_mapping)
+    def _inverse_physical_vandermonde(self, coordinate_mapping):
+        return self._parent._inverse_physical_vandermonde(coordinate_mapping)
 
     def space_dimension(self):
-        return len(self.restriction_indices)
+        return len(self._physical_indices)
 
     def entity_dofs(self):
-        return self.restriction_entity_dofs
+        return self._entity_dofs
 
 
 @singledispatch
