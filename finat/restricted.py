@@ -72,16 +72,19 @@ def restrict_fiat(element, domain, take_closure):
     except ValueError:
         return null_element
 
-    if element.space_dimension() == re.space_dimension():
+    if isinstance(element, PhysicallyMappedElement) and not (domain == "interior" and not take_closure):
+        restricted = RestrictedPhysicallyMappedElement(element, re._indices)
+    else:
+        restricted = FiatElement(re)
+
+    if restricted.space_dimension() == 0:
+        return null_element
+    if restricted.space_dimension() == element.space_dimension():
         # FIAT.RestrictedElement wipes out entity_permutations.
         # In case the restriction is trivial we return the original element
         # to avoid reconstructing the space with an undesired permutation.
         return element
-
-    if isinstance(element, PhysicallyMappedElement) and not (domain == "interior" and not take_closure):
-        return RestrictedPhysicallyMappedElement(element, re._indices)
-
-    return FiatElement(re)
+    return restricted
 
 
 @restrict.register(finat.FlattenedDimensions)
