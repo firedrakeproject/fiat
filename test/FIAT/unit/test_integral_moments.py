@@ -1,6 +1,7 @@
 import numpy
 import pytest
 
+import FIAT
 from FIAT import dual_set, functional, polynomial_set, quadrature_schemes, ufc_simplex
 
 
@@ -68,3 +69,40 @@ def test_normal_derivative_moment(sd):
         value = sum(w * a @ alpha for entries in node.deriv_dict.values() for w, alpha, _ in entries)
         expected = Q.get_weights().sum() * (a @ cell.compute_normal(facet))
         assert numpy.allclose(value, expected)
+
+
+@pytest.mark.parametrize("element, degree", [("Argyris", 6), ("HsiehCloughTocher", 4), ("Walkington", 5),
+                                             ("ArnoldWinther", 3), ("MardalTaiWinther", 1),
+                                             ("Nedelec", 3), ("BrezziDouglasMarini", 2)])
+def test_integral_moment_weight_tensors(element, degree):
+    """Weights read from the quadrature rule agree with the point dictionaries."""
+    sd = 3 if element in {"Walkington", "Nedelec"} else 2
+    kwargs = {"variant": "integral"} if element in {"Nedelec", "BrezziDouglasMarini"} else {}
+    nodes = getattr(FIAT, element)(ufc_simplex(sd), degree, **kwargs).get_dual_set().nodes
+    moments = [node for node in nodes if isinstance(node, functional.IntegralMoment)]
+    assert moments
+    for node in moments:
+        expected = functional.Functional.weight_tensors.func(node)
+        assert node.weight_tensors.keys() == expected.keys()
+        for (points, W), (expected_points, expected_W) in zip(node.weight_tensors.values(), expected.values()):
+            assert points == expected_points
+            assert numpy.allclose(W, expected_W)
+
+
+@pytest.mark.parametrize("sd", [2, 3])
+def test_uncontracted_riesz(sd):
+    """Inserting a map between the derivative axes changes the direction of the derivative."""
+    cell = ufc_simplex(sd)
+    Q = quadrature_schemes.create_quadrature(cell, 4)
+    f = 1 + Q.get_points().sum(axis=1)
+    n = numpy.arange(1, sd + 1, dtype=float)
+    G = numpy.random.default_rng(0).random((sd, sd))
+    ids = {dim: {entity: [] for entity in entities} for dim, entities in cell.get_topology().items()}
+    ids[sd][0] = [0]
+    poly = polynomial_set.ONPolynomialSet(cell, 3)
+
+    dual = dual_set.DualSet([functional.IntegralMomentOfDerivative(cell, Q, f, n)], cell, ids)
+    R = dual.to_uncontracted_riesz(poly)[1][0]
+    mapped = dual_set.DualSet([functional.IntegralMomentOfDerivative(cell, Q, f, G.T @ n)], cell, ids)
+    assert numpy.allclose(numpy.einsum("bgk,bg->k", R, G), mapped.to_riesz(poly)[0])
+    assert numpy.allclose(numpy.einsum("bbk->k", R), dual.to_riesz(poly)[0])

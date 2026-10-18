@@ -14,6 +14,7 @@
 
 from itertools import chain, permutations
 from collections import defaultdict
+from functools import cached_property
 import numpy
 
 from FIAT import polynomial_set, jacobi, quadrature, quadrature_schemes
@@ -55,46 +56,35 @@ class Functional(object):
         else:
             self.max_deriv_order = 0
 
-    def as_tensor(self, mapping="affine", tol=1e-12):
-        r"""Return points, symmetric coefficient tensors, and axis pullback laws.
+    @cached_property
+    def weight_tensors(self):
+        r"""The weights of the functional as tensors, one per derivative order.
 
-        Component axes precede derivative axes; divergence axes have extent one.
-        The tolerance controls recognition of divergence contractions."""
-        if self.pt_dict and self.deriv_dict:
-            raise NotImplementedError(f"{type(self).__name__} mixes values and derivatives.")
+        Map each derivative order :math:`k` to the points :math:`x_q` and the
+        weights :math:`W^k` such that
+        :math:`\ell(f) = \sum_k \sum_q W^k_q : D^k f(x_q)`.
+        The axes of :math:`W^k` are the value axes of ``target_shape``,
+        then :math:`k` symmetric derivative axes, then the point axis.
+        """
         sd = self.ref_el.get_spatial_dimension()
-        if self.deriv_dict:
-            entries = {pt: [(w, tuple(alpha), tuple(comp)) for w, alpha, comp in wac]
-                       for pt, wac in self.deriv_dict.items()}
-        else:
-            alpha = (0,) * sd
-            entries = {pt: [(w, alpha, tuple(comp)) for w, comp in wc]
-                       for pt, wc in self.pt_dict.items()}
-        orders = {sum(alpha) for wac in entries.values() for _, alpha, _ in wac}
-        ranks = {len(comp) for wac in entries.values() for _, _, comp in wac}
-        if len(orders) > 1 or len(ranks) > 1:
-            raise NotImplementedError(f"{type(self).__name__} mixes derivative orders or ranks.")
-        order, = orders
-        rank, = ranks
-        mappings = _split_axis_mappings(mapping, rank) + ("derivative",) * order
+        terms = defaultdict(lambda: defaultdict(list))
+        for pt, wc_list in self.pt_dict.items():
+            terms[0][pt].extend((w, (0,) * sd, c) for w, c in wc_list)
+        for pt, wac_list in self.deriv_dict.items():
+            for w, alpha, c in wac_list:
+                terms[sum(alpha)][pt].append((w, alpha, c))
 
-        points = tuple(entries)
-        coefficients = numpy.zeros((len(points),) + (sd,) * (rank + order))
-        for q, weights in enumerate(entries.values()):
-            for w, alpha, comp in weights:
-                indices = set(permutations(sum(([k] * a for k, a in enumerate(alpha)), [])))
-                for index in indices:
-                    coefficients[(q, *comp, *index)] += w / len(indices)
-
-        # W[..., i, k] = c delta_ik represents a divergence.
-        if order == 1 and rank > 0 and mappings[rank - 1] == "contravariant piola":
-            trace = numpy.trace(coefficients, axis1=-2, axis2=-1) / sd
-            if numpy.allclose(coefficients, trace[..., None, None] * numpy.eye(sd),
-                              rtol=0, atol=tol * numpy.abs(coefficients).max()):
-                coefficients = trace[..., None]
-                mappings = mappings[:rank - 1] + ("divergence",)
-
-        return points, coefficients, mappings
+        weight_tensors = {}
+        for order, entries in sorted(terms.items()):
+            W = numpy.zeros((*self.target_shape, *(sd,) * order, len(entries)))
+            for q, wac_list in enumerate(entries.values()):
+                for w, alpha, c in wac_list:
+                    c = c if isinstance(c, tuple) else (c,)
+                    indices = set(permutations(sum(([k] * a for k, a in enumerate(alpha)), [])))
+                    for index in indices:
+                        W[(*c, *index, q)] += w / len(indices)
+            weight_tensors[order] = tuple(entries), W
+        return weight_tensors
 
     def evaluate(self, f):
         """Obsolete and broken functional evaluation.
@@ -344,6 +334,19 @@ class IntegralMoment(Functional):
         weights = numpy.multiply(f_at_qpts, Q.get_weights())
         pt_dict = {tuple(pt): [(wt, comp)] for pt, wt in zip(points, weights)}
         super().__init__(ref_el, shp, pt_dict, {}, "IntegralMoment")
+
+    @cached_property
+    def weight_tensors(self):
+        sd = self.ref_el.get_spatial_dimension()
+        order = self.max_deriv_order
+        W = numpy.zeros((*self.target_shape, *(sd,) * order, len(self.Q.pts)))
+        W[self.comp] = numpy.multiply(self.f_at_qpts, self.Q.get_weights())
+        if order > 1:
+            # Only the symmetric part pairs with D^k f.
+            rank = len(self.target_shape)
+            W = numpy.mean([W.transpose((*range(rank), *axes, W.ndim - 1))
+                            for axes in permutations(range(rank, rank + order))], axis=0)
+        return {order: (tuple(self.deriv_dict or self.pt_dict), W)}
 
     def __call__(self, fn):
         """Evaluate the functional on the function fn."""
@@ -715,17 +718,3 @@ def contravariant_piola_dual(J, values):
     """
     transform = numpy.sign(numpy.linalg.det(J)) * numpy.linalg.inv(J).T
     return numpy.einsum("ij,bjq->biq", transform, values)
-
-
-def _split_axis_mappings(mapping, rank):
-    r"""Split the function mapping into one pullback law per component axis."""
-    words = mapping.split()
-    if words == ["affine"]:
-        return (mapping,) * rank
-    if words[0] == "double":
-        kinds = (f"{words[1]} piola",) * 2
-    else:
-        kinds = tuple(f"{word} piola" for word in words[:-1])
-    if len(kinds) != rank:
-        raise ValueError(f"A {mapping} functional must have rank {len(kinds)}, not {rank}.")
-    return kinds

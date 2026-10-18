@@ -11,7 +11,7 @@ from itertools import chain
 from functools import cached_property
 from collections import defaultdict
 
-from FIAT import polynomial_set, functional
+from FIAT import functional
 from FIAT.reference_element import compute_unflattening_map
 
 
@@ -163,113 +163,98 @@ class DualSet:
         of functions it takes, and the number of members of the
         expansion set.
         """
-
-        # This rather technical code queries the low-level information
-        # in pt_dict and deriv_dict
-        # for each functional to find out where it evaluates its
-        # inputs and/or their derivatives.  Then, it tabulates the
-        # expansion set one time for all the function values and
-        # another for all of the derivatives.  This circumvents
-        # needing to call the to_riesz method of each functional and
-        # also limits the number of different calls to tabulate.
-
         tshape = self.nodes[0].target_shape
-        num_nodes = len(self.nodes)
-        es = poly_set.get_expansion_set()
-        ed = poly_set.get_embedded_degree()
-        num_exp = es.get_num_members(poly_set.get_embedded_degree())
-
-        riesz_shape = (num_nodes, *tshape, num_exp)
-        mat = numpy.zeros(riesz_shape, "d")
-
-        def map_quadratures_to_points(nodes, deriv=False):
-            Qs_to_ells = defaultdict(list)
-            for i, ell in enumerate(nodes):
-                if deriv and len(ell.deriv_dict) == 0:
-                    continue
-                elif not deriv and len(ell.pt_dict) == 0:
-                    continue
-                if isinstance(ell, functional.IntegralMoment):
-                    Q = ell.Q
-                else:
-                    Q = None
-                Qs_to_ells[Q].append(i)
-            pts = set()
-            Qs_to_pts = {}
-            for Q in Qs_to_ells:
-                if Q is None:
-                    if deriv:
-                        cur_pts = chain.from_iterable(nodes[i].deriv_dict.keys() for i in Qs_to_ells[None])
-                    else:
-                        cur_pts = chain.from_iterable(nodes[i].pt_dict.keys() for i in Qs_to_ells[None])
-                    cur_pts = tuple(set(cur_pts))
-                else:
-                    cur_pts = tuple(map(tuple, Q.pts))
-                Qs_to_pts[Q] = cur_pts
-                pts.update(cur_pts)
-            pts = list(sorted(pts))
-            return Qs_to_ells, Qs_to_pts, pts
-
-        # Now tabulate the function values
-        Qs_to_ells, Qs_to_pts, pts = map_quadratures_to_points(self.nodes)
-        expansion_values = numpy.transpose(es.tabulate(ed, pts))
-        for Q in Qs_to_ells:
-            ells = Qs_to_ells[Q]
-            cur_pts = Qs_to_pts[Q]
-            indices = list(map(pts.index, cur_pts))
-            wshape = (len(ells), *tshape, len(cur_pts))
-            wts = numpy.zeros(wshape, "d")
-            if Q is None:
-                for i, k in enumerate(ells):
-                    ell = self.nodes[k]
-                    for pt, wc_list in ell.pt_dict.items():
-                        j = cur_pts.index(pt)
-                        for (w, c) in wc_list:
-                            wts[i][c][j] = w
-            else:
-                for i, k in enumerate(ells):
-                    ell = self.nodes[k]
-                    wts[i][ell.comp][:] = ell.f_at_qpts
-                qwts = Q.get_weights()
-                wts = numpy.multiply(wts, qwts, out=wts)
-            mat[ells] += numpy.dot(wts, expansion_values[indices])
-
-        # Tabulate the derivative values that are needed
-        max_deriv_order = max(ell.max_deriv_order for ell in self.nodes)
-        if max_deriv_order > 0:
-            Qs_to_ells, Qs_to_pts, pts = map_quadratures_to_points(self.nodes, deriv=True)
-            # It's easiest/most efficient to get derivatives of the
-            # expansion set through the polynomial set interface.
-            # This is creating a short-lived set to do just this.
-            coeffs = numpy.eye(num_exp)
-            expansion = polynomial_set.PolynomialSet(self.ref_el, ed, ed, es, coeffs)
-            dexpansion_values = expansion.tabulate(pts, max_deriv_order)
-            for Q in Qs_to_ells:
-                ells = Qs_to_ells[Q]
-                cur_pts = Qs_to_pts[Q]
-                indices = list(map(pts.index, cur_pts))
-                wshape = (len(ells), *tshape, len(cur_pts))
-                dwts = {alpha: numpy.zeros(wshape, "d") for alpha in dexpansion_values if sum(alpha) > 0}
-                if Q is None:
-                    for i, k in enumerate(ells):
-                        ell = self.nodes[k]
-                        for pt, wac_list in ell.deriv_dict.items():
-                            j = cur_pts.index(pt)
-                            for (w, alpha, c) in wac_list:
-                                dwts[alpha][i][c][j] = w
-                else:
-                    for i, k in enumerate(ells):
-                        ell = self.nodes[k]
-                        for alpha in ell.weights:
-                            dwts[alpha][i][ell.comp][:] = ell.weights[alpha]
-                for alpha in dwts:
-                    wts = dwts[alpha]
-                    expansion_values = dexpansion_values[alpha].T
-                    mat[ells] += numpy.dot(wts, expansion_values[indices])
+        sd = self.ref_el.get_spatial_dimension()
+        num_exp = poly_set.get_expansion_set().get_num_members(poly_set.get_embedded_degree())
+        mat = numpy.zeros((len(self.nodes), *tshape, num_exp))
+        for order, R in self.to_uncontracted_riesz(poly_set).items():
+            for index in numpy.ndindex((sd,) * order):
+                mat += R[..., *index, *index, :]
         coeffs = self.get_coeffs()
         if coeffs is not None:
             mat = numpy.tensordot(coeffs, mat, axes=(1, 0))
         return mat
+
+    def to_uncontracted_riesz(self, poly_set):
+        r"""Riesz representation of the nodes with their derivative axes left uncontracted.
+
+        Writing each node as :math:`\ell_i(f) = \sum_k \sum_q W^k_{i,q} : D^k f(x_q)`
+        (see :attr:`.Functional.weight_tensors`), return for each derivative
+        order :math:`k` the tensor
+
+        .. math::
+
+            R^k_{i,a,\beta,\gamma,j} = \sum_q W^k_{i,a,\beta,q}\,\partial^\gamma \phi_j(x_q)
+
+        over the expansion set :math:`\phi` underlying ``poly_set``, where
+        :math:`a` are the value axes and :math:`\beta, \gamma` are :math:`k`
+        derivative axes each. Contracting :math:`\beta` with :math:`\gamma` and
+        summing over :math:`k` gives :meth:`to_riesz`; leaving them
+        uncontracted allows a linear map on the values and derivatives of
+        :math:`f` to be inserted in between. There is one row per node in
+        :meth:`get_nodes`, without the recombination coefficients.
+        """
+        tshape = self.nodes[0].target_shape
+        sd = self.ref_el.get_spatial_dimension()
+        es = poly_set.get_expansion_set()
+        ed = poly_set.get_embedded_degree()
+        num_exp = es.get_num_members(ed)
+
+        def map_quadratures_to_points(orders):
+            Qs_to_ells = defaultdict(list)
+            for i, ell in enumerate(self.nodes):
+                if orders.intersection(ell.weight_tensors):
+                    Q = ell.Q if isinstance(ell, functional.IntegralMoment) else None
+                    Qs_to_ells[Q].append(i)
+            pts = set()
+            Qs_to_pts = {}
+            for Q, ells in Qs_to_ells.items():
+                if Q is None:
+                    cur_pts = tuple(set(chain.from_iterable(
+                        self.nodes[i].weight_tensors[order][0]
+                        for i in ells for order in orders.intersection(self.nodes[i].weight_tensors))))
+                else:
+                    cur_pts = tuple(map(tuple, Q.get_points()))
+                Qs_to_pts[Q] = cur_pts
+                pts.update(cur_pts)
+            return Qs_to_ells, Qs_to_pts, sorted(pts)
+
+        # Tabulate the expansion set one time for all the values and another
+        # for all the derivatives, and contract the nodes of each quadrature
+        # rule in a single product.
+        all_orders = set(chain.from_iterable(ell.weight_tensors for ell in self.nodes))
+        riesz = {}
+        for orders in (all_orders & {0}, all_orders - {0}):
+            if not orders:
+                continue
+            Qs_to_ells, Qs_to_pts, pts = map_quadratures_to_points(orders)
+            columns = {pt: j for j, pt in enumerate(pts)}
+            tabulation = es._tabulate(ed, pts, max(orders))
+            for order in sorted(orders):
+                # D^order phi with axes (gamma, j, point)
+                dphi = numpy.zeros((*(sd,) * order, num_exp, len(pts)))
+                for index in numpy.ndindex(dphi.shape[:order]):
+                    dphi[index] = tabulation[tuple(map(index.count, range(sd)))]
+
+                R = numpy.zeros((len(self.nodes), *tshape, *(sd,) * order, *(sd,) * order, num_exp))
+                for Q, ells in Qs_to_ells.items():
+                    ells = [i for i in ells if order in self.nodes[i].weight_tensors]
+                    if not ells:
+                        continue
+                    cur_pts = Qs_to_pts[Q]
+                    wts = numpy.zeros((len(ells), *tshape, *(sd,) * order, len(cur_pts)))
+                    if Q is None:
+                        cur_columns = {pt: j for j, pt in enumerate(cur_pts)}
+                        for k, i in enumerate(ells):
+                            points, W = self.nodes[i].weight_tensors[order]
+                            wts[k][..., [cur_columns[pt] for pt in points]] = W
+                    else:
+                        for k, i in enumerate(ells):
+                            wts[k] = self.nodes[i].weight_tensors[order][1]
+                    indices = [columns[pt] for pt in cur_pts]
+                    R[ells] = numpy.tensordot(wts, dphi[..., indices], axes=(-1, -1))
+                riesz[order] = R
+        return riesz
 
     @cached_property
     def node_mapping(self):
@@ -295,80 +280,6 @@ class DualSet:
                     else:
                         mappings[i] = "cartesian"
         return tuple(mappings)
-
-    @cached_property
-    def entity_support_ids(self):
-        """Partition each entity_ids[dim][entity] by supporting entity."""
-        support_ids = {}
-        for dim, entities in self.entity_ids.items():
-            support_ids[dim] = {}
-            for entity, dofs in entities.items():
-                supports = defaultdict(list)
-                for i in dofs:
-                    node = self.nodes[i]
-                    points = set(node.pt_dict)
-                    points.update(node.deriv_dict)
-                    support = _support_entity(self.ref_el, sorted(points))
-                    supports[support].append(i)
-                support_ids[dim][entity] = dict(supports)
-        return support_ids
-
-    def as_tensor(self, mappings, tol=1e-10):
-        r"""Write source functionals as :math:`n_i(u)=\sum_q W_{i,q}:D_i u(x_{i,q})`.
-
-        Return evaluation points, coefficient tensors W, and axis pullback laws,
-        in source-node order. Component axes precede derivative axes; divergence
-        axes are contracted. Recombination coefficients are kept separate.
-        """
-        points = [None] * len(self.nodes)
-        coefficients = [None] * len(self.nodes)
-        axis_mappings = [None] * len(self.nodes)
-        sd = self.ref_el.get_spatial_dimension()
-        for dim, entities in self.entity_ids.items():
-            for entity, dofs in entities.items():
-                if 0 < dim < sd - 1:
-                    t = self.ref_el.compute_edge_tangent(entity)
-                    normal = numpy.eye(sd) - numpy.outer(t, t) / (t @ t)
-                for i in dofs:
-                    pts, W, axes = self.nodes[i].as_tensor(mappings[i], tol)
-                    if 0 < dim < sd - 1:
-                        if any(axis == "derivative" and _has_direction(W, k, normal, tol)
-                               for k, axis in enumerate(axes)):
-                            raise NotImplementedError("No physical convention for derivatives normal to an edge")
-                    points[i] = pts
-                    coefficients[i] = W
-                    axis_mappings[i] = axes
-        return tuple(points), tuple(coefficients), tuple(axis_mappings)
-
-    def get_scaling_exponents(self, coefficients, axis_mappings, avg=True, tol=1e-10):
-        r"""Return :math:`p_i` for physical source nodes that dilate as :math:`h^{-p_i}`.
-
-        Use the coefficient tensors and axis mappings from as_tensor.
-        The avg flag selects physical averages for framed integral moments."""
-        sd = self.ref_el.get_spatial_dimension()
-        exponents = numpy.zeros(len(self.nodes), dtype=int)
-        for dim, entities in self.entity_ids.items():
-            for entity, dofs in entities.items():
-                for i in dofs:
-                    W = coefficients[i]
-                    axes = axis_mappings[i]
-                    mapping = self.node_mapping[i]
-                    if mapping == "invariant":
-                        continue
-                    exponent = axes.count("derivative")
-                    if mapping == "cartesian":
-                        weights = {"covariant piola": 1, "contravariant piola": sd - 1, "divergence": sd}
-                        exponent += sum(weights.get(axis, 0) for axis in axes)
-                    else:
-                        nu = self.ref_el.compute_scaled_normal(entity)
-                        tangent = numpy.eye(sd) - numpy.outer(nu, nu) / (nu @ nu)
-                        for k, axis in enumerate(axes):
-                            if axis == "contravariant piola" and _has_direction(W, k, tangent, tol):
-                                exponent += 2 - sd
-                        if isinstance(self.nodes[i], functional.IntegralMoment) and not avg:
-                            exponent -= dim
-                    exponents[i] = exponent
-        return exponents
 
     def get_indices(self, restriction_domain, take_closure=True):
         """Returns the list of dofs with support on a given restriction domain.
@@ -506,27 +417,3 @@ def merge_entities(nodes, ref_el, entity_ids, entity_permutations):
                     parent_ids[dim][entity].extend(entity_ids[child_dim][child_entity])
 
     return parent_nodes, parent_cell, parent_ids, parent_permutations, child_ids
-
-
-def _support_entity(ref_el, points, tol=1e-12):
-    """Find the smallest simplex entity containing all evaluation points.
-
-    :arg ref_el: Reference simplex.
-    :arg points: Points in reference Cartesian coordinates.
-    :arg tol: Absolute tolerance for a zero barycentric coordinate.
-    :returns: Entity dimension and number.
-    """
-    bary = ref_el.compute_barycentric_coordinates(numpy.asarray(points))
-    # A nonzero barycentric coordinate requires its vertex in the entity.
-    verts = set(numpy.flatnonzero(numpy.abs(bary).max(axis=0) > tol))
-    top = ref_el.get_topology()
-    for dim, entities in sorted(top.items()):
-        for entity, vertices in sorted(entities.items()):
-            if verts <= set(vertices):
-                return dim, entity
-    raise ValueError("The evaluation points have no supporting entity.")
-
-
-def _has_direction(W, axis, projector, tol):
-    residual = numpy.tensordot(W, projector, axes=(1 + axis, 1))
-    return numpy.abs(residual).max() > tol * numpy.abs(W).max()
