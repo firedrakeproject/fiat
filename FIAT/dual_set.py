@@ -8,7 +8,6 @@
 
 import numpy
 from itertools import chain
-from functools import cached_property
 from collections import defaultdict
 
 from FIAT import functional
@@ -38,10 +37,6 @@ class DualSet:
         the coefficients for the recombined functionals, and its columns
         correspond to ``nodes``.
 
-    node_mapping : sequence of str, optional
-        Physical convention of each source node: ``cartesian``, ``frame``
-        or ``invariant``. Defaults follow point and moment conventions.
-
     Raises
     ------
     ValueError
@@ -49,7 +44,7 @@ class DualSet:
     """
 
     def __init__(self, nodes, ref_el, entity_ids, entity_permutations=None,
-                 coeffs=None, node_mapping=None):
+                 coeffs=None):
         if ref_el.get_dimension() != max(entity_ids):
             entity_ids = unflatten_entity_ids(ref_el, entity_ids)
         nodes, ref_el, entity_ids, entity_permutations, macro_entity_ids = merge_entities(
@@ -66,7 +61,6 @@ class DualSet:
         # The entity ids on the simplicial complex, numbered by the merged node ordering
         self._macro_entity_ids = macro_entity_ids
         self.entity_permutations = entity_permutations
-        self._node_mapping = node_mapping
 
         # Compute the nodes on the closure of each sub_entity.
         self.entity_closure_ids = {}
@@ -106,8 +100,7 @@ class DualSet:
         if self.coeffs is not None:
             coefficients = numpy.dot(coefficients, self.coeffs)
         return DualSet(self.nodes, self.ref_el, self.entity_ids,
-                       self.entity_permutations, coeffs=coefficients,
-                       node_mapping=self._node_mapping)
+                       self.entity_permutations, coeffs=coefficients)
 
     def get_entity_closure_ids(self):
         return self.entity_closure_ids
@@ -255,31 +248,6 @@ class DualSet:
                     R[ells] = numpy.tensordot(wts, dphi[..., indices], axes=(-1, -1))
                 riesz[order] = R
         return riesz
-
-    @cached_property
-    def node_mapping(self):
-        """Physical conventions of the source nodes, in source-node order."""
-        if self._node_mapping is not None:
-            if len(self._node_mapping) != len(self.nodes):
-                raise ValueError("Expected one physical convention per source node")
-            if set(self._node_mapping) - {"cartesian", "frame", "invariant"}:
-                raise ValueError("Unknown physical node convention")
-            return tuple(self._node_mapping)
-        sd = self.ref_el.get_spatial_dimension()
-        mappings = [None] * len(self.nodes)
-        for dim, entities in self.entity_ids.items():
-            for dofs in entities.values():
-                for i in dofs:
-                    node = self.nodes[i]
-                    order = node.max_deriv_order
-                    rank = len(node.target_shape)
-                    if order == rank == 0 or (dim == sd and isinstance(node, functional.IntegralMoment) and order == 0):
-                        mappings[i] = "invariant"
-                    elif dim == sd - 1 and (isinstance(node, functional.IntegralMoment) or order > 0 or rank > 1):
-                        mappings[i] = "frame"
-                    else:
-                        mappings[i] = "cartesian"
-        return tuple(mappings)
 
     def get_indices(self, restriction_domain, take_closure=True):
         """Returns the list of dofs with support on a given restriction domain.

@@ -83,18 +83,15 @@ def test_single_point_moment(avg):
     for i in chain.from_iterable(dual.entity_ids[1].values()):
         points, _ = dual.nodes[i].weight_tensors[1]
         assert len(points) == 1
-        assert dual.node_mapping[i] == "frame"
+        assert element.node_mapping[i] == "frame"
         assert isinstance(dual.nodes[i], FIAT.functional.IntegralMoment)
         assert element._scaling_exponents[i] == int(avg)
 
 
 def test_explicit_integral_convention(ref_to_phys):
     element = FIAT.CrouzeixRaviart(FIAT.ufc_simplex(2), 1, variant="integral")
-    dual = element.get_dual_set()
-    dual = FIAT.dual_set.DualSet(dual.nodes, dual.ref_el, dual.entity_ids,
-                                 node_mapping=["frame"] * len(dual))
-    element = FIAT.finite_element.CiarletElement(element.get_nodal_basis(), dual, 1)
     mapped = MappedElement(element)
+    mapped.node_mapping = ("frame",) * element.space_dimension()
     mapped.avg = False
     B, M = [result.arr for result in evaluate([
         mapped.dual_transformation(gem.Literal(np.eye(3)), ref_to_phys[2]), mapped.basis_transformation(ref_to_phys[2])])]

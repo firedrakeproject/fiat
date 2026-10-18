@@ -133,6 +133,32 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         return self.map_tabulation(result, coordinate_mapping)
 
     @cached_property
+    def node_mapping(self):
+        """The physical convention of each node: ``cartesian``, ``frame`` or ``invariant``.
+
+        Scalar values and interior moments, without derivatives, are
+        invariant. Other facet moments, and facet nodes with derivatives or
+        matrix values, are posed on the facet frame. All other nodes map as
+        Cartesian tensors.
+        """
+        dual = self._element.get_dual_set()
+        sd = self.cell.get_spatial_dimension()
+        mappings = [None] * len(dual.nodes)
+        for dim, entities in dual.get_entity_ids().items():
+            for dofs in entities.values():
+                for i in dofs:
+                    node = dual.nodes[i]
+                    order = node.max_deriv_order
+                    rank = len(node.target_shape)
+                    if order == rank == 0 or (dim == sd and isinstance(node, IntegralMoment) and order == 0):
+                        mappings[i] = "invariant"
+                    elif dim == sd - 1 and (isinstance(node, IntegralMoment) or order > 0 or rank > 1):
+                        mappings[i] = "frame"
+                    else:
+                        mappings[i] = "cartesian"
+        return tuple(mappings)
+
+    @cached_property
     def _physical_indices(self):
         """The reference dofs exposed as physical dofs, in local order."""
         return sorted(i for entities in self.entity_dofs().values()
@@ -186,11 +212,11 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         for dim, entities in dual.get_entity_ids().items():
             for entity, dofs in entities.items():
                 for i in dofs:
-                    if dual.node_mapping[i] == "invariant":
+                    if self.node_mapping[i] == "invariant":
                         continue
                     W = self._weights[i]
                     axis_mappings = self._axis_mappings[i]
-                    cartesian = dual.node_mapping[i] == "cartesian"
+                    cartesian = self.node_mapping[i] == "cartesian"
                     on_edge = cartesian and 0 < dim < sd - 1
                     groups[i] = {}
                     if cartesian:
@@ -230,7 +256,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         riesz = dual.to_uncontracted_riesz(self._element.get_nodal_basis())
         result = [None] * len(dual.nodes)
         for i, (node, W) in enumerate(zip(dual.nodes, self._weights)):
-            if dual.node_mapping[i] == "invariant":
+            if self.node_mapping[i] == "invariant":
                 continue
             rank = len(node.target_shape)
             R = numpy.tensordot(riesz[node.max_deriv_order][i], coeffs, axes=(-1, -1))
@@ -271,10 +297,10 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
             for entity, dofs in entities.items():
                 for i in dofs:
                     axis_mappings = self._axis_mappings[i]
-                    if dual.node_mapping[i] == "cartesian":
+                    if self.node_mapping[i] == "cartesian":
                         weights = {"derivative": 1, "covariant piola": 1, "contravariant piola": sd - 1}
                         exponents[i] = sum(weights.get(mapping, 0) for mapping in axis_mappings)
-                    elif dual.node_mapping[i] == "frame":
+                    elif self.node_mapping[i] == "frame":
                         exponents[i] = axis_mappings.count("derivative")
                         nu = self.cell.compute_scaled_normal(entity)
                         for k, mapping in enumerate(axis_mappings):
@@ -325,14 +351,14 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         for dim, entities in self._entity_support_ids.items():
             for entity, supports in entities.items():
                 for support, dofs in supports.items():
-                    if any(dual.node_mapping[i] == "frame" for i in dofs):
+                    if any(self.node_mapping[i] == "frame" for i in dofs):
                         frame = _frame_pullbacks(self.cell, entity, support, J, adjJ, detJ)
                     for i in dofs:
-                        if dual.node_mapping[i] == "invariant":
+                        if self.node_mapping[i] == "invariant":
                             continue
-                        pullbacks = frame if dual.node_mapping[i] == "frame" else cartesian
+                        pullbacks = frame if self.node_mapping[i] == "frame" else cartesian
                         measure = one
-                        if dual.node_mapping[i] == "frame" and not self.avg and isinstance(dual.nodes[i], IntegralMoment):
+                        if self.node_mapping[i] == "frame" and not self.avg and isinstance(dual.nodes[i], IntegralMoment):
                             # The physical facet measure induced by the cofactor map
                             nu = self.cell.compute_scaled_normal(entity)
                             Knu = adjJ.T @ nu
