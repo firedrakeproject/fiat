@@ -170,13 +170,12 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
 
     @cached_property
     def _weights(self):
-        """The weight tensor of each node, see :attr:`FIAT.functional.Functional.weight_tensors`."""
+        """The weight tensor of each node, see :attr:`FIAT.functional.Functional.weights_by_order`."""
         weights = []
         for node in self._element.get_dual_set().nodes:
-            if len(node.weight_tensors) > 1:
+            if len(node.weights_by_order) > 1:
                 raise NotImplementedError(f"{type(node).__name__} mixes derivative orders.")
-            _, W = node.weight_tensors[node.max_deriv_order]
-            weights.append(W)
+            weights.append(node.weights_by_order[node.max_deriv_order])
         return weights
 
     @cached_property

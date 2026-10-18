@@ -23,7 +23,8 @@ def test_duality_pairing_respects_tolerance():
         {(0.0, 0.0): [(1.0, (1, 0), (0,)),
                       (1.0 + 1.0e-6, (0, 1), (1,))]},
         "NearDivergence")
-    _, W = node.weight_tensors[1]
+    weights_by_order = node.weights_by_order
+    W = weights_by_order[1]
     P = _duality_projector(2)
     assert _in_range(np.eye(2)[..., None], (0, 1), P, 1.0e-12)
     assert not _in_range(W, (0, 1), P, 1.0e-12)
@@ -81,7 +82,8 @@ def test_single_point_moment(avg):
     element.avg = avg
     dual = element._element.get_dual_set()
     for i in chain.from_iterable(dual.entity_ids[1].values()):
-        points, _ = dual.nodes[i].weight_tensors[1]
+        points_by_order = dual.nodes[i].points_by_order
+        points = points_by_order[1]
         assert len(points) == 1
         assert element.node_mapping[i] == "frame"
         assert isinstance(dual.nodes[i], FIAT.functional.IntegralMoment)

@@ -172,7 +172,7 @@ class DualSet:
         r"""Riesz representation of the nodes with their derivative axes left uncontracted.
 
         Writing each node as :math:`\ell_i(f) = \sum_k \sum_q W^k_{i,q} : D^k f(x_q)`
-        (see :attr:`.Functional.weight_tensors`), return for each derivative
+        (see :attr:`.Functional.weights_by_order`), return for each derivative
         order :math:`k` the tensor
 
         .. math::
@@ -192,35 +192,25 @@ class DualSet:
         es = poly_set.get_expansion_set()
         ed = poly_set.get_embedded_degree()
         num_exp = es.get_num_members(ed)
-
-        def map_quadratures_to_points(orders):
-            Qs_to_ells = defaultdict(list)
-            for i, ell in enumerate(self.nodes):
-                if orders.intersection(ell.weight_tensors):
-                    Q = ell.Q if isinstance(ell, functional.IntegralMoment) else None
-                    Qs_to_ells[Q].append(i)
-            pts = set()
-            Qs_to_pts = {}
-            for Q, ells in Qs_to_ells.items():
-                if Q is None:
-                    cur_pts = tuple(set(chain.from_iterable(
-                        self.nodes[i].weight_tensors[order][0]
-                        for i in ells for order in orders.intersection(self.nodes[i].weight_tensors))))
-                else:
-                    cur_pts = tuple(map(tuple, Q.get_points()))
-                Qs_to_pts[Q] = cur_pts
-                pts.update(cur_pts)
-            return Qs_to_ells, Qs_to_pts, sorted(pts)
+        points = defaultdict(dict)
+        weights = defaultdict(dict)
+        for node_id, node in enumerate(self.nodes):
+            node_points = node.points_by_order
+            node_weights = node.weights_by_order
+            for order in node_points:
+                points[order][node_id] = node_points[order]
+                weights[order][node_id] = node_weights[order]
 
         # Tabulate the expansion set one time for all the values and another
-        # for all the derivatives, and contract the nodes of each quadrature
-        # rule in a single product.
-        all_orders = set(chain.from_iterable(ell.weight_tensors for ell in self.nodes))
+        # for all the derivatives, and contract nodes with the same point set
+        # in a single product.
+        all_orders = set(points)
         riesz = {}
         for orders in (all_orders & {0}, all_orders - {0}):
             if not orders:
                 continue
-            Qs_to_ells, Qs_to_pts, pts = map_quadratures_to_points(orders)
+            pts = sorted(set(chain.from_iterable(
+                node_points for order in orders for node_points in points[order].values())))
             columns = {pt: j for j, pt in enumerate(pts)}
             tabulation = es._tabulate(ed, pts, max(orders))
             for order in sorted(orders):
@@ -230,22 +220,13 @@ class DualSet:
                     dphi[index] = tabulation[tuple(map(index.count, range(sd)))]
 
                 R = numpy.zeros((len(self.nodes), *tshape, *(sd,) * order, *(sd,) * order, num_exp))
-                for Q, ells in Qs_to_ells.items():
-                    ells = [i for i in ells if order in self.nodes[i].weight_tensors]
-                    if not ells:
-                        continue
-                    cur_pts = Qs_to_pts[Q]
-                    wts = numpy.zeros((len(ells), *tshape, *(sd,) * order, len(cur_pts)))
-                    if Q is None:
-                        cur_columns = {pt: j for j, pt in enumerate(cur_pts)}
-                        for k, i in enumerate(ells):
-                            points, W = self.nodes[i].weight_tensors[order]
-                            wts[k][..., [cur_columns[pt] for pt in points]] = W
-                    else:
-                        for k, i in enumerate(ells):
-                            wts[k] = self.nodes[i].weight_tensors[order][1]
-                    indices = [columns[pt] for pt in cur_pts]
-                    R[ells] = numpy.tensordot(wts, dphi[..., indices], axes=(-1, -1))
+                point_groups = defaultdict(list)
+                for node_id, node_points in points[order].items():
+                    point_groups[node_points].append(node_id)
+                for node_points, node_ids in point_groups.items():
+                    wts = numpy.stack([weights[order][node_id] for node_id in node_ids])
+                    indices = [columns[pt] for pt in node_points]
+                    R[node_ids] = numpy.tensordot(wts, dphi[..., indices], axes=(-1, -1))
                 riesz[order] = R
         return riesz
 

@@ -57,14 +57,23 @@ class Functional(object):
             self.max_deriv_order = 0
 
     @cached_property
-    def weight_tensors(self):
-        r"""The weights of the functional as tensors, one per derivative order.
+    def points_by_order(self):
+        """Points used by this functional, grouped by derivative order."""
+        return self.points_and_weights[0]
 
-        Map each derivative order :math:`k` to the points :math:`x_q` and the
-        weights :math:`W^k` such that
-        :math:`\ell(f) = \sum_k \sum_q W^k_q : D^k f(x_q)`.
-        The axes of :math:`W^k` are the value axes of ``target_shape``,
-        then :math:`k` symmetric derivative axes, then the point axis.
+    @cached_property
+    def weights_by_order(self):
+        """Weight tensors used by this functional, grouped by derivative order."""
+        return self.points_and_weights[1]
+
+    @cached_property
+    def points_and_weights(self):
+        r"""Represent the functional using points and weights for each order.
+
+        For derivative order :math:`k`, the weights :math:`W^k` satisfy
+        :math:`\ell(f) = \sum_k \sum_q W^k_q : D^k f(x_q)`. The axes of
+        :math:`W^k` are the value axes of ``target_shape``, then :math:`k`
+        symmetric derivative axes, then the point axis.
         """
         sd = self.ref_el.get_spatial_dimension()
         terms = defaultdict(lambda: defaultdict(list))
@@ -74,17 +83,19 @@ class Functional(object):
             for w, alpha, c in wac_list:
                 terms[sum(alpha)][pt].append((w, alpha, c))
 
-        weight_tensors = {}
-        for order, entries in sorted(terms.items()):
-            W = numpy.zeros((*self.target_shape, *(sd,) * order, len(entries)))
-            for q, wac_list in enumerate(entries.values()):
+        points_by_order = {}
+        weights_by_order = {}
+        for order, weights_by_point in sorted(terms.items()):
+            W = numpy.zeros((*self.target_shape, *(sd,) * order, len(weights_by_point)))
+            for q, wac_list in enumerate(weights_by_point.values()):
                 for w, alpha, c in wac_list:
                     c = c if isinstance(c, tuple) else (c,)
                     indices = set(permutations(sum(([k] * a for k, a in enumerate(alpha)), [])))
                     for index in indices:
                         W[(*c, *index, q)] += w / len(indices)
-            weight_tensors[order] = tuple(entries), W
-        return weight_tensors
+            points_by_order[order] = tuple(weights_by_point)
+            weights_by_order[order] = W
+        return points_by_order, weights_by_order
 
     def evaluate(self, f):
         """Obsolete and broken functional evaluation.
@@ -336,7 +347,8 @@ class IntegralMoment(Functional):
         super().__init__(ref_el, shp, pt_dict, {}, "IntegralMoment")
 
     @cached_property
-    def weight_tensors(self):
+    def points_and_weights(self):
+        """Represent this moment using points and weights for each order."""
         sd = self.ref_el.get_spatial_dimension()
         order = self.max_deriv_order
         W = numpy.zeros((*self.target_shape, *(sd,) * order, len(self.Q.pts)))
@@ -346,7 +358,7 @@ class IntegralMoment(Functional):
             rank = len(self.target_shape)
             W = numpy.mean([W.transpose((*range(rank), *axes, W.ndim - 1))
                             for axes in permutations(range(rank, rank + order))], axis=0)
-        return {order: (tuple(self.deriv_dict or self.pt_dict), W)}
+        return ({order: tuple(self.deriv_dict or self.pt_dict)}, {order: W})
 
     def __call__(self, fn):
         """Evaluate the functional on the function fn."""

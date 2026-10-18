@@ -1,3 +1,5 @@
+from itertools import permutations
+
 import numpy
 import pytest
 
@@ -74,19 +76,28 @@ def test_normal_derivative_moment(sd):
 @pytest.mark.parametrize("element, degree", [("Argyris", 6), ("HsiehCloughTocher", 4), ("Walkington", 5),
                                              ("ArnoldWinther", 3), ("MardalTaiWinther", 1),
                                              ("Nedelec", 3), ("BrezziDouglasMarini", 2)])
-def test_integral_moment_weight_tensors(element, degree):
-    """Weights read from the quadrature rule agree with the point dictionaries."""
+def test_integral_moment_points_and_weights(element, degree):
+    """Public point and weight accessors represent the quadrature functional."""
     sd = 3 if element in {"Walkington", "Nedelec"} else 2
     kwargs = {"variant": "integral"} if element in {"Nedelec", "BrezziDouglasMarini"} else {}
     nodes = getattr(FIAT, element)(ufc_simplex(sd), degree, **kwargs).get_dual_set().nodes
     moments = [node for node in nodes if isinstance(node, functional.IntegralMoment)]
     assert moments
     for node in moments:
-        expected = functional.Functional.weight_tensors.func(node)
-        assert node.weight_tensors.keys() == expected.keys()
-        for (points, W), (expected_points, expected_W) in zip(node.weight_tensors.values(), expected.values()):
-            assert points == expected_points
-            assert numpy.allclose(W, expected_W)
+        points_by_order = node.points_by_order
+        weights_by_order = node.weights_by_order
+        order = node.max_deriv_order
+        points = tuple(map(tuple, node.Q.get_points()))
+        assert set(points_by_order) == set(weights_by_order) == {order}
+        assert points_by_order[order] == points
+
+        expected = numpy.zeros((*node.target_shape, *(sd,) * order, len(points)))
+        expected[node.comp] = node.f_at_qpts * node.Q.get_weights()
+        if order > 1:
+            rank = len(node.target_shape)
+            expected = numpy.mean([expected.transpose((*range(rank), *axes, expected.ndim - 1))
+                                   for axes in permutations(range(rank, rank + order))], axis=0)
+        assert numpy.allclose(weights_by_order[order], expected)
 
 
 @pytest.mark.parametrize("sd", [2, 3])
