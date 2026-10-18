@@ -6,6 +6,7 @@ import pytest
 import pprint
 
 from gem.interpreter import evaluate
+from finat.fiat_elements import FiatElement
 from finat.physically_mapped import PhysicallyMappedElement
 from finat.physically_mapped import adjugate_and_determinant
 
@@ -219,6 +220,16 @@ zany_piola_elements = {
 ])
 def test_piola(ref_to_phys, element, dimension):
     check_zany_mapping(element, ref_to_phys[dimension])
+
+
+class UnreducedArnoldWinther(PhysicallyMappedElement, FiatElement):
+    """The Arnold-Winther element with its divergence constraint dofs exposed."""
+    def __init__(self, cell, degree=3):
+        super().__init__(FIAT.ArnoldWinther(cell, degree))
+
+
+def test_unreduced_arnold_winther(ref_to_phys):
+    check_zany_mapping(UnreducedArnoldWinther, ref_to_phys[2])
 
 
 @pytest.mark.parametrize("dimension, element, degree", [
