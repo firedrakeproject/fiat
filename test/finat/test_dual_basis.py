@@ -10,7 +10,7 @@ import finat.ufl
 from finat.element_factory import create_element
 from finat.enriched import as_enriched
 from finat.fiat_elements import FiatElement
-from finat.physically_mapped import (PhysicallyMappedElement, _cartesian_pullbacks, _duality_projector,
+from finat.physically_mapped import (PhysicallyMappedElement, _cartesian_pullbacks, _pairing_projector,
                                      _in_range, adjugate_and_determinant)
 from finat.point_set import PointSet, UnionPointSet
 from finat.quadrature import QuadratureRule
@@ -366,7 +366,7 @@ class MappedElement(PhysicallyMappedElement, FiatElement):
     pass
 
 
-def test_duality_pairing_respects_tolerance():
+def test_pairing_respects_tolerance():
     """Near-divergence weights are not paired using NumPy's default tolerance."""
     ref_el = FIAT.ufc_simplex(2)
     node = FIAT.functional.Functional(
@@ -376,7 +376,7 @@ def test_duality_pairing_respects_tolerance():
         "NearDivergence")
     assert node.orders == (1,)
     _, W = node.get_order_tensors(1)
-    P = _duality_projector(2)
+    P = _pairing_projector(2)
     assert _in_range(numpy.eye(2)[..., None], (0, 1), P, 1.0e-12)
     assert not _in_range(W, (0, 1), P, 1.0e-12)
 
@@ -388,20 +388,20 @@ def pullback_matrix(pullback):
 
 
 @pytest.mark.parametrize("sd", [2, 3])
-def test_duality_pullback(sd):
-    """Pairing a contravariant axis with a derivative axis only splits the Kronecker product."""
+def test_pairing_pullback(sd):
+    """Pairing a contravariant axis with a covariant axis only splits the Kronecker product."""
     J = numpy.eye(sd) + numpy.random.default_rng(0).random((sd, sd))
     adjJ, detJ = adjugate_and_determinant(numpy.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object))
     J = numpy.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object)
     pullbacks = _cartesian_pullbacks(J, adjJ, detJ)
-    contravariant, derivative, pair = (pullback_matrix(pullbacks[mapping])
-                                       for mapping in ("contravariant piola", "derivative", "duality"))
+    contravariant, covariant, pair = (pullback_matrix(pullbacks[mapping])
+                                      for mapping in ("contravariant piola", "covariant piola", "L2 piola"))
     J, = evaluate([gem.ListTensor(J)])
     J = J.arr
     assert numpy.allclose(contravariant, J.T / numpy.linalg.det(J))
-    assert numpy.allclose(derivative, numpy.linalg.inv(J))
-    assert numpy.allclose(pair, numpy.kron(contravariant, derivative))
-    P = _duality_projector(sd)
+    assert numpy.allclose(covariant, numpy.linalg.inv(J))
+    assert numpy.allclose(pair, numpy.kron(contravariant, covariant))
+    P = _pairing_projector(sd)
     assert numpy.allclose(pair @ P, P / numpy.linalg.det(J))
 
 
@@ -427,23 +427,30 @@ def test_recombined_physical_dual(ref_to_phys, scaled_ref_to_phys, scaled):
 
 
 @pytest.mark.parametrize("avg", [False, True])
-def test_single_point_moment(avg):
+def test_single_point_moment(ref_to_phys, avg):
     """A normal derivative moment at a single point is still an integral moment."""
     element = MappedElement(FIAT.Morley(FIAT.ufc_simplex(2)))
     element.avg = avg
     dual = element.fiat_equivalent.get_dual_set()
     nodes = dual.get_nodes()
-    for i in chain.from_iterable(dual.get_entity_ids()[1].values()):
+    edge_dofs = list(chain.from_iterable(dual.get_entity_ids()[1].values()))
+    for i in edge_dofs:
         points, _ = nodes[i].get_order_tensors(1)
         assert len(points) == 1
-        assert element.node_mapping[i] == "frame"
         assert isinstance(nodes[i], FIAT.functional.IntegralMoment)
 
+    # The plain integral of the physical normal derivative is its average times the edge length.
+    averaged = MappedElement(element.fiat_equivalent)
+    Q = gem.Literal(numpy.eye(element.space_dimension()))
+    B, Bavg = [result.arr for result in evaluate([
+        element.dual_transformation(Q, ref_to_phys[2]), averaged.dual_transformation(Q, ref_to_phys[2])])]
+    lengths = [1.0 if avg else ref_to_phys[2].phys_cell.volume_of_subcomplex(1, e) for e in range(3)]
+    assert numpy.allclose(B[edge_dofs], numpy.multiply(lengths, Bavg[edge_dofs].T).T)
 
-def test_explicit_integral_convention(ref_to_phys):
+
+def test_plain_integral_facet_moments(ref_to_phys):
     element = FIAT.CrouzeixRaviart(FIAT.ufc_simplex(2), 1, variant="integral")
     mapped = MappedElement(element)
-    mapped.node_mapping = ("frame",) * element.space_dimension()
     mapped.avg = False
     B, M = [result.arr for result in evaluate([
         mapped.dual_transformation(gem.Literal(numpy.eye(3)), ref_to_phys[2]), mapped.basis_transformation(ref_to_phys[2])])]
