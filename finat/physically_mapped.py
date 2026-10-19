@@ -77,7 +77,7 @@ class MappedTabulation(Mapping):
 class PhysicalFunctional:
     r"""A FIAT node and the data that maps it to the physical cell.
 
-    :attr:`group_mappings` assigns a mapping to each group of axes of
+    :attr:`pullback_mappings` assigns a mapping to each group of axes of
     :attr:`weights`: ``affine``, ``covariant piola``, ``contravariant
     piola``, or ``L2 piola`` for a contravariant axis paired with a
     covariant axis through the identity.  These mappings act on Cartesian
@@ -130,7 +130,7 @@ class PhysicalFunctional:
 
     @cached_property
     def support_facet(self):
-        r"""The facet in whose frame :attr:`group_mappings` act, or None for Cartesian components.
+        r"""The facet in whose frame :attr:`pullback_mappings` act, or None for Cartesian components.
 
         For integral moments on a facet, and for nodes on a facet with
         derivatives or matrix values, this is the facet itself, with the
@@ -162,23 +162,22 @@ class PhysicalFunctional:
         return None
 
     @cached_property
-    def group_mappings(self):
-        """The mapping of each group of axes of :attr:`weights`.
-
-        Interior moments map every axis as ``affine``.  With a
-        :attr:`support_facet`, each axis keeps its :attr:`axis_mappings`
-        entry.  Otherwise, a contravariant axis paired with a covariant axis
-        through the identity maps as ``L2 piola``, and a covariant axis
-        along an edge maps as ``affine``.
-        """
+    def pullback_mappings(self):
+        """A dict from each group of axes of :attr:`weights` that map together to its mapping."""
+        # vandermonde_row takes the Kronecker product of the pullbacks
+        # in the order of this dict.
         sd = self.ref_el.get_spatial_dimension()
         W = self.weights
         axis_mappings = self.axis_mappings
+        # Interior moments map every axis as affine.
         if self.dim == sd and isinstance(self.node, IntegralMoment):
             return {(k,): "affine" for k in range(len(axis_mappings))}
+        # In the frame of a support facet, each axis keeps its own mapping.
         if self.support_facet is not None:
             return {(k,): mapping for k, mapping in enumerate(axis_mappings)}
 
+        # A contravariant axis contracted with a covariant axis through the
+        # identity is a trace, and the pair maps as L2 piola.
         groups = {}
         for k, vector in enumerate(axis_mappings):
             for l, covector in enumerate(axis_mappings):
@@ -186,6 +185,8 @@ class PhysicalFunctional:
                         and not any(k in axes or l in axes for axes in groups)
                         and in_range_of(W, pairing_projector(sd), (k, l), self.tol)):
                     groups[k, l] = "L2 piola"
+        # A derivative along the edge maps as affine.
+        # Every other axis keeps its own mapping.
         on_edge = 0 < self.dim < sd - 1
         for k, mapping in enumerate(axis_mappings):
             if any(k in axes for axes in groups):
@@ -202,17 +203,17 @@ class PhysicalFunctional:
     def scaling_exponent(self):
         """The exponent :math:`p` such that the physical node dilates as :math:`h^{-p}`.
 
-        Each group in :attr:`group_mappings` contributes its scaling.  If
+        Each group in :attr:`pullback_mappings` contributes its scaling.  If
         :attr:`avg` is False, an integral moment with a :attr:`support_facet`
         is a plain integral over its entity, which contributes :math:`-dim`.
         """
         sd = self.ref_el.get_spatial_dimension()
         if self.support_facet is None:
             weights = {"covariant piola": 1, "contravariant piola": sd - 1, "L2 piola": sd}
-            return sum(weights.get(mapping, 0) for mapping in self.group_mappings.values())
+            return sum(weights.get(mapping, 0) for mapping in self.pullback_mappings.values())
         nu = self.ref_el.compute_scaled_normal(self.support_facet)
         exponent = 0
-        for axes, mapping in self.group_mappings.items():
+        for axes, mapping in self.pullback_mappings.items():
             if mapping == "covariant piola":
                 exponent += 1
             elif mapping == "contravariant piola" and not in_range_of(
@@ -228,13 +229,16 @@ class PhysicalFunctional:
 
         The row is :math:`B_j = h^p\,|e|\sum_{a,b}G_{ba}R_{abj}`, where
         :math:`G` is the Kronecker product of the pullbacks of
-        :attr:`group_mappings`, :math:`p` is :attr:`scaling_exponent`, and
+        :attr:`pullback_mappings`, :math:`p` is :attr:`scaling_exponent`, and
         :math:`|e|` is the physical measure of the entity if :attr:`avg` is
         False and there is a :attr:`support_facet`, and 1 otherwise.
 
-        :arg uncontracted_riesz: :math:`R_{a,\beta,b,\gamma,j}=\sum_q W_{a,\beta,q}(\partial^\gamma\psi^0_j)_b(x_q)`,
+        :arg uncontracted_riesz: The matrix
+            :math:`R_{(a,\beta),(b,\gamma),j}=\sum_q W_{a,\beta,q}(\partial^\gamma\psi^0_j)_b(x_q)`,
             where :math:`W` are the weights of the node and :math:`\psi^0`
-            is the nodal basis of the nodes before recombination.
+            is the nodal basis of the nodes before recombination.  The axes
+            of the node and of the basis are each flattened in the order of
+            :attr:`pullback_mappings`.
         :arg pullbacks: The pullback of each mapping, in Cartesian components
             or in the frame of :attr:`support_facet`.
         :arg J: The Jacobian as an object array of GEM scalars.
@@ -252,7 +256,7 @@ class PhysicalFunctional:
 
         numerators = {}
         is_identity = measure == one and self.scaling_exponent == 0
-        for axes, mapping in self.group_mappings.items():
+        for axes, mapping in self.pullback_mappings.items():
             pullback = pullbacks[mapping]
             in_range = in_range_of(self.weights, pullback.projector, axes, self.tol)
             is_identity = is_identity and in_range and pullback.scale == pullback.denominator
@@ -260,9 +264,7 @@ class PhysicalFunctional:
         if is_identity:
             return None
 
-        n = (uncontracted_riesz.ndim - 1) // 2
-        axes = list(chain.from_iterable(self.group_mappings))
-        R = uncontracted_riesz.transpose(*axes, *(n + k for k in axes), -1).reshape(-1, uncontracted_riesz.shape[-1])
+        R = uncontracted_riesz
         numerator = numpy.full(R.shape[1], zero, dtype=object)
         cutoff = self.tol * numpy.abs(R).max()
         for terms in product(*numerators.values()):
@@ -274,7 +276,7 @@ class PhysicalFunctional:
             for j in nonzeros:
                 numerator[j] += coefficient * reference_row[j]
         numerator = numerator * measure
-        denominator = gem.Product(*(pullbacks[mapping].denominator for mapping in self.group_mappings.values()))
+        denominator = gem.Product(*(pullbacks[mapping].denominator for mapping in self.pullback_mappings.values()))
 
         p = self.scaling_exponent
         if p is not None:
@@ -365,9 +367,11 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
     def _uncontracted_riesz(self):
         r"""Uncontracted Riesz representation of each node in the source nodal basis.
 
-        :math:`R_{i,a,\beta,b,\gamma,j}=\sum_q W_{i,a,\beta,q}(\partial^\gamma\psi^0_j)_b(x_q)`,
+        For node :math:`i`, the matrix
+        :math:`R_{(a,\beta),(b,\gamma),j}=\sum_q W_{i,a,\beta,q}(\partial^\gamma\psi^0_j)_b(x_q)`,
         where :math:`\psi^0` is the nodal basis of the nodes before
-        recombination.
+        recombination.  The axes of the node and of the basis are each
+        flattened in the order of :attr:`PhysicalFunctional.pullback_mappings`.
         """
         dual = self._element.get_dual_set()
         coeffs = self._element.get_coeffs()
@@ -375,14 +379,26 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         if C is not None:
             # The source nodal basis is C^T times the basis dual to C n_0.
             coeffs = numpy.tensordot(C.T, coeffs, axes=(1, 0))
+        sd = self.cell.get_spatial_dimension()
+        value_shape = coeffs.shape[1:-1]
+        num_bf, num_exp = coeffs.shape[0], coeffs.shape[-1]
+        coeffs = coeffs.reshape(num_bf, -1, num_exp)
         riesz = dual.to_uncontracted_riesz(self._element.get_nodal_basis())
+        for order, R in riesz.items():
+            R = R.reshape(len(R), -1, sd**order, num_exp)
+            # (i, a beta, gamma, e) x (j, b, e) -> (i, a beta, gamma, j, b) -> (i, a beta, b, gamma, j)
+            R = numpy.tensordot(R, coeffs, axes=(-1, -1)).transpose(0, 1, 4, 2, 3)
+            shape = (*value_shape, *(sd,) * order)
+            riesz[order] = R.reshape(len(R), *shape, *shape, num_bf)
+
         result = []
-        for i, node in enumerate(dual.nodes):
-            rank = len(node.target_shape)
-            order = node.max_deriv_order
-            R = numpy.tensordot(riesz[order][i], coeffs, axes=(-1, -1))
-            # (a, beta, gamma, j, b) -> (a, beta, b, gamma, j)
-            result.append(numpy.moveaxis(R, range(R.ndim - rank, R.ndim), range(rank + order, 2 * rank + order)))
+        for i, functional in enumerate(self._physical_functionals):
+            R = riesz[functional.node.max_deriv_order][i]
+            # Flatten the axes of the node, and then the matching axes of the
+            # basis, in the order of the pullback mappings.
+            axes = list(chain.from_iterable(functional.pullback_mappings))
+            R = R.transpose(*axes, *(len(axes) + k for k in axes), -1)
+            result.append(R.reshape(-1, num_bf))
         return result
 
     def _vandermonde_rows(self, coordinate_mapping):
