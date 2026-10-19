@@ -233,15 +233,7 @@ class PhysicallyMappedFunctional:
         :math:`|e|` is the physical measure of the entity if :attr:`avg` is
         False and there is a :attr:`support_facet`, and 1 otherwise.
 
-        :arg uncontracted_riesz: The tensor
-            :math:`R_{(a,\beta),(b,\gamma),j}=\sum_q W_{a,\beta,q}(\partial^\gamma\psi^0_j)_b(x_q)`,
-            where :math:`W` are the weights of the node and :math:`\psi^0`
-            is the nodal basis of the nodes before recombination, stored as
-            a matrix with one row per pair of multi-indices
-            :math:`((a,\beta),(b,\gamma))` and one column per basis
-            function :math:`j`.  The value and derivative axes of the node
-            and of the basis are each flattened in the order of
-            :attr:`pullback_mappings`.
+        :arg uncontracted_riesz: See :attr:`PhysicallyMappedElement._uncontracted_riesz`.
         :arg pullbacks: The pullback of each mapping, in Cartesian components
             or in the frame of :attr:`support_facet`.
         :arg J: The Jacobian as an object array of GEM scalars.
@@ -374,7 +366,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
     def _uncontracted_riesz(self):
         r"""Uncontracted Riesz representation of each node in the source nodal basis.
 
-        For node :math:`i`, the matrix
+        For node :math:`i`, the rank-3 tensor
         :math:`R_{(a,\beta),(b,\gamma),j}=\sum_q W_{i,a,\beta,q}(\partial^\gamma\psi^0_j)_b(x_q)`,
         where :math:`\psi^0` is the nodal basis of the nodes before
         recombination.  The axes of the node and of the basis are each
