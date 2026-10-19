@@ -3,7 +3,7 @@ expressions."""
 
 from collections import OrderedDict, defaultdict
 from functools import singledispatch, partial
-from itertools import combinations, permutations, zip_longest
+from itertools import chain, combinations, permutations, zip_longest
 from numbers import Integral
 
 import numpy
@@ -12,7 +12,7 @@ from gem.utils import groupby
 from gem.node import (Memoizer, MemoizerArg, reuse_if_untouched,
                       reuse_if_untouched_arg, traversal)
 from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
-                     Product, Sum, Comparison, Conditional, Division,
+                     Product, Sum, Comparison, Conditional, Division, Power,
                      Index, VariableIndex, Indexed, FlexiblyIndexed,
                      IndexSum, ComponentTensor, ListTensor, Delta,
                      partial_indexed, one)
@@ -815,3 +815,187 @@ def aggressive_unroll(expression):
     expression, = unroll_indexsum((expression,), predicate=lambda index: True)
     expression, = remove_componenttensors((expression,))
     return expression
+
+
+def _factor_deltas(factor):
+    r"""Factor Kronecker deltas out of an indexed constant.
+
+    Rewrites :math:`C_{\ldots i \ldots j \ldots} = \delta_{ij} D_{\ldots i}`
+    for each pair of axes on which :math:`C` vanishes off the diagonal, and
+    drops the index :math:`i` from :math:`D` if it is constant along the
+    diagonal.
+
+    :returns: a list of factors
+    """
+    if not isinstance(factor, Indexed):
+        return [factor]
+    C, = factor.children
+    if not isinstance(C, Constant):
+        return [factor]
+    array = C.array
+    multiindex = factor.multiindex
+    if any(isinstance(i, Integral) for i in multiindex):
+        array = array[tuple(i if isinstance(i, Integral) else slice(None) for i in multiindex)]
+        multiindex = tuple(i for i in multiindex if not isinstance(i, Integral))
+
+    deltas = []
+    found = True
+    while found:
+        found = False
+        for p, q in combinations(range(len(multiindex)), 2):
+            i, j = multiindex[p], multiindex[q]
+            n = array.shape[p]
+            if not (isinstance(i, Index) and isinstance(j, Index)) or i == j or n != array.shape[q]:
+                continue
+            shape = [1] * array.ndim
+            shape[p] = shape[q] = n
+            if numpy.any(numpy.where(numpy.eye(n, dtype=bool).reshape(shape), 0, array)):
+                continue
+            # The diagonal is moved to the last axis
+            array = numpy.diagonal(array, axis1=p, axis2=q)
+            multiindex = tuple(k for k in multiindex if k not in (i, j)) + (i,)
+            if numpy.array_equal(array, numpy.broadcast_to(array[..., :1], array.shape)):
+                array = array[..., 0]
+                multiindex = multiindex[:-1]
+            deltas.append(Delta(i, j))
+            found = True
+            break
+
+    if not deltas:
+        return [factor]
+    return deltas + [Indexed(Literal(array, dtype=C.dtype), multiindex)]
+
+
+def _match_inverse(sum_indices, factors, inverses):
+    r"""Find a contraction :math:`\sum_k A_{ak} B_{kb}` of a pair of inverses.
+
+    The index :math:`k` must not appear in any other factor.
+
+    :returns: (positions of the two factors, k, the equivalent Delta), or None
+    """
+    for (p, f), (q, g) in permutations(enumerate(factors), 2):
+        if not (isinstance(f, Indexed) and isinstance(g, Indexed)
+                and (f.children[0], g.children[0]) in inverses):
+            continue
+        (a, k), (k_, b) = f.multiindex, g.multiindex
+        if (k == k_ and k in sum_indices and k not in (a, b)
+                and not any(k in h.free_indices for r, h in enumerate(factors) if r not in (p, q))):
+            return (p, q), k, Delta(a, b)
+    return None
+
+
+def _cancel_inverses_contraction(expression, inverses, index_replacer):
+    """Cancel the contractions of inverses in the tensor product at the root of expression."""
+    renamer = make_renamer(make_rename_map())
+    renamer(expression.free_indices)
+    sum_indices, factors = traverse_product(expression, renamer=renamer, index_replacer=index_replacer)
+    num_indices = len(sum_indices)
+    factors = list(chain.from_iterable(map(_factor_deltas, factors)))
+    while True:
+        sum_indices, factors = delta_elimination(sum_indices, factors, index_replacer=index_replacer)
+        factors = [index_replacer(f, ()) for f in factors]
+        match = _match_inverse(sum_indices, factors, inverses)
+        if match is None:
+            break
+        positions, k, delta = match
+        factors = [f for p, f in enumerate(factors) if p not in positions] + [delta]
+        sum_indices.remove(k)
+    if len(sum_indices) == num_indices:
+        return expression
+    return sum_factorise(sum_indices, factors)
+
+
+@singledispatch
+def _cancel_inverses(node, self):
+    raise AssertionError("cannot handle type %s" % type(node))
+
+
+_cancel_inverses.register(Node)(reuse_if_untouched)
+
+
+@_cancel_inverses.register(IndexSum)
+def _cancel_inverses_indexsum(node, self):
+    node = reuse_if_untouched(node, self)
+    return _cancel_inverses_contraction(node, self.inverses, self.index_replacer)
+
+
+def cancel_inverses(expressions, inverses):
+    r"""Cancel contractions of matrices with their inverses.
+
+    Rewrites :math:`\sum_k A_{ak} B_{kb} \to \delta_{ab}` for each pair
+    :math:`(A, B)` in ``inverses``, and eliminates the resulting Kronecker
+    deltas, together with those factored out of constant tensors.
+
+    :arg expressions: list of expression DAGs
+    :arg inverses: pairs of matrices :math:`(A, B)` such that :math:`AB = I`
+    :returns: list of expression DAGs
+    """
+    mapper = Memoizer(_cancel_inverses)
+    mapper.inverses = frozenset(inverses)
+    mapper.index_replacer = MemoizerArg(filtered_replace_indices)
+    return list(map(mapper, expressions))
+
+
+def _collect_powers(node, exponent, powers):
+    """Accumulate the exponent of each base in a product tree raised to exponent."""
+    if isinstance(node, Product):
+        for child in node.children:
+            _collect_powers(child, exponent, powers)
+    elif isinstance(node, Division):
+        a, b = node.children
+        _collect_powers(a, exponent, powers)
+        _collect_powers(b, -exponent, powers)
+    elif isinstance(node, Power) and isinstance(node.children[1], Literal):
+        base, e = node.children
+        e = e.value
+        if e == int(e):
+            _collect_powers(base, exponent * int(e), powers)
+        else:
+            # (x^a)^b = x^(ab) only holds for integer b.
+            powers[base].append(exponent * e)
+    else:
+        powers[node].append(exponent)
+
+
+def _make_power(base, exponent):
+    if exponent == int(exponent):
+        exponent = int(exponent)
+    return base if exponent == 1 else Power(base, Literal(exponent))
+
+
+@singledispatch
+def _cancel_reciprocals(node, self):
+    raise AssertionError("cannot handle type %s" % type(node))
+
+
+_cancel_reciprocals.register(Node)(reuse_if_untouched)
+
+
+@_cancel_reciprocals.register(Product)
+@_cancel_reciprocals.register(Division)
+def _cancel_reciprocals_product(node, self):
+    node = reuse_if_untouched(node, self)
+    if not isinstance(node, (Product, Division)):
+        return node
+    powers = defaultdict(list)
+    _collect_powers(node, 1, powers)
+    if not any(min(es) < 0 < max(es) for es in powers.values()):
+        return node
+
+    exponents = {base: sum(es) for base, es in powers.items()}
+    numerator = Product(*(_make_power(b, e) for b, e in exponents.items() if e > 0))
+    denominator = [_make_power(b, -e) for b, e in exponents.items() if e < 0]
+    result = Division(numerator, Product(*denominator)) if denominator else numerator
+    if set(result.free_indices) != set(node.free_indices):
+        return node
+    return result
+
+
+def cancel_reciprocals(expressions):
+    """Cancel reciprocal factors within products, such as ``d**2 * (1/d)**2 -> 1``.
+
+    :arg expressions: list of expression DAGs
+    :returns: list of expression DAGs
+    """
+    mapper = Memoizer(_cancel_reciprocals)
+    return list(map(mapper, expressions))
