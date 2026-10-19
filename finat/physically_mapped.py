@@ -237,8 +237,7 @@ class PhysicallyMappedFunctional:
             in Cartesian components or in the frame of :attr:`support_facet`.
         :arg J: The Jacobian as an object array of GEM scalars.
         :arg h: The cell size at each vertex.
-        :returns: The numerator and denominator of the Vandermonde row, or
-            None if the row is the identity.
+        :returns: The numerator and denominator of the Vandermonde row.
         """
         measure = one
         if self.support_facet is not None and isinstance(self.node, IntegralMoment) and not self.avg:
@@ -249,14 +248,10 @@ class PhysicallyMappedFunctional:
             measure = volume / numpy.sqrt(numpy.linalg.det(T @ T.T)) * determinant(JT.T @ JT)**0.5
 
         G = reduce(WeightTransformation.kron, map(transformations.get, self.pullback_mappings.values()),
-                   WeightTransformation(numpy.ones((1, 1))))
-        axes = tuple(chain.from_iterable(self.pullback_mappings))
-        if in_range_of(self.weights, G.projector, axes, self.tol):
-            G = G.on_range()
-            if measure == one and self.scaling_exponent == 0 and G.scale == G.denominator:
-                return None
-
-        numerator = G.contract(uncontracted_riesz, self.tol)
+                   WeightTransformation([one], [numpy.eye(1)]))
+        axes = list(chain.from_iterable(self.pullback_mappings))
+        W = self.weights.transpose(*axes, -1).reshape(len(G.matrices[0]), -1)
+        numerator = G.to_riesz(W, uncontracted_riesz, self.tol)
         numerator *= measure
         denominator = G.denominator
 
@@ -421,15 +416,16 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
                 transformations = frames[key]
             else:
                 transformations = cartesian
-            row = functional.vandermonde_row(self._uncontracted_riesz[i], transformations, J, h)
-            if row is None:
+            numerator, denominator = functional.vandermonde_row(self._uncontracted_riesz[i], transformations, J, h)
+            nonzeros = [j for j, entry in enumerate(numerator) if not isinstance(entry, gem.Zero)]
+            if nonzeros == [i] and numerator[i] == denominator:
                 continue
             closure = closures[functional.dim][functional.entity]
-            outside = [j for j, entry in enumerate(row[0]) if j not in closure and not isinstance(entry, gem.Zero)]
+            outside = [j for j in nonzeros if j not in closure]
             if outside:
                 raise NotImplementedError(f"Dof {i} on entity {(functional.dim, functional.entity)} "
                                           f"couples outside its closure: {outside}")
-            rows[i] = row
+            rows[i] = numerator, denominator
         return rows
 
     def _recombine(self, A):
@@ -702,89 +698,87 @@ def solve(A, B, cache=None):
 
 
 class WeightTransformation:
-    r"""The transformation :math:`G=(sP+\sum_t g_t C_t)/d` of the weights on a group of tensor axes.
+    r"""A matrix :math:`G=\frac{1}{d}\sum_t g_t C_t` that transforms the weights on a group of tensor axes.
 
-    The constant matrices :math:`C_t` vanish on the range of the
-    projector :math:`P`, where :math:`G` acts as the scalar :math:`s/d`.
-    The scalars :math:`s`, :math:`g_t` and :math:`d` are GEM expressions.
+    The coefficients :math:`g_t` and the denominator :math:`d` are GEM
+    scalars, and the matrices :math:`C_t` are constant, so that
+    contractions with constant tensors cancel numerically.
 
-    :arg projector: The projector :math:`P`.
-    :arg scale: The scale :math:`s`, which defaults to :math:`d`.
     :arg coefficients: The coefficients :math:`g_t`.
     :arg matrices: The matrices :math:`C_t`.
     :arg denominator: The denominator :math:`d`.
     """
 
-    def __init__(self, projector, scale=None, coefficients=(), matrices=(), denominator=one):
-        self.projector = numpy.asarray(projector, dtype=float)
-        n = len(self.projector)
-        self.scale = denominator if scale is None else scale
+    def __init__(self, coefficients, matrices, denominator=one):
         self.coefficients = tuple(coefficients)
-        self.matrices = numpy.reshape(numpy.asarray(matrices, dtype=float), (len(self.coefficients), n, n))
+        self.matrices = numpy.asarray(matrices, dtype=float)
         self.denominator = denominator
-        if not numpy.allclose(self.matrices @ self.projector, 0):
-            raise ValueError("The matrices must vanish on the range of the projector.")
 
     @classmethod
     def from_matrix(cls, A, denominator=one):
-        """The transformation :math:`A/d` of a matrix of GEM scalars."""
+        """The transformation :math:`A/d` of a matrix of GEM scalars, expanded in its entries."""
         n = len(A)
         units = numpy.eye(n * n).reshape(n, n, n, n)
         entries = [(A[a, b], units[a, b]) for a, b in numpy.ndindex(A.shape) if not isinstance(A[a, b], gem.Zero)]
-        return cls(numpy.zeros((n, n)), None, *zip(*entries), denominator=denominator)
-
-    @property
-    def terms(self):
-        """The pairs :math:`(g, C)` of the numerator, starting with :math:`(s, P)` if :math:`P` is nonzero."""
-        terms = list(zip(self.coefficients, self.matrices))
-        if self.projector.any():
-            terms.insert(0, (self.scale, self.projector))
-        return terms
+        return cls(*zip(*entries), denominator)
 
     def __add__(self, other):
-        if other.projector.any():
-            if self.projector.any():
-                raise ValueError("At most one summand can have a nonzero projector.")
-            return other + self
         d, e = self.denominator, other.denominator
-        return WeightTransformation(self.projector, self.scale * e,
-                                    [g * e for g in self.coefficients] + [g * d for g in other.coefficients],
+        return WeightTransformation([g * e for g in self.coefficients] + [g * d for g in other.coefficients],
                                     numpy.concatenate([self.matrices, other.matrices]), d * e)
 
     def kron(self, other):
         """The Kronecker product, which transforms the axes of self followed by the axes of other."""
-        terms = [(g * h, numpy.kron(C, D)) for (g, C), (h, D) in product(self.terms, other.terms)]
-        projector = numpy.kron(self.projector, other.projector)
-        scale = None
-        if projector.any():
-            (scale, _), *terms = terms
-        coefficients, matrices = zip(*terms) if terms else ((), ())
-        return WeightTransformation(projector, scale, coefficients, matrices,
+        return WeightTransformation([g * h for g, h in product(self.coefficients, other.coefficients)],
+                                    [numpy.kron(C, D) for C, D in product(self.matrices, other.matrices)],
                                     self.denominator * other.denominator)
 
-    def with_eigenspace(self, projector, scale):
-        """The same transformation, given that it acts as :math:`s/d` on the range of the projector."""
-        if self.projector.any():
-            raise ValueError("The transformation already has a nonzero projector.")
-        complement = numpy.eye(len(projector)) - projector
-        return WeightTransformation(projector, scale, self.coefficients, self.matrices @ complement,
-                                    self.denominator)
+    def eigenvalue(self, W, tol):
+        r"""The numerator :math:`\lambda d` such that :math:`GW=\lambda W`, or None.
 
-    def on_range(self):
-        """The restriction to the range of the projector."""
-        return WeightTransformation(self.projector, self.scale, denominator=self.denominator)
+        This holds when each :math:`C_tW=c_tW`, and then
+        :math:`\lambda d=\sum_t c_t g_t`.
 
-    def contract(self, R, tol):
-        r"""The numerator of :math:`\sum_{a,b}G_{ba}R_{abj}`, dropping terms below tol relative to R."""
-        coefficients, matrices = zip(*self.terms)
-        matrices = numpy.asarray(matrices)
+        :arg W: The weights as a matrix, with the transformed axes as rows.
+        :arg tol: Relative tolerance on :math:`C_tW-c_tW`.
+        """
+        CW = self.matrices @ W
+        c = numpy.tensordot(CW, W, axes=2) / numpy.tensordot(W, W, axes=2)
+        residual = numpy.abs(CW - c[:, None, None] * W).max(axis=(1, 2))
+        if (residual > tol * numpy.abs(self.matrices).max(axis=(1, 2)) * numpy.abs(W).max()).any():
+            return None
+        c = round_to_int(c, tol)
+        return sum((g * ct for g, ct in zip(self.coefficients, c) if ct), zero)
+
+    def to_riesz(self, W, R, tol):
+        r"""The numerator of the Riesz representation :math:`\sum_{a,b}G_{ba}R_{abj}` of the transformed node.
+
+        If :math:`GW=\lambda W`, this is the trace :math:`\lambda\sum_a R_{aaj}`.
+
+        :arg W: The weights of the node as a matrix, with the transformed
+            axes as rows.
+        :arg R: The uncontracted Riesz representation of the node, with
+            rows :math:`(a,b)` and columns :math:`j`.
+        :arg tol: Tolerance relative to :math:`R` below which terms are dropped.
+        """
+        coefficients, matrices = self.coefficients, self.matrices
+        eigenvalue = self.eigenvalue(W, tol)
+        if eigenvalue is not None:
+            coefficients, matrices = [eigenvalue], numpy.eye(len(W))[None]
         rows = matrices.transpose(0, 2, 1).reshape(len(matrices), -1) @ R
         cutoffs = tol * numpy.abs(R).max() * numpy.abs(matrices).max(axis=(1, 2))
         numerator = numpy.full(R.shape[1], zero, dtype=object)
         for g, row, cutoff in zip(coefficients, rows, cutoffs):
+            row = round_to_int(row, cutoff)
             for j in numpy.flatnonzero(numpy.abs(row) > cutoff):
                 numerator[j] += g * row[j]
         return numerator
+
+
+def round_to_int(x, tol):
+    """Round the entries of x that lie within tol of an integer."""
+    rounded = numpy.round(x)
+    return numpy.where(numpy.abs(x - rounded) <= tol, rounded, x)
 
 
 def cartesian_transformations(J, adjJ, detJ):
@@ -792,9 +786,13 @@ def cartesian_transformations(J, adjJ, detJ):
     sd = J.shape[1]
     contravariant = WeightTransformation.from_matrix(J.T, detJ)
     covariant = WeightTransformation.from_matrix(adjJ, detJ)
-    # The pairing of a contravariant axis with a covariant axis only scales by 1/detJ.
-    pairing = contravariant.kron(covariant).with_eigenspace(pairing_projector(sd), detJ)
-    return {"affine": WeightTransformation(numpy.eye(sd)), "contravariant piola": contravariant,
+    # The pairing of a contravariant axis with a covariant axis scales the
+    # identity by 1/detJ, so it is expanded in the identity and its complement.
+    pairing = contravariant.kron(covariant)
+    P = pairing_projector(sd)
+    pairing = WeightTransformation([detJ, *pairing.coefficients], [P, *(pairing.matrices @ (numpy.eye(sd * sd) - P))],
+                                   pairing.denominator)
+    return {"affine": WeightTransformation([one], [numpy.eye(sd)]), "contravariant piola": contravariant,
             "covariant piola": covariant, "L2 piola": pairing}
 
 
@@ -837,18 +835,19 @@ def frame_transformations(ref_el, facet, support, J, adjJ, detJ):
     normals.append((n, adjJ @ Kn, detJ * (Kn @ Kn)**0.5, frame))
     # Covariant weights are unchanged along the tangents, and each normal
     # component maps through the frame.
-    covariant = WeightTransformation(numpy.eye(sd) - sum(numpy.outer(n, n) for n, *_ in normals))
+    covariant = WeightTransformation([one], [numpy.eye(sd) - sum(numpy.outer(n, n) for n, *_ in normals)])
     for n, u, d, frame in normals:
-        covariant += WeightTransformation(numpy.zeros((sd, sd)), None, [u @ f for f in frame],
-                                          [numpy.outer(f, n) for f in frame], d)
+        covariant += WeightTransformation([u @ f for f in frame], [numpy.outer(f, n) for f in frame], d)
+    # Contravariant weights keep their normal component, and their
+    # tangential components map through the frame.
     nn = nu @ nu
     Knu = K @ nu
     KtKnu = K.T @ Knu
     P = numpy.outer(nu, nu) / nn
-    contravariant = WeightTransformation(P, None, [Knu @ Knu, *(KtKnu @ -tau for tau in tangents)],
-                                         [numpy.eye(sd) - P, *(numpy.outer(nu, tau) for tau in tangents)],
-                                         detJ * nn)
-    return {"affine": WeightTransformation(numpy.eye(sd)), "covariant piola": covariant,
+    d = detJ * nn
+    contravariant = WeightTransformation([d, Knu @ Knu, *(KtKnu @ -tau for tau in tangents)],
+                                         [P, numpy.eye(sd) - P, *(numpy.outer(nu, tau) for tau in tangents)], d)
+    return {"affine": WeightTransformation([one], [numpy.eye(sd)]), "covariant piola": covariant,
             "contravariant piola": contravariant}
 
 
