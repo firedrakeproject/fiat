@@ -10,7 +10,6 @@ from abc import ABCMeta, abstractmethod
 from collections.abc import Mapping
 from functools import cached_property, reduce
 from itertools import chain, product
-from operator import mul
 
 import gem
 import numpy
@@ -164,7 +163,7 @@ class PhysicallyMappedFunctional:
     @cached_property
     def pullback_mappings(self):
         """A dict from each group of axes of :attr:`weights` that map together to its mapping."""
-        # vandermonde_row takes the Kronecker product of the pullbacks
+        # vandermonde_row takes the Kronecker product of the weight transformations
         # in the order of this dict.
         sd = self.ref_el.get_spatial_dimension()
         W = self.weights
@@ -224,18 +223,18 @@ class PhysicallyMappedFunctional:
             exponent -= self.dim
         return exponent
 
-    def vandermonde_row(self, uncontracted_riesz, pullbacks, J, h):
+    def vandermonde_row(self, uncontracted_riesz, transformations, J, h):
         r"""The row of the physical Vandermonde matrix for this node.
 
         The row is :math:`B_j = h^p\,|e|\sum_{a,b}G_{ba}R_{abj}`, where
-        :math:`G` is the Kronecker product of the pullbacks of
+        :math:`G` is the Kronecker product of the weight transformations of
         :attr:`pullback_mappings`, :math:`p` is :attr:`scaling_exponent`, and
         :math:`|e|` is the physical measure of the entity if :attr:`avg` is
         False and there is a :attr:`support_facet`, and 1 otherwise.
 
         :arg uncontracted_riesz: See :attr:`PhysicallyMappedElement._uncontracted_riesz`.
-        :arg pullbacks: The pullback of each mapping, in Cartesian components
-            or in the frame of :attr:`support_facet`.
+        :arg transformations: The :class:`WeightTransformation` of each mapping,
+            in Cartesian components or in the frame of :attr:`support_facet`.
         :arg J: The Jacobian as an object array of GEM scalars.
         :arg h: The cell size at each vertex.
         :returns: The numerator and denominator of the Vandermonde row, or
@@ -249,29 +248,17 @@ class PhysicallyMappedFunctional:
             volume = self.ref_el.volume_of_subcomplex(self.dim, self.entity)
             measure = volume / numpy.sqrt(numpy.linalg.det(T @ T.T)) * determinant(JT.T @ JT)**0.5
 
-        numerators = {}
-        is_identity = measure == one and self.scaling_exponent == 0
-        for axes, mapping in self.pullback_mappings.items():
-            pullback = pullbacks[mapping]
-            in_range = in_range_of(self.weights, pullback.projector, axes, self.tol)
-            is_identity = is_identity and in_range and pullback.scale == pullback.denominator
-            numerators[axes] = pullback.numerator(in_range)
-        if is_identity:
-            return None
+        G = reduce(WeightTransformation.kron, map(transformations.get, self.pullback_mappings.values()),
+                   WeightTransformation(numpy.ones((1, 1))))
+        axes = tuple(chain.from_iterable(self.pullback_mappings))
+        if in_range_of(self.weights, G.projector, axes, self.tol):
+            G = G.on_range()
+            if measure == one and self.scaling_exponent == 0 and G.scale == G.denominator:
+                return None
 
-        R = uncontracted_riesz
-        numerator = numpy.full(R.shape[1], zero, dtype=object)
-        cutoff = self.tol * numpy.abs(R).max()
-        for terms in product(*numerators.values()):
-            coefficients, matrices = zip(*terms) if terms else ((), ())
-            C = reduce(numpy.kron, matrices) if matrices else numpy.ones((1, 1))
-            reference_row = C.T.ravel() @ R
-            nonzeros = numpy.flatnonzero(numpy.abs(reference_row) > cutoff * numpy.abs(C).max())
-            coefficient = gem.Product(*coefficients)
-            for j in nonzeros:
-                numerator[j] += coefficient * reference_row[j]
+        numerator = G.contract(uncontracted_riesz, self.tol)
         numerator *= measure
-        denominator = gem.Product(*(pullbacks[mapping].denominator for mapping in self.pullback_mappings.values()))
+        denominator = G.denominator
 
         p = self.scaling_exponent
         if p:
@@ -421,7 +408,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         adjJ, detJ = adjugate_and_determinant(J)
         h = coordinate_mapping.cell_size()
 
-        cartesian = cartesian_pullbacks(J, adjJ, detJ)
+        cartesian = cartesian_transformations(J, adjJ, detJ)
         frames = {}
 
         closures = self._element.entity_closure_dofs()
@@ -430,11 +417,11 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
             if functional.support_facet is not None:
                 key = (functional.support_facet, (functional.dim, functional.entity))
                 if key not in frames:
-                    frames[key] = frame_pullbacks(self.cell, *key, J, adjJ, detJ)
-                pullbacks = frames[key]
+                    frames[key] = frame_transformations(self.cell, *key, J, adjJ, detJ)
+                transformations = frames[key]
             else:
-                pullbacks = cartesian
-            row = functional.vandermonde_row(self._uncontracted_riesz[i], pullbacks, J, h)
+                transformations = cartesian
+            row = functional.vandermonde_row(self._uncontracted_riesz[i], transformations, J, h)
             if row is None:
                 continue
             closure = closures[functional.dim][functional.entity]
@@ -714,40 +701,100 @@ def solve(A, B, cache=None):
     return X
 
 
-class Pullback:
-    r"""The pullback :math:`G=(sP+\sum_t g_t C_t)/d` of a group of tensor axes.
+class WeightTransformation:
+    r"""The transformation :math:`G=(sP+\sum_t g_t C_t)/d` of the weights on a group of tensor axes.
 
-    The terms :math:`C_t` vanish on the range of the projector :math:`P`,
-    where :math:`G` only scales by :math:`s/d`. By default :math:`s=d`.
+    The constant matrices :math:`C_t` vanish on the range of the
+    projector :math:`P`, where :math:`G` acts as the scalar :math:`s/d`.
+    The scalars :math:`s`, :math:`g_t` and :math:`d` are GEM expressions.
+
+    :arg projector: The projector :math:`P`.
+    :arg scale: The scale :math:`s`, which defaults to :math:`d`.
+    :arg coefficients: The coefficients :math:`g_t`.
+    :arg matrices: The matrices :math:`C_t`.
+    :arg denominator: The denominator :math:`d`.
     """
 
-    def __init__(self, projector, terms=(), denominator=one, scale=None):
-        self.projector = numpy.asarray(projector)
-        self.terms = list(terms)
-        self.denominator = denominator
+    def __init__(self, projector, scale=None, coefficients=(), matrices=(), denominator=one):
+        self.projector = numpy.asarray(projector, dtype=float)
+        n = len(self.projector)
         self.scale = denominator if scale is None else scale
+        self.coefficients = tuple(coefficients)
+        self.matrices = numpy.reshape(numpy.asarray(matrices, dtype=float), (len(self.coefficients), n, n))
+        self.denominator = denominator
+        if not numpy.allclose(self.matrices @ self.projector, 0):
+            raise ValueError("The matrices must vanish on the range of the projector.")
 
-    def numerator(self, in_range=False):
-        """The numerator terms of G, restricted to the range of P if in_range."""
-        terms = [] if in_range else self.terms
+    @classmethod
+    def from_matrix(cls, A, denominator=one):
+        """The transformation :math:`A/d` of a matrix of GEM scalars."""
+        n = len(A)
+        units = numpy.eye(n * n).reshape(n, n, n, n)
+        entries = [(A[a, b], units[a, b]) for a, b in numpy.ndindex(A.shape) if not isinstance(A[a, b], gem.Zero)]
+        return cls(numpy.zeros((n, n)), None, *zip(*entries), denominator=denominator)
+
+    @property
+    def terms(self):
+        """The pairs :math:`(g, C)` of the numerator, starting with :math:`(s, P)` if :math:`P` is nonzero."""
+        terms = list(zip(self.coefficients, self.matrices))
         if self.projector.any():
-            terms = [(self.scale, self.projector), *terms]
+            terms.insert(0, (self.scale, self.projector))
         return terms
 
+    def __add__(self, other):
+        if other.projector.any():
+            if self.projector.any():
+                raise ValueError("At most one summand can have a nonzero projector.")
+            return other + self
+        d, e = self.denominator, other.denominator
+        return WeightTransformation(self.projector, self.scale * e,
+                                    [g * e for g in self.coefficients] + [g * d for g in other.coefficients],
+                                    numpy.concatenate([self.matrices, other.matrices]), d * e)
 
-def cartesian_pullbacks(J, adjJ, detJ):
-    """The pullback of each mapping in Cartesian components."""
+    def kron(self, other):
+        """The Kronecker product, which transforms the axes of self followed by the axes of other."""
+        terms = [(g * h, numpy.kron(C, D)) for (g, C), (h, D) in product(self.terms, other.terms)]
+        projector = numpy.kron(self.projector, other.projector)
+        scale = None
+        if projector.any():
+            (scale, _), *terms = terms
+        coefficients, matrices = zip(*terms) if terms else ((), ())
+        return WeightTransformation(projector, scale, coefficients, matrices,
+                                    self.denominator * other.denominator)
+
+    def with_eigenspace(self, projector, scale):
+        """The same transformation, given that it acts as :math:`s/d` on the range of the projector."""
+        if self.projector.any():
+            raise ValueError("The transformation already has a nonzero projector.")
+        complement = numpy.eye(len(projector)) - projector
+        return WeightTransformation(projector, scale, self.coefficients, self.matrices @ complement,
+                                    self.denominator)
+
+    def on_range(self):
+        """The restriction to the range of the projector."""
+        return WeightTransformation(self.projector, self.scale, denominator=self.denominator)
+
+    def contract(self, R, tol):
+        r"""The numerator of :math:`\sum_{a,b}G_{ba}R_{abj}`, dropping terms below tol relative to R."""
+        coefficients, matrices = zip(*self.terms)
+        matrices = numpy.asarray(matrices)
+        rows = matrices.transpose(0, 2, 1).reshape(len(matrices), -1) @ R
+        cutoffs = tol * numpy.abs(R).max() * numpy.abs(matrices).max(axis=(1, 2))
+        numerator = numpy.full(R.shape[1], zero, dtype=object)
+        for g, row, cutoff in zip(coefficients, rows, cutoffs):
+            for j in numpy.flatnonzero(numpy.abs(row) > cutoff):
+                numerator[j] += g * row[j]
+        return numerator
+
+
+def cartesian_transformations(J, adjJ, detJ):
+    """The weight transformation of each mapping in Cartesian components."""
     sd = J.shape[1]
-    units = numpy.eye(sd * sd).reshape(sd, sd, sd, sd)
-    contravariant = Pullback(numpy.zeros((sd, sd)), [(J[b, a], units[a, b]) for a, b in numpy.ndindex(sd, sd)], detJ)
-    covariant = Pullback(numpy.zeros((sd, sd)), [(adjJ[a, b], units[a, b]) for a, b in numpy.ndindex(sd, sd)], detJ)
+    contravariant = WeightTransformation.from_matrix(J.T, detJ)
+    covariant = WeightTransformation.from_matrix(adjJ, detJ)
     # The pairing of a contravariant axis with a covariant axis only scales by 1/detJ.
-    P = pairing_projector(sd)
-    complement = numpy.eye(sd * sd) - P
-    pairing = Pullback(P, [(g * h, numpy.kron(C, D) @ complement)
-                           for (g, C), (h, D) in product(contravariant.terms, covariant.terms)],
-                       detJ * detJ, scale=detJ)
-    return {"affine": Pullback(numpy.eye(sd)), "contravariant piola": contravariant,
+    pairing = contravariant.kron(covariant).with_eigenspace(pairing_projector(sd), detJ)
+    return {"affine": WeightTransformation(numpy.eye(sd)), "contravariant piola": contravariant,
             "covariant piola": covariant, "L2 piola": pairing}
 
 
@@ -762,8 +809,8 @@ def pairing_projector(sd):
     return numpy.outer(delta, delta) / sd
 
 
-def frame_pullbacks(ref_el, facet, support, J, adjJ, detJ):
-    r"""The pullback of each mapping in the frame of the facet.
+def frame_transformations(ref_el, facet, support, J, adjJ, detJ):
+    r"""The weight transformation of each mapping in the frame of the facet.
 
     On an edge support, the frame is :math:`(t, t \times n, n)` for the
     edge tangent :math:`t` and the facet normal :math:`n`.
@@ -788,21 +835,20 @@ def frame_pullbacks(ref_el, facet, support, J, adjJ, detJ):
         edge_tangents = tangents
     frame = edge_tangents + [m for m, *_ in normals] + [n]
     normals.append((n, adjJ @ Kn, detJ * (Kn @ Kn)**0.5, frame))
-    P = numpy.eye(sd) - sum(numpy.outer(n, n) for n, *_ in normals)
-    dens = [d for _, _, d, _ in normals]
-    terms = []
-    for k, (n, u, _, frame) in enumerate(normals):
-        scale = reduce(mul, dens[:k] + dens[k+1:], one)
-        terms.extend(((u @ f) * scale, numpy.outer(f, n)) for f in frame)
-    covariant = Pullback(P, terms, reduce(mul, dens))
+    # Covariant weights are unchanged along the tangents, and each normal
+    # component maps through the frame.
+    covariant = WeightTransformation(numpy.eye(sd) - sum(numpy.outer(n, n) for n, *_ in normals))
+    for n, u, d, frame in normals:
+        covariant += WeightTransformation(numpy.zeros((sd, sd)), None, [u @ f for f in frame],
+                                          [numpy.outer(f, n) for f in frame], d)
     nn = nu @ nu
     Knu = K @ nu
     KtKnu = K.T @ Knu
     P = numpy.outer(nu, nu) / nn
-    terms = [(Knu @ Knu, numpy.eye(sd) - P)]
-    terms.extend((KtKnu @ -tau, numpy.outer(nu, tau)) for tau in tangents)
-    contravariant = Pullback(P, terms, detJ * nn)
-    return {"affine": Pullback(numpy.eye(sd)), "covariant piola": covariant,
+    contravariant = WeightTransformation(P, None, [Knu @ Knu, *(KtKnu @ -tau for tau in tangents)],
+                                         [numpy.eye(sd) - P, *(numpy.outer(nu, tau) for tau in tangents)],
+                                         detJ * nn)
+    return {"affine": WeightTransformation(numpy.eye(sd)), "covariant piola": covariant,
             "contravariant piola": contravariant}
 
 

@@ -10,7 +10,7 @@ import finat.ufl
 from finat.element_factory import create_element
 from finat.enriched import as_enriched
 from finat.fiat_elements import FiatElement
-from finat.physically_mapped import (PhysicallyMappedElement, cartesian_pullbacks, pairing_projector,
+from finat.physically_mapped import (PhysicallyMappedElement, cartesian_transformations, pairing_projector,
                                      in_range_of, adjugate_and_determinant)
 from finat.point_set import PointSet, UnionPointSet
 from finat.quadrature import QuadratureRule
@@ -381,20 +381,20 @@ def test_pairing_respects_tolerance():
     assert not in_range_of(W, P, (0, 1), 1.0e-12)
 
 
-def pullback_matrix(pullback):
-    coefficients, matrices = zip(*pullback.numerator())
-    coefficients, d = (result.arr for result in evaluate([gem.ListTensor(coefficients), pullback.denominator]))
+def transformation_matrix(G):
+    coefficients, matrices = zip(*G.terms)
+    coefficients, d = (result.arr for result in evaluate([gem.ListTensor(coefficients), G.denominator]))
     return sum(c * C for c, C in zip(coefficients, matrices)) / d
 
 
 @pytest.mark.parametrize("sd", [2, 3])
-def test_pairing_pullback(sd):
+def test_pairing_transformation(sd):
     """Pairing a contravariant axis with a covariant axis only splits the Kronecker product."""
     J = numpy.eye(sd) + numpy.random.default_rng(0).random((sd, sd))
     adjJ, detJ = adjugate_and_determinant(numpy.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object))
     J = numpy.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object)
-    pullbacks = cartesian_pullbacks(J, adjJ, detJ)
-    contravariant, covariant, pair = (pullback_matrix(pullbacks[mapping])
+    transformations = cartesian_transformations(J, adjJ, detJ)
+    contravariant, covariant, pair = (transformation_matrix(transformations[mapping])
                                       for mapping in ("contravariant piola", "covariant piola", "L2 piola"))
     J, = evaluate([gem.ListTensor(J)])
     J = J.arr
