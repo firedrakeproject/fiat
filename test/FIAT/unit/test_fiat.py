@@ -20,7 +20,7 @@ import numpy as np
 import pytest
 
 from FIAT.reference_element import LINE, ReferenceElement
-from FIAT.reference_element import Point, UFCInterval, UFCTriangle, UFCTetrahedron, ufc_simplex
+from FIAT.reference_element import Point, UFCInterval, UFCTriangle, UFCTetrahedron
 from FIAT.lagrange import Lagrange
 from FIAT.discontinuous_lagrange import DiscontinuousLagrange   # noqa: F401
 from FIAT.discontinuous_taylor import DiscontinuousTaylor       # noqa: F401
@@ -66,7 +66,6 @@ from FIAT.nodal_enriched import NodalEnrichedElement
 from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen    # noqa: F401
 from FIAT.histopolation import Histopolation                    # noqa: F401
 from FIAT.wuxu import WuXuH3NC, WuXuRobustH3NC                  # noqa: F401
-from FIAT import dual_set, functional, polynomial_set, quadrature_schemes
 from FIAT.walkington import Walkington                         # noqa: F401
 
 P = Point()
