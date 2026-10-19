@@ -20,7 +20,7 @@ import numpy
 from FIAT import polynomial_set, jacobi, quadrature, quadrature_schemes
 
 
-class Functional(object):
+class Functional:
     r"""Abstract class representing a linear functional.
     All FIAT functionals are discrete in the sense that
     they are written as a weighted sum of (derivatives of components of) their
@@ -57,17 +57,7 @@ class Functional(object):
             self.max_deriv_order = 0
 
     @cached_property
-    def points_by_order(self):
-        """Points used by this functional, grouped by derivative order."""
-        return self.points_and_weights[0]
-
-    @cached_property
-    def weights_by_order(self):
-        """Weight tensors used by this functional, grouped by derivative order."""
-        return self.points_and_weights[1]
-
-    @cached_property
-    def points_and_weights(self):
+    def _order_tensors(self):
         r"""Represent the functional using points and weights for each order.
 
         For derivative order :math:`k`, the weights :math:`W^k` satisfy
@@ -83,8 +73,7 @@ class Functional(object):
             for w, alpha, c in wac_list:
                 terms[sum(alpha)][pt].append((w, alpha, c))
 
-        points_by_order = {}
-        weights_by_order = {}
+        order_tensors = {}
         for order, weights_by_point in sorted(terms.items()):
             W = numpy.zeros((*self.target_shape, *(sd,) * order, len(weights_by_point)))
             for q, wac_list in enumerate(weights_by_point.values()):
@@ -93,9 +82,42 @@ class Functional(object):
                     indices = set(permutations(sum(([k] * a for k, a in enumerate(alpha)), [])))
                     for index in indices:
                         W[(*c, *index, q)] += w / len(indices)
-            points_by_order[order] = tuple(weights_by_point)
-            weights_by_order[order] = W
-        return points_by_order, weights_by_order
+            order_tensors[order] = (tuple(weights_by_point), W)
+        return order_tensors
+
+    @cached_property
+    def orders(self):
+        """Derivative orders represented by this functional.
+
+        Returns
+        -------
+        tuple of int
+            Derivative orders for which this functional has terms.
+        """
+        return tuple(sorted(self._order_tensors))
+
+    def get_order_tensors(self, order):
+        """Return the points and weights for one derivative order.
+
+        Parameters
+        ----------
+        order : int
+            Derivative order of the requested tensors.
+
+        Returns
+        -------
+        points : tuple of tuple
+            Points at which the functional samples derivatives of ``order``.
+        weights : numpy.ndarray
+            Weights for the requested derivative order. Its final axis
+            corresponds to ``points``.
+
+        Raises
+        ------
+        KeyError
+            If this functional has no terms of the requested order.
+        """
+        return self._order_tensors[order]
 
     def evaluate(self, f):
         """Obsolete and broken functional evaluation.
@@ -347,7 +369,7 @@ class IntegralMoment(Functional):
         super().__init__(ref_el, shp, pt_dict, {}, "IntegralMoment")
 
     @cached_property
-    def points_and_weights(self):
+    def _order_tensors(self):
         """Represent this moment using points and weights for each order."""
         sd = self.ref_el.get_spatial_dimension()
         order = self.max_deriv_order
@@ -358,7 +380,7 @@ class IntegralMoment(Functional):
             rank = len(self.target_shape)
             W = numpy.mean([W.transpose((*range(rank), *axes, W.ndim - 1))
                             for axes in permutations(range(rank, rank + order))], axis=0)
-        return ({order: tuple(self.deriv_dict or self.pt_dict)}, {order: W})
+        return {order: (tuple(self.deriv_dict or self.pt_dict), W)}
 
     def __call__(self, fn):
         """Evaluate the functional on the function fn."""

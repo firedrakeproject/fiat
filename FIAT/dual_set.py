@@ -172,7 +172,7 @@ class DualSet:
         r"""Riesz representation of the nodes with their derivative axes left uncontracted.
 
         Writing each node as :math:`\ell_i(f) = \sum_k \sum_q W^k_{i,q} : D^k f(x_q)`
-        (see :attr:`.Functional.weights_by_order`), return for each derivative
+        (see :meth:`.Functional.get_order_tensors`), return for each derivative
         order :math:`k` the tensor
 
         .. math::
@@ -195,11 +195,10 @@ class DualSet:
         points = defaultdict(dict)
         weights = defaultdict(dict)
         for node_id, node in enumerate(self.nodes):
-            node_points = node.points_by_order
-            node_weights = node.weights_by_order
-            for order in node_points:
-                points[order][node_id] = node_points[order]
-                weights[order][node_id] = node_weights[order]
+            for order in node.orders:
+                pts, wts = node.get_order_tensors(order)
+                points[order][node_id] = pts
+                weights[order][node_id] = wts
 
         # Tabulate the expansion set one time for all the values and another
         # for all the derivatives, and contract nodes with the same point set
@@ -215,11 +214,12 @@ class DualSet:
             tabulation = es._tabulate(ed, pts, max(orders))
             for order in sorted(orders):
                 # D^order phi with axes (gamma, j, point)
-                dphi = numpy.zeros((*(sd,) * order, num_exp, len(pts)))
+                dshape = (sd,) * order
+                dphi = numpy.zeros((*dshape, num_exp, len(pts)))
                 for index in numpy.ndindex(dphi.shape[:order]):
                     dphi[index] = tabulation[tuple(map(index.count, range(sd)))]
 
-                R = numpy.zeros((len(self.nodes), *tshape, *(sd,) * order, *(sd,) * order, num_exp))
+                R = numpy.zeros((len(self.nodes), *tshape, *dshape, *dshape, num_exp))
                 point_groups = defaultdict(list)
                 for node_id, node_points in points[order].items():
                     point_groups[node_points].append(node_id)
