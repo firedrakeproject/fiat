@@ -31,11 +31,18 @@ class FiatElement(FiniteElementBase):
     def formdegree(self):
         return self._element.get_formdegree()
 
-    def entity_dofs(self):
-        return self._element.entity_dofs()
+    @cached_property
+    def _entity_dofs(self):
+        entity_dofs = self._element.entity_dofs()
+        n = self.space_dimension()
+        if n == self._element.space_dimension():
+            return entity_dofs
+        # The nodes beyond space_dimension() are constraints, not dofs.
+        return {dim: {entity: [i for i in dofs if i < n] for entity, dofs in entities.items()}
+                for dim, entities in entity_dofs.items()}
 
-    def entity_closure_dofs(self):
-        return self._element.entity_closure_dofs()
+    def entity_dofs(self):
+        return self._entity_dofs
 
     @property
     def entity_permutations(self):

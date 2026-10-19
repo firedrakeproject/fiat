@@ -74,7 +74,7 @@ class MappedTabulation(Mapping):
         return len(self.ref_tabulation)
 
 
-class PhysicalFunctional:
+class PhysicallyMappedFunctional:
     r"""A FIAT node and the data that maps it to the physical cell.
 
     :attr:`pullback_mappings` assigns a mapping to each group of axes of
@@ -233,11 +233,14 @@ class PhysicalFunctional:
         :math:`|e|` is the physical measure of the entity if :attr:`avg` is
         False and there is a :attr:`support_facet`, and 1 otherwise.
 
-        :arg uncontracted_riesz: The matrix
+        :arg uncontracted_riesz: The tensor
             :math:`R_{(a,\beta),(b,\gamma),j}=\sum_q W_{a,\beta,q}(\partial^\gamma\psi^0_j)_b(x_q)`,
             where :math:`W` are the weights of the node and :math:`\psi^0`
-            is the nodal basis of the nodes before recombination.  The axes
-            of the node and of the basis are each flattened in the order of
+            is the nodal basis of the nodes before recombination, stored as
+            a matrix with one row per pair of multi-indices
+            :math:`((a,\beta),(b,\gamma))` and one column per basis
+            function :math:`j`.  The value and derivative axes of the node
+            and of the basis are each flattened in the order of
             :attr:`pullback_mappings`.
         :arg pullbacks: The pullback of each mapping, in Cartesian components
             or in the frame of :attr:`support_facet`.
@@ -275,14 +278,14 @@ class PhysicalFunctional:
             coefficient = gem.Product(*coefficients)
             for j in nonzeros:
                 numerator[j] += coefficient * reference_row[j]
-        numerator = numerator * measure
+        numerator *= measure
         denominator = gem.Product(*(pullbacks[mapping].denominator for mapping in self.pullback_mappings.values()))
 
         p = self.scaling_exponent
-        if p is not None:
+        if p:
             vertices = self.ref_el.get_topology()[self.dim][self.entity]
             havg = sum(h[v] for v in vertices) / len(vertices)
-            denominator = denominator * havg**-p
+            denominator *= havg**-p
         return numerator, denominator
 
 
@@ -346,7 +349,11 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
 
     @cached_property
     def _physical_indices(self):
-        """The reference dofs exposed as physical dofs, in local order."""
+        """The reference dofs exposed as physical dofs, in local order.
+
+        These are the dofs of :meth:`entity_dofs`, which omits the
+        constraint nodes that only complete the transformation.
+        """
         return sorted(i for entities in self.entity_dofs().values()
                       for dofs in entities.values() for i in dofs)
 
@@ -359,8 +366,8 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         for dim, entities in dual.get_entity_ids().items():
             for entity, dofs in entities.items():
                 for i in dofs:
-                    functionals[i] = PhysicalFunctional(dual.nodes[i], self.cell, dim, entity, mappings[i],
-                                                        self.avg, self.tol)
+                    functionals[i] = PhysicallyMappedFunctional(dual.nodes[i], self.cell, dim, entity,
+                                                                mappings[i], self.avg, self.tol)
         return tuple(functionals)
 
     @cached_property
@@ -371,7 +378,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         :math:`R_{(a,\beta),(b,\gamma),j}=\sum_q W_{i,a,\beta,q}(\partial^\gamma\psi^0_j)_b(x_q)`,
         where :math:`\psi^0` is the nodal basis of the nodes before
         recombination.  The axes of the node and of the basis are each
-        flattened in the order of :attr:`PhysicalFunctional.pullback_mappings`.
+        flattened in the order of :attr:`PhysicallyMappedFunctional.pullback_mappings`.
         """
         dual = self._element.get_dual_set()
         coeffs = self._element.get_coeffs()
@@ -407,7 +414,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         :arg coordinate_mapping: Object providing the physical geometry
             as GEM expressions.
         :returns: A dict from each node number to the numerator and
-            denominator of its :meth:`PhysicalFunctional.vandermonde_row`.
+            denominator of its :meth:`PhysicallyMappedFunctional.vandermonde_row`.
         :raises NotImplementedError: If a row couples to a dof outside the
             closure of the entity of the node.
         """
@@ -753,7 +760,12 @@ def cartesian_pullbacks(J, adjJ, detJ):
 
 
 def pairing_projector(sd):
-    """Projector onto the identity, the pairing of a contravariant axis with a covariant axis."""
+    r"""Orthogonal projector onto the span of the flattened identity :math:`\delta_{ab}`.
+
+    Weights on a contravariant axis :math:`a` and a covariant axis
+    :math:`b` lie in its range when they only contract :math:`a` with
+    :math:`b`, as in the divergence :math:`\delta_{ab}\partial_b u_a`.
+    """
     delta = numpy.eye(sd).ravel()
     return numpy.outer(delta, delta) / sd
 

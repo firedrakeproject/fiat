@@ -106,7 +106,7 @@ class Functional:
 
         Returns
         -------
-        points : tuple of tuple
+        points : tuple of tuple of float
             Points at which the functional samples derivatives of ``order``.
         weights : numpy.ndarray
             Weights for the requested derivative order. Its final axis
