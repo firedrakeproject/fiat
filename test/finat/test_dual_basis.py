@@ -10,8 +10,8 @@ import finat.ufl
 from finat.element_factory import create_element
 from finat.enriched import as_enriched
 from finat.fiat_elements import FiatElement
-from finat.physically_mapped import (PhysicallyMappedElement, _cartesian_pullbacks, _pairing_projector,
-                                     _in_range, adjugate_and_determinant)
+from finat.physically_mapped import (PhysicallyMappedElement, cartesian_pullbacks, pairing_projector,
+                                     in_range_of, adjugate_and_determinant)
 from finat.point_set import PointSet, UnionPointSet
 from finat.quadrature import QuadratureRule
 from finat.quadrature_element import QuadratureElement
@@ -376,9 +376,9 @@ def test_pairing_respects_tolerance():
         "NearDivergence")
     assert node.orders == (1,)
     _, W = node.get_order_tensors(1)
-    P = _pairing_projector(2)
-    assert _in_range(numpy.eye(2)[..., None], (0, 1), P, 1.0e-12)
-    assert not _in_range(W, (0, 1), P, 1.0e-12)
+    P = pairing_projector(2)
+    assert in_range_of(numpy.eye(2)[..., None], P, (0, 1), 1.0e-12)
+    assert not in_range_of(W, P, (0, 1), 1.0e-12)
 
 
 def pullback_matrix(pullback):
@@ -393,7 +393,7 @@ def test_pairing_pullback(sd):
     J = numpy.eye(sd) + numpy.random.default_rng(0).random((sd, sd))
     adjJ, detJ = adjugate_and_determinant(numpy.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object))
     J = numpy.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object)
-    pullbacks = _cartesian_pullbacks(J, adjJ, detJ)
+    pullbacks = cartesian_pullbacks(J, adjJ, detJ)
     contravariant, covariant, pair = (pullback_matrix(pullbacks[mapping])
                                       for mapping in ("contravariant piola", "covariant piola", "L2 piola"))
     J, = evaluate([gem.ListTensor(J)])
@@ -401,7 +401,7 @@ def test_pairing_pullback(sd):
     assert numpy.allclose(contravariant, J.T / numpy.linalg.det(J))
     assert numpy.allclose(covariant, numpy.linalg.inv(J))
     assert numpy.allclose(pair, numpy.kron(contravariant, covariant))
-    P = _pairing_projector(sd)
+    P = pairing_projector(sd)
     assert numpy.allclose(pair @ P, P / numpy.linalg.det(J))
 
 

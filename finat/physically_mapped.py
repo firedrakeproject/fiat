@@ -149,14 +149,14 @@ class PhysicalFunctional:
         if moment and 0 < self.dim < sd - 1:
             covectors = [k for k, mapping in enumerate(self.axis_mappings) if mapping == "covariant piola"]
             t = ref_el.compute_edge_tangent(self.entity)
-            if not all(_in_range(self.weights, (k,), numpy.outer(t, t) / (t @ t), self.tol) for k in covectors):
+            if not all(in_range_of(self.weights, numpy.outer(t, t) / (t @ t), (k,), self.tol) for k in covectors):
                 top = ref_el.get_topology()
                 vertices = set(top[self.dim][self.entity])
                 for facet in sorted(top[sd - 1]):
                     nu = ref_el.compute_scaled_normal(facet)
                     P = numpy.eye(sd) - numpy.outer(nu, nu) / (nu @ nu)
                     if (vertices <= set(top[sd - 1][facet])
-                            and all(_in_range(self.weights, (k,), P, self.tol) for k in covectors)):
+                            and all(in_range_of(self.weights, P, (k,), self.tol) for k in covectors)):
                         return facet
                 raise NotImplementedError(f"No facet contains the derivatives of {type(node).__name__}.")
         return None
@@ -184,7 +184,7 @@ class PhysicalFunctional:
             for l, covector in enumerate(axis_mappings):
                 if (vector == "contravariant piola" and covector == "covariant piola"
                         and not any(k in axes or l in axes for axes in groups)
-                        and _in_range(W, (k, l), _pairing_projector(sd), self.tol)):
+                        and in_range_of(W, pairing_projector(sd), (k, l), self.tol)):
                     groups[k, l] = "L2 piola"
         on_edge = 0 < self.dim < sd - 1
         for k, mapping in enumerate(axis_mappings):
@@ -192,7 +192,7 @@ class PhysicalFunctional:
                 continue
             if on_edge and mapping == "covariant piola":
                 t = self.ref_el.compute_edge_tangent(self.entity)
-                if not _in_range(W, (k,), numpy.outer(t, t) / (t @ t), self.tol):
+                if not in_range_of(W, numpy.outer(t, t) / (t @ t), (k,), self.tol):
                     raise NotImplementedError(f"Cannot map derivatives normal to an edge of {type(self.node).__name__}.")
                 mapping = "affine"
             groups[k,] = mapping
@@ -215,8 +215,8 @@ class PhysicalFunctional:
         for axes, mapping in self.group_mappings.items():
             if mapping == "covariant piola":
                 exponent += 1
-            elif mapping == "contravariant piola" and not _in_range(
-                    self.weights, axes, numpy.outer(nu, nu) / (nu @ nu), self.tol):
+            elif mapping == "contravariant piola" and not in_range_of(
+                    self.weights, numpy.outer(nu, nu) / (nu @ nu), axes, self.tol):
                 # Tangential components of a contravariant axis
                 exponent += 2 - sd
         if isinstance(self.node, IntegralMoment) and not self.avg:
@@ -254,7 +254,7 @@ class PhysicalFunctional:
         is_identity = measure == one and self.scaling_exponent == 0
         for axes, mapping in self.group_mappings.items():
             pullback = pullbacks[mapping]
-            in_range = _in_range(self.weights, axes, pullback.projector, self.tol)
+            in_range = in_range_of(self.weights, pullback.projector, axes, self.tol)
             is_identity = is_identity and in_range and pullback.scale == pullback.denominator
             numerators[axes] = pullback.numerator(in_range)
         if is_identity:
@@ -406,7 +406,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         adjJ, detJ = adjugate_and_determinant(J)
         h = coordinate_mapping.cell_size()
 
-        cartesian = _cartesian_pullbacks(J, adjJ, detJ)
+        cartesian = cartesian_pullbacks(J, adjJ, detJ)
         frames = {}
 
         closures = self._element.entity_closure_dofs()
@@ -415,7 +415,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
             if functional.support_facet is not None:
                 key = (functional.support_facet, (functional.dim, functional.entity))
                 if key not in frames:
-                    frames[key] = _frame_pullbacks(self.cell, *key, J, adjJ, detJ)
+                    frames[key] = frame_pullbacks(self.cell, *key, J, adjJ, detJ)
                 pullbacks = frames[key]
             else:
                 pullbacks = cartesian
@@ -720,14 +720,14 @@ class Pullback:
         return terms
 
 
-def _cartesian_pullbacks(J, adjJ, detJ):
+def cartesian_pullbacks(J, adjJ, detJ):
     """The pullback of each mapping in Cartesian components."""
     sd = J.shape[1]
     units = numpy.eye(sd * sd).reshape(sd, sd, sd, sd)
     contravariant = Pullback(numpy.zeros((sd, sd)), [(J[b, a], units[a, b]) for a, b in numpy.ndindex(sd, sd)], detJ)
     covariant = Pullback(numpy.zeros((sd, sd)), [(adjJ[a, b], units[a, b]) for a, b in numpy.ndindex(sd, sd)], detJ)
     # The pairing of a contravariant axis with a covariant axis only scales by 1/detJ.
-    P = _pairing_projector(sd)
+    P = pairing_projector(sd)
     complement = numpy.eye(sd * sd) - P
     pairing = Pullback(P, [(g * h, numpy.kron(C, D) @ complement)
                            for (g, C), (h, D) in product(contravariant.terms, covariant.terms)],
@@ -736,13 +736,13 @@ def _cartesian_pullbacks(J, adjJ, detJ):
             "covariant piola": covariant, "L2 piola": pairing}
 
 
-def _pairing_projector(sd):
+def pairing_projector(sd):
     """Projector onto the identity, the pairing of a contravariant axis with a covariant axis."""
     delta = numpy.eye(sd).ravel()
     return numpy.outer(delta, delta) / sd
 
 
-def _frame_pullbacks(ref_el, facet, support, J, adjJ, detJ):
+def frame_pullbacks(ref_el, facet, support, J, adjJ, detJ):
     r"""The pullback of each mapping in the frame of the facet.
 
     On an edge support, the frame is :math:`(t, t \times n, n)` for the
@@ -786,7 +786,9 @@ def _frame_pullbacks(ref_el, facet, support, J, adjJ, detJ):
             "contravariant piola": contravariant}
 
 
-def _in_range(weights, axes, projector, tol):
-    """Whether the weights lie in the range of the projector on the given axes."""
-    W = numpy.moveaxis(weights, axes, range(len(axes))).reshape(projector.shape[1], -1)
-    return numpy.abs(W - projector @ W).max() <= tol * numpy.abs(weights).max()
+def in_range_of(weights, projector, axes, tol):
+    """Whether the weights lie in the range of the projector acting on the given axes."""
+    shape = tuple(weights.shape[k] for k in axes)
+    complement = numpy.eye(projector.shape[0]) - projector
+    residual = numpy.tensordot(complement.reshape(shape + shape), weights, axes=(range(len(axes), 2 * len(axes)), axes))
+    return numpy.abs(residual).max() <= tol * numpy.abs(weights).max()
