@@ -1990,7 +1990,6 @@ def make_facet_orientation_maps(ref_cell):
             # Simplex facet: use all vertices
             xs = facet_verts
             ys = permuted_facet_verts
-            o_int = o
         else:
             # Tensor-product facet: use a fixed simplex subset
             subset = [0, 1, 2]  # any non-collinear triple works on a non-degenerate quad
@@ -1998,5 +1997,5 @@ def make_facet_orientation_maps(ref_cell):
             ys = permuted_facet_verts[subset]
 
         Q, t = make_affine_mapping(xs, ys)
-        o_coord_maps[o_int] = (Q, t)
+        o_coord_maps[o] = (Q, t)
     return o_coord_maps
