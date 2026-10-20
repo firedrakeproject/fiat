@@ -172,7 +172,7 @@ class PhysicallyMappedFunctional:
     def pullback_mappings(self):
         """A dict from each group of axes of :attr:`weights` that map together to its mapping."""
         # pullback takes the Kronecker product of the weight transformations in
-        # the order of this dict, where the pairs come before the single axes.
+        # the order of this dict.
         sd = self.ref_el.get_spatial_dimension()
         W = self.weights
         axis_mappings = self.axis_mappings
@@ -207,19 +207,6 @@ class PhysicallyMappedFunctional:
                 mapping = "affine"
             groups[k,] = mapping
         return groups
-
-    @cached_property
-    def unpaired_weights(self):
-        r"""The weights :math:`W'` such that :math:`W=\delta_{a_ka_l}W'` for each pair (k, l) of :attr:`pullback_mappings`.
-
-        These are the :attr:`weights` without the axes of the pairs.
-        """
-        index = [slice(None)] * self.weights.ndim
-        for axes in self.pullback_mappings:
-            if len(axes) == 2:
-                index[axes[0]] = 0
-                index[axes[1]] = 0
-        return self.weights[tuple(index)]
 
     @cached_property
     def scaling_exponent(self):
@@ -288,7 +275,8 @@ class PhysicallyMappedFunctional:
         # The weights and the derivatives with the axes of the groups flattened
         # in the order of the Kronecker product
         axes = list(chain.from_iterable(self.pullback_mappings))
-        W = self.unpaired_weights.reshape(-1, self.weights.shape[-1])
+        W = numpy.moveaxis(self.weights, axes, range(len(axes)))
+        W = W.reshape(-1, W.shape[-1])
         D = numpy.moveaxis(D, axes, range(len(axes)))
         D = D.reshape(-1, *D.shape[len(axes):])
         return G.to_riesz(W, D, self.tol)
@@ -758,11 +746,9 @@ def cartesian_transformations(J, adjJ, detJ):
     covariant = WeightTransformation.from_matrix(adjJ / detJ)
     covariant_inverse = WeightTransformation.from_matrix(J)
     # The identity on a contravariant axis and a covariant axis pulls back
-    # as (J^T/detJ) K^T = I/detJ, so the pair maps the unpaired weights to
-    # the identity over detJ.
-    delta = numpy.eye(sd).reshape(-1, 1)
-    pairing = WeightTransformation([one / detJ], [delta])
-    pairing_inverse = WeightTransformation([detJ], [delta])
+    # as (J^T/detJ) K^T = I/detJ, so the pair scales its weights by 1/detJ.
+    pairing = WeightTransformation([one / detJ], [numpy.eye(sd * sd)])
+    pairing_inverse = WeightTransformation([detJ], [numpy.eye(sd * sd)])
     return {"affine": Pullback(affine, affine),
             "contravariant piola": Pullback(contravariant, contravariant_inverse),
             "covariant piola": Pullback(covariant, covariant_inverse),

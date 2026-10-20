@@ -402,8 +402,8 @@ def test_pairing_transformation(sd):
     assert numpy.allclose(contravariant, J.T / numpy.linalg.det(J))
     assert numpy.allclose(covariant, numpy.linalg.inv(J))
     delta = numpy.eye(sd).reshape(-1, 1)
-    assert numpy.allclose(pair, numpy.kron(contravariant, covariant) @ delta)
-    assert numpy.allclose(pair, delta / numpy.linalg.det(J))
+    assert numpy.allclose(pair @ delta, numpy.kron(contravariant, covariant) @ delta)
+    assert numpy.allclose(pair, numpy.eye(sd * sd) / numpy.linalg.det(J))
 
 
 @pytest.mark.parametrize("sd,support", [(2, (1, 0)), (3, (2, 0)), (3, (1, 1))])
