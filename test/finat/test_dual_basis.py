@@ -394,9 +394,9 @@ def test_pairing_transformation(sd):
     adjJ, detJ = adjugate_and_determinant(numpy.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object))
     J = numpy.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object)
     transformations = cartesian_transformations(J, adjJ, detJ)
-    contravariant = transformation_matrix(transformations["contravariant piola"][0])
-    covariant = transformation_matrix(transformations["covariant piola"][0])
-    pair = transformation_matrix(transformations["L2 piola"][0])
+    contravariant = transformation_matrix(transformations["contravariant piola"].forward)
+    covariant = transformation_matrix(transformations["covariant piola"].forward)
+    pair = transformation_matrix(transformations["L2 piola"].forward)
     J, = evaluate([gem.ListTensor(J)])
     J = J.arr
     assert numpy.allclose(contravariant, J.T / numpy.linalg.det(J))
@@ -418,8 +418,8 @@ def test_transformation_inverse(sd, support):
     frame = frame_transformations(ref_el, 0, support, J, adjJ, detJ)
     for mapping in ("affine", "contravariant piola", "covariant piola"):
         for transformations in (cartesian, frame):
-            G = transformation_matrix(transformations[mapping][0])
-            inverse = transformation_matrix(transformations[mapping][1])
+            G = transformation_matrix(transformations[mapping].forward)
+            inverse = transformation_matrix(transformations[mapping].inverse)
             assert numpy.allclose(inverse @ G, numpy.eye(sd))
 
 

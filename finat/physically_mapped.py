@@ -21,6 +21,9 @@ from finat.citations import cite
 zero = gem.Zero()
 one = gem.Literal(1.0)
 
+#: A weight transformation and its inverse.
+Pullback = namedtuple("Pullback", ["forward", "inverse"])
+
 #: The row of :math:`B_0` of a node, the row of the inverse of the diagonal
 #: block of :math:`B_0`, and the scaling of the row of :math:`B=SB_0`.
 VandermondeRow = namedtuple("VandermondeRow", ["entries", "inverse", "scale"])
@@ -168,8 +171,8 @@ class PhysicallyMappedFunctional:
     @cached_property
     def pullback_mappings(self):
         """A dict from each group of axes of :attr:`weights` that map together to its mapping."""
-        # vandermonde_row takes the Kronecker product of the weight transformations
-        # in the order of this dict, where the pairs come before the single axes.
+        # pullback takes the Kronecker product of the weight transformations in
+        # the order of this dict, where the pairs come before the single axes.
         sd = self.ref_el.get_spatial_dimension()
         W = self.weights
         axis_mappings = self.axis_mappings
@@ -243,34 +246,52 @@ class PhysicallyMappedFunctional:
             exponent -= self.dim
         return exponent
 
-    def vandermonde_row(self, transformations, D, block):
-        r"""The row of the Vandermonde matrix :math:`B_0` for this node, and of the inverse of its diagonal block.
+    @cached_property
+    def pullback_key(self):
+        """The frame of :attr:`support_facet`, or None for Cartesian components, and the :attr:`pullback_mappings`."""
+        mappings = tuple(self.pullback_mappings.values())
+        if self.support_facet is None:
+            return (None, mappings)
+        return ((self.support_facet, (self.dim, self.entity)), mappings)
 
-        The row is :math:`(GW):D_j`, where :math:`W` are the :attr:`weights`,
-        :math:`D` are the derivatives of the basis, and :math:`G` is the
-        Kronecker product of the weight transformations of :attr:`pullback_mappings`.
-        The row of the inverse of the diagonal block is
-        :math:`(G^{-1}W):D_j` for the dofs j of the block.
+    def pullback(self, J, adjJ, detJ):
+        """The Kronecker product of the weight transformations of :attr:`pullback_mappings`.
 
-        :arg transformations: A dict from each mapping to its
-            :class:`WeightTransformation` and the inverse, in Cartesian
-            components or in the frame of :attr:`support_facet`.
+        :arg J: The Jacobian as an object array of GEM scalars.
+        :arg adjJ: The adjugate of the Jacobian.
+        :arg detJ: The determinant of the Jacobian.
+        :returns: A :class:`Pullback`.
+        """
+        if self.support_facet is None:
+            transformations = cartesian_transformations(J, adjJ, detJ)
+        else:
+            transformations = frame_transformations(self.ref_el, self.support_facet, (self.dim, self.entity),
+                                                    J, adjJ, detJ)
+        pullbacks = [transformations[mapping] for mapping in self.pullback_mappings.values()]
+        unit = WeightTransformation([one], [numpy.eye(1)])
+        forward = reduce(WeightTransformation.kron, (pullback.forward for pullback in pullbacks), unit)
+        inverse = reduce(WeightTransformation.kron, (pullback.inverse for pullback in pullbacks), unit)
+        return Pullback(forward, inverse)
+
+    def vandermonde_row(self, G, D):
+        r"""The row :math:`(GW):D_j` of the Vandermonde matrix, where :math:`W` are the :attr:`weights`.
+
+        For the :meth:`pullback` G and the reference basis, this is the row of
+        :math:`B_0`, and for its inverse and the basis of the entity of the
+        node, the row of the inverse of the diagonal block.
+
+        :arg G: The :class:`WeightTransformation` of the axes of the weights.
         :arg D: The derivatives of the basis at the points of the node, with
             the axes of the weights followed by the basis.
-        :arg block: The dofs of the entity of the node.
-        :returns: A pair of object arrays of GEM scalars, over all the dofs
-            and over the block.
+        :returns: An object array of GEM scalars, one for each basis function.
         """
-        mappings = self.pullback_mappings.values()
-        unit = WeightTransformation([one], [numpy.eye(1)])
-        G = reduce(WeightTransformation.kron, (transformations[mapping][0] for mapping in mappings), unit)
-        inverse = reduce(WeightTransformation.kron, (transformations[mapping][1] for mapping in mappings), unit)
-        # The weights and the derivatives with the axes of the groups flattened in order
+        # The weights and the derivatives with the axes of the groups flattened
+        # in the order of the Kronecker product
         axes = list(chain.from_iterable(self.pullback_mappings))
         W = self.unpaired_weights.reshape(-1, self.weights.shape[-1])
         D = numpy.moveaxis(D, axes, range(len(axes)))
         D = D.reshape(-1, *D.shape[len(axes):])
-        return (G.to_riesz(W, D, self.tol), inverse.to_riesz(W, D[..., block], self.tol))
+        return G.to_riesz(W, D, self.tol)
 
     def scaling(self, J, h):
         r"""The factor :math:`h^p\,|e|` of the row of the physical Vandermonde matrix :math:`B=SB_0`.
@@ -437,26 +458,21 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         adjJ, detJ = adjugate_and_determinant(J)
         h = coordinate_mapping.cell_size()
 
-        cartesian = cartesian_transformations(J, adjJ, detJ)
-        frames = {}
-        derivatives = self._reference_derivatives
-
         closures = self._element.entity_closure_dofs()
         entity_dofs = self._element.entity_dofs()
+        derivatives = self._reference_derivatives
+        pullbacks = {}
         rows = {}
         for i, functional in enumerate(self._physical_functionals):
-            if functional.support_facet is not None:
-                key = (functional.support_facet, (functional.dim, functional.entity))
-                if key not in frames:
-                    frames[key] = frame_transformations(self.cell, *key, J, adjJ, detJ)
-                transformations = frames[key]
-            else:
-                transformations = cartesian
+            key = functional.pullback_key
+            if key not in pullbacks:
+                pullbacks[key] = functional.pullback(J, adjJ, detJ)
             order = functional.node.max_deriv_order
             points, _ = functional.node.get_order_tensors(order)
             D = numpy.stack([derivatives[order][x] for x in points], axis=-2)
             block = entity_dofs[functional.dim][functional.entity]
-            row, inverse = functional.vandermonde_row(transformations, D, block)
+            row = functional.vandermonde_row(pullbacks[key].forward, D)
+            inverse = functional.vandermonde_row(pullbacks[key].inverse, D[..., block])
             scale = functional.scaling(J, h)
             nonzeros = [j for j, entry in enumerate(row) if not isinstance(entry, gem.Zero)]
             if nonzeros == [i] and row[i] == one and scale == one:
@@ -734,7 +750,7 @@ def round_to_int(x, tol):
 
 
 def cartesian_transformations(J, adjJ, detJ):
-    """The weight transformation of each mapping in Cartesian components, and its inverse."""
+    """The :class:`Pullback` of each mapping in Cartesian components."""
     sd = J.shape[1]
     affine = WeightTransformation([one], [numpy.eye(sd)])
     contravariant = WeightTransformation.from_matrix(J.T / detJ)
@@ -747,12 +763,14 @@ def cartesian_transformations(J, adjJ, detJ):
     delta = numpy.eye(sd).reshape(-1, 1)
     pairing = WeightTransformation([one / detJ], [delta])
     pairing_inverse = WeightTransformation([detJ], [delta])
-    return {"affine": (affine, affine), "contravariant piola": (contravariant, contravariant_inverse),
-            "covariant piola": (covariant, covariant_inverse), "L2 piola": (pairing, pairing_inverse)}
+    return {"affine": Pullback(affine, affine),
+            "contravariant piola": Pullback(contravariant, contravariant_inverse),
+            "covariant piola": Pullback(covariant, covariant_inverse),
+            "L2 piola": Pullback(pairing, pairing_inverse)}
 
 
 def frame_transformations(ref_el, facet, support, J, adjJ, detJ):
-    r"""The weight transformation of each mapping in the frame of the facet, and its inverse.
+    r"""The :class:`Pullback` of each mapping in the frame of the facet.
 
     The frame consists of the tangents of the support, the normals to the
     support, and the scaled normal :math:`\nu` of the facet.  On an edge
@@ -805,8 +823,9 @@ def frame_transformations(ref_el, facet, support, J, adjJ, detJ):
                                          [P, Q, *(numpy.outer(nu, s) for s in dual_tangents)])
     contravariant_inverse = WeightTransformation([one, detJ * (nu @ nu) / (x @ x), *(z @ tau / (x @ x) for tau in tangents)],
                                                  [P, Q, *(numpy.outer(nu, s) for s in dual_tangents)])
-    return {"affine": (affine, affine), "covariant piola": (covariant, covariant_inverse),
-            "contravariant piola": (contravariant, contravariant_inverse)}
+    return {"affine": Pullback(affine, affine),
+            "covariant piola": Pullback(covariant, covariant_inverse),
+            "contravariant piola": Pullback(contravariant, contravariant_inverse)}
 
 
 def tangential_projector(tangents):
