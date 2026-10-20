@@ -7,7 +7,7 @@ where :math:`B_{ij} = n_i(\mathcal{P}\hat\psi_j)` and :math:`M = B^{-T}`
 """
 
 from abc import ABCMeta, abstractmethod
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from collections.abc import Mapping
 from functools import cached_property, reduce
 from itertools import chain, product
@@ -20,6 +20,10 @@ from finat.citations import cite
 
 zero = gem.Zero()
 one = gem.Literal(1.0)
+
+#: The row of :math:`B_0` of a node, the row of the inverse of the diagonal
+#: block of :math:`B_0`, and the scaling of the row of :math:`B=SB_0`.
+VandermondeRow = namedtuple("VandermondeRow", ["entries", "inverse", "scale"])
 
 
 class NeedsCoordinateMappingElement(metaclass=ABCMeta):
@@ -239,27 +243,34 @@ class PhysicallyMappedFunctional:
             exponent -= self.dim
         return exponent
 
-    def vandermonde_row(self, transformations, D):
-        r"""The row of the Vandermonde matrix :math:`B_0` for this node.
+    def vandermonde_row(self, transformations, D, block):
+        r"""The row of the Vandermonde matrix :math:`B_0` for this node, and of the inverse of its diagonal block.
 
         The row is :math:`(GW):D_j`, where :math:`W` are the :attr:`weights`,
         :math:`D` are the derivatives of the basis, and :math:`G` is the
         Kronecker product of the weight transformations of :attr:`pullback_mappings`.
+        The row of the inverse of the diagonal block is
+        :math:`(G^{-1}W):D_j` for the dofs j of the block.
 
-        :arg transformations: The :class:`WeightTransformation` of each mapping,
-            in Cartesian components or in the frame of :attr:`support_facet`.
+        :arg transformations: A dict from each mapping to its
+            :class:`WeightTransformation` and the inverse, in Cartesian
+            components or in the frame of :attr:`support_facet`.
         :arg D: The derivatives of the basis at the points of the node, with
             the axes of the weights followed by the basis.
-        :returns: An object array of GEM scalars, one for each basis function.
+        :arg block: The dofs of the entity of the node.
+        :returns: A pair of object arrays of GEM scalars, over all the dofs
+            and over the block.
         """
-        G = reduce(WeightTransformation.kron, map(transformations.get, self.pullback_mappings.values()),
-                   WeightTransformation([one], [numpy.eye(1)]))
+        mappings = self.pullback_mappings.values()
+        unit = WeightTransformation([one], [numpy.eye(1)])
+        G = reduce(WeightTransformation.kron, (transformations[mapping][0] for mapping in mappings), unit)
+        inverse = reduce(WeightTransformation.kron, (transformations[mapping][1] for mapping in mappings), unit)
         # The weights and the derivatives with the axes of the groups flattened in order
         axes = list(chain.from_iterable(self.pullback_mappings))
         W = self.unpaired_weights.reshape(-1, self.weights.shape[-1])
         D = numpy.moveaxis(D, axes, range(len(axes)))
         D = D.reshape(-1, *D.shape[len(axes):])
-        return G.to_riesz(W, D, self.tol)
+        return (G.to_riesz(W, D, self.tol), inverse.to_riesz(W, D[..., block], self.tol))
 
     def scaling(self, J, h):
         r"""The factor :math:`h^p\,|e|` of the row of the physical Vandermonde matrix :math:`B=SB_0`.
@@ -411,8 +422,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
 
         :arg coordinate_mapping: Object providing the physical geometry
             as GEM expressions.
-        :returns: A dict from each node number to its row of :math:`B_0` and
-            its :meth:`PhysicallyMappedFunctional.scaling`.
+        :returns: A dict from each node number to its :class:`VandermondeRow`.
         :raises NotImplementedError: If a row couples to a dof outside the
             closure of the entity of the node.
         """
@@ -432,6 +442,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         derivatives = self._reference_derivatives
 
         closures = self._element.entity_closure_dofs()
+        entity_dofs = self._element.entity_dofs()
         rows = {}
         for i, functional in enumerate(self._physical_functionals):
             if functional.support_facet is not None:
@@ -444,7 +455,8 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
             order = functional.node.max_deriv_order
             points, _ = functional.node.get_order_tensors(order)
             D = numpy.stack([derivatives[order][x] for x in points], axis=-2)
-            row = functional.vandermonde_row(transformations, D)
+            block = entity_dofs[functional.dim][functional.entity]
+            row, inverse = functional.vandermonde_row(transformations, D, block)
             scale = functional.scaling(J, h)
             nonzeros = [j for j, entry in enumerate(row) if not isinstance(entry, gem.Zero)]
             if nonzeros == [i] and row[i] == one and scale == one:
@@ -454,7 +466,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
             if outside:
                 raise NotImplementedError(f"Dof {i} on entity {(functional.dim, functional.entity)} "
                                           f"couples outside its closure: {outside}")
-            rows[i] = (row, scale)
+            rows[i] = VandermondeRow(row, inverse, scale)
         return rows
 
     def _recombine(self, A):
@@ -467,45 +479,39 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
     def _physical_vandermonde(self, coordinate_mapping):
         """The physical Vandermonde matrix :math:`B` over all reference dofs."""
         B = identity(self._element.space_dimension())
-        for i, (row, scale) in self._vandermonde_rows(coordinate_mapping).items():
-            B[i] = row * scale
+        for i, row in self._vandermonde_rows(coordinate_mapping).items():
+            B[i] = row.entries * row.scale
         return self._recombine(B)
 
     def _inverse_physical_vandermonde(self, coordinate_mapping):
         r""":math:`B^{-1}=B_0^{-1}S^{-1}` over all reference dofs.
 
-        Solve the entity blocks of :math:`B_0` in closure order, retaining
-        completion functions.
+        Back-substitute the entity blocks of :math:`B_0` in closure order,
+        retaining completion functions.  The rows of each block e are
+        :math:`B_{ee}^{-1}(I_e - B_{ec}V_c)` over the rest c of its closure.
         """
         rows = self._vandermonde_rows(coordinate_mapping)
         nbf = self._element.space_dimension()
         closures = self._element.entity_closure_dofs()
         entity_dofs = self._element.entity_dofs()
+        I = identity(nbf)
         V = identity(nbf)
-        cache = {}
         for dim, entities in sorted(closures.items()):
             for entity, closure_dofs in entities.items():
                 block = entity_dofs[dim][entity]
                 if not any(i in rows for i in block):
                     continue
                 closure = [j for j in closure_dofs if j not in block]
-                n = len(block)
-                Bee = numpy.full((n, n), zero, dtype=object)
-                rhs = numpy.full((n, nbf), zero, dtype=object)
+                inverse = identity(len(block))
+                coupling = numpy.full((len(block), len(closure)), zero, dtype=object)
                 for k, i in enumerate(block):
-                    if i not in rows:
-                        Bee[k, k] = one
-                        rhs[k, i] = one
-                        continue
-                    row, _ = rows[i]
-                    Bee[k] = row[block]
-                    rhs[k, i] = one
-                    for j in closure:
-                        if not isinstance(row[j], gem.Zero):
-                            rhs[k] = rhs[k] - V[j] * row[j]
-                V[block] = solve(Bee, rhs, cache)
-        for i, (_, scale) in rows.items():
-            V[:, i] = V[:, i] / scale
+                    if i in rows:
+                        inverse[k] = rows[i].inverse
+                        coupling[k] = rows[i].entries[closure]
+                rhs = I[block] - sparse_matmul(coupling, V[closure])
+                V[block] = sparse_matmul(inverse, rhs)
+        for i, row in rows.items():
+            V[:, i] = V[:, i] / row.scale
         return self._recombine(V)
 
 
@@ -625,6 +631,17 @@ def determinant(A):
         return detA
 
 
+def sparse_matmul(A, B):
+    """The product of matrices of GEM scalars, which skips the zero entries."""
+    columns = [[j for j, b in enumerate(row) if not isinstance(b, gem.Zero)] for row in B]
+    C = numpy.full((A.shape[0], B.shape[1]), zero, dtype=object)
+    for i, k in numpy.ndindex(A.shape):
+        if not isinstance(A[i, k], gem.Zero):
+            for j in columns[k]:
+                C[i, j] = C[i, j] + A[i, k] * B[k, j]
+    return C
+
+
 def adjugate(A):
     """Returns the adjugate matrix of A"""
     A = numpy.asarray(A)
@@ -641,20 +658,6 @@ def adjugate(A):
     return C
 
 
-def pseudoinverse(A):
-    """Returns the Moore-Penrose pseudoinverse of a full-column-rank matrix.
-
-    :arg A: An object array of GEM scalars with at least as many rows as
-        columns.
-    :returns: The Moore-Penrose pseudoinverse, formed as
-        ``solve(A.T @ A, A.T)``.
-    """
-    m, n = A.shape
-    if m < n:
-        raise ValueError("A must have at least as many rows as columns.")
-    return solve(A.T @ A, A.T)
-
-
 def adjugate_and_determinant(J):
     r"""Return the determinant-scaled inverse and volume factor of a Jacobian.
 
@@ -668,65 +671,10 @@ def adjugate_and_determinant(J):
     """
     gdim, tdim = J.shape
     if gdim == tdim:
-        return adjugate(J), determinant(J)
-    detJ = determinant(J.T @ J)**0.5
-    return pseudoinverse(J) * detJ, detJ
-
-
-def connected_components(A):
-    """Returns the connected components of the sparsity pattern of A.
-
-    :arg A: A square object array of GEM scalars.
-    :returns: A list of sorted lists of indices.
-    """
-    m, n = A.shape
-    if m != n:
-        raise ValueError("A must be square.")
-    components = []
-    candidates = set(range(m))
-    neighbors = [{j for j in range(m) if not isinstance(A[i, j], gem.Zero)
-                  or not isinstance(A[j, i], gem.Zero)} for i in range(m)]
-    while candidates:
-        ids = set()
-        pending = [min(candidates)]
-        while pending:
-            i = pending.pop()
-            if i not in ids:
-                ids.add(i)
-                pending.extend(neighbors[i] - ids)
-        candidates -= ids
-        components.append(sorted(ids))
-    return components
-
-
-def solve(A, B, cache=None):
-    """Solves A X = B for a matrix A of GEM scalars.
-
-    Each connected component of A is solved through its adjugate and
-    determinant, which are cached so that identical blocks (e.g. the
-    vertex jets of every vertex) are only inverted once.
-
-    :arg A: A square object array of GEM scalars.
-    :arg B: An object array with the right-hand sides as columns.
-    :arg cache: An optional dict of adjugate and determinant pairs.
-    :returns: X as an object array.
-    """
-    if cache is None:
-        cache = {}
-    X = numpy.full(B.shape, zero, dtype=object)
-    for ids in connected_components(A):
-        Aii = A[numpy.ix_(ids, ids)]
-        if len(ids) == 1:
-            d = Aii[0, 0]
-            X[ids] = B[ids] if d == one else B[ids] / d
-            continue
-        key = gem.ListTensor(Aii)
-        try:
-            adj, det = cache[key]
-        except KeyError:
-            adj, det = cache[key] = adjugate_and_determinant(Aii)
-        X[ids] = (adj @ B[ids]) / det
-    return X
+        return (adjugate(J), determinant(J))
+    JTJ = J.T @ J
+    detJ = determinant(JTJ)**0.5
+    return (adjugate(JTJ) @ J.T / detJ, detJ)
 
 
 class WeightTransformation:
@@ -753,8 +701,7 @@ class WeightTransformation:
         return cls(*zip(*entries))
 
     def __add__(self, other):
-        return WeightTransformation(self.coefficients + other.coefficients,
-                                    numpy.concatenate([self.matrices, other.matrices]))
+        return WeightTransformation(self.coefficients + other.coefficients, [*self.matrices, *other.matrices])
 
     def kron(self, other):
         """The Kronecker product, which transforms the axes of self followed by the axes of other."""
@@ -787,20 +734,25 @@ def round_to_int(x, tol):
 
 
 def cartesian_transformations(J, adjJ, detJ):
-    """The weight transformation of each mapping in Cartesian components."""
+    """The weight transformation of each mapping in Cartesian components, and its inverse."""
     sd = J.shape[1]
+    affine = WeightTransformation([one], [numpy.eye(sd)])
     contravariant = WeightTransformation.from_matrix(J.T / detJ)
+    contravariant_inverse = WeightTransformation.from_matrix(adjJ.T)
     covariant = WeightTransformation.from_matrix(adjJ / detJ)
+    covariant_inverse = WeightTransformation.from_matrix(J)
     # The identity on a contravariant axis and a covariant axis pulls back
     # as (J^T/detJ) K^T = I/detJ, so the pair maps the unpaired weights to
     # the identity over detJ.
-    pairing = WeightTransformation([one / detJ], [numpy.eye(sd).reshape(-1, 1)])
-    return {"affine": WeightTransformation([one], [numpy.eye(sd)]), "contravariant piola": contravariant,
-            "covariant piola": covariant, "L2 piola": pairing}
+    delta = numpy.eye(sd).reshape(-1, 1)
+    pairing = WeightTransformation([one / detJ], [delta])
+    pairing_inverse = WeightTransformation([detJ], [delta])
+    return {"affine": (affine, affine), "contravariant piola": (contravariant, contravariant_inverse),
+            "covariant piola": (covariant, covariant_inverse), "L2 piola": (pairing, pairing_inverse)}
 
 
 def frame_transformations(ref_el, facet, support, J, adjJ, detJ):
-    r"""The weight transformation of each mapping in the frame of the facet.
+    r"""The weight transformation of each mapping in the frame of the facet, and its inverse.
 
     The frame consists of the tangents of the support, the normals to the
     support, and the scaled normal :math:`\nu` of the facet.  On an edge
@@ -808,14 +760,18 @@ def frame_transformations(ref_el, facet, support, J, adjJ, detJ):
     :math:`t \times \nu`.
     """
     sd = ref_el.get_spatial_dimension()
+    affine = WeightTransformation([one], [numpy.eye(sd)])
     tangents = ref_el.compute_tangents(sd - 1, facet)
     nu = ref_el.compute_scaled_normal(facet)
     # The cofactor normal
     x = adjJ.T @ nu
+    length = ((x @ x) * (nu @ nu))**0.5
     # Covariant weights are unchanged along the tangents of the support, and
-    # each normal maps to the pullback of the unit physical normal.
-    normal = adjJ @ x / (detJ * ((x @ x) * (nu @ nu))**0.5)
-    covariant = WeightTransformation(normal, [numpy.outer(e, nu) for e in numpy.eye(sd)])
+    # each normal maps to the pullback of the unit physical normal.  The
+    # inverse takes the components along the pushed forward tangents and the
+    # unit physical normals.
+    covariant = WeightTransformation(adjJ @ x / (detJ * length), [numpy.outer(e, nu) for e in numpy.eye(sd)])
+    covariant_inverse = WeightTransformation([detJ / length], [numpy.outer(nu, nu)])
     if support[0] == sd - 2 >= 1:
         t = ref_el.compute_edge_tangent(support[1])
         m = numpy.cross(t, nu)
@@ -823,23 +779,34 @@ def frame_transformations(ref_el, facet, support, J, adjJ, detJ):
         # lies in the span of the orthogonal t and m.
         w = numpy.cross(J.T @ (J @ t), nu)
         Jw = J @ w
-        length = ((Jw @ Jw) * (m @ m))**0.5
-        covariant += WeightTransformation([w @ f / ((f @ f) * length) for f in (t, m)],
+        edge_length = ((Jw @ Jw) * (m @ m))**0.5
+        covariant += WeightTransformation([w @ f / ((f @ f) * edge_length) for f in (t, m)],
                                           [numpy.outer(f, m) for f in (t, m)])
-        covariant += WeightTransformation([one], [tangential_projector(t[None])])
+        covariant_inverse += WeightTransformation(J.T @ Jw / edge_length, [numpy.outer(m, e) for e in numpy.eye(sd)])
+        support_tangents = t[None]
     else:
-        covariant += WeightTransformation([one], [tangential_projector(tangents)])
+        support_tangents = tangents
+    Jt = J @ support_tangents.T
+    gJ = Jt.T @ Jt
+    components = adjugate(gJ) @ Jt.T @ J / determinant(gJ)
+    covariant += WeightTransformation([one], [tangential_projector(support_tangents)])
+    covariant_inverse += WeightTransformation(components.ravel(), [numpy.outer(tau, e) for tau in support_tangents
+                                                                   for e in numpy.eye(sd)])
 
     # Contravariant weights keep their normal component, and their
     # tangential components map through the dual tangents of the facet.
     g = tangents @ tangents.T
     dual_tangents = adjugate(g) @ tangents / determinant(g)
     P = numpy.outer(nu, nu) / (nu @ nu)
-    y = adjJ @ x / (detJ * (nu @ nu))
-    contravariant = WeightTransformation([one, (x @ x) / (detJ * (nu @ nu)), *(y @ -tau for tau in tangents)],
-                                         [P, tangential_projector(tangents), *(numpy.outer(nu, s) for s in dual_tangents)])
-    return {"affine": WeightTransformation([one], [numpy.eye(sd)]), "covariant piola": covariant,
-            "contravariant piola": contravariant}
+    Q = tangential_projector(tangents)
+    z = adjJ @ x
+    contravariant = WeightTransformation([one, (x @ x) / (detJ * (nu @ nu)),
+                                          *(z @ -tau / (detJ * (nu @ nu)) for tau in tangents)],
+                                         [P, Q, *(numpy.outer(nu, s) for s in dual_tangents)])
+    contravariant_inverse = WeightTransformation([one, detJ * (nu @ nu) / (x @ x), *(z @ tau / (x @ x) for tau in tangents)],
+                                                 [P, Q, *(numpy.outer(nu, s) for s in dual_tangents)])
+    return {"affine": (affine, affine), "covariant piola": (covariant, covariant_inverse),
+            "contravariant piola": (contravariant, contravariant_inverse)}
 
 
 def tangential_projector(tangents):

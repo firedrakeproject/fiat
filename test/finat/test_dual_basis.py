@@ -10,7 +10,7 @@ import finat.ufl
 from finat.element_factory import create_element
 from finat.enriched import as_enriched
 from finat.fiat_elements import FiatElement
-from finat.physically_mapped import (PhysicallyMappedElement, cartesian_transformations,
+from finat.physically_mapped import (PhysicallyMappedElement, cartesian_transformations, frame_transformations,
                                      in_range_of, adjugate_and_determinant)
 from finat.point_set import PointSet, UnionPointSet
 from finat.quadrature import QuadratureRule
@@ -394,8 +394,9 @@ def test_pairing_transformation(sd):
     adjJ, detJ = adjugate_and_determinant(numpy.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object))
     J = numpy.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object)
     transformations = cartesian_transformations(J, adjJ, detJ)
-    contravariant, covariant, pair = (transformation_matrix(transformations[mapping])
-                                      for mapping in ("contravariant piola", "covariant piola", "L2 piola"))
+    contravariant = transformation_matrix(transformations["contravariant piola"][0])
+    covariant = transformation_matrix(transformations["covariant piola"][0])
+    pair = transformation_matrix(transformations["L2 piola"][0])
     J, = evaluate([gem.ListTensor(J)])
     J = J.arr
     assert numpy.allclose(contravariant, J.T / numpy.linalg.det(J))
@@ -403,6 +404,23 @@ def test_pairing_transformation(sd):
     delta = numpy.eye(sd).reshape(-1, 1)
     assert numpy.allclose(pair, numpy.kron(contravariant, covariant) @ delta)
     assert numpy.allclose(pair, delta / numpy.linalg.det(J))
+
+
+@pytest.mark.parametrize("sd,support", [(2, (1, 0)), (3, (2, 0)), (3, (1, 1))])
+def test_transformation_inverse(sd, support):
+    """The inverse of each weight transformation is the inverse of the matrix."""
+    ref_el = FIAT.ufc_simplex(sd)
+    J = numpy.eye(sd) + numpy.random.default_rng(0).random((sd, sd))
+    J = numpy.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object)
+    adjJ, detJ = adjugate_and_determinant(J)
+    # The facet 0 contains the support
+    cartesian = cartesian_transformations(J, adjJ, detJ)
+    frame = frame_transformations(ref_el, 0, support, J, adjJ, detJ)
+    for mapping in ("affine", "contravariant piola", "covariant piola"):
+        for transformations in (cartesian, frame):
+            G = transformation_matrix(transformations[mapping][0])
+            inverse = transformation_matrix(transformations[mapping][1])
+            assert numpy.allclose(inverse @ G, numpy.eye(sd))
 
 
 @pytest.mark.parametrize("scaled", [False, True])
