@@ -229,18 +229,20 @@ class PhysicallyMappedFunctional:
         """The :attr:`frame` and the :attr:`pullback_mappings`."""
         return (self.frame, tuple(self.pullback_mappings.values()))
 
-    def pullback(self, J, adjJ, detJ):
+    def pullback(self, J, adjJ, detJ, G, adjG):
         """The Kronecker product of the weight transformations of :attr:`pullback_mappings`.
 
         :arg J: The Jacobian as an object array of GEM scalars.
         :arg adjJ: The adjugate of the Jacobian.
         :arg detJ: The determinant of the Jacobian.
+        :arg G: The metric :math:`J^TJ`.
+        :arg adjG: The adjugate of the metric.
         :returns: A :class:`Pullback`.
         """
         if self.frame is None:
             transformations = cartesian_transformations(J, adjJ, detJ)
         else:
-            transformations = frame_transformations(self.ref_el, self.frame, J, adjJ, detJ)
+            transformations = frame_transformations(self.ref_el, self.frame, G, adjG, detJ)
         pullbacks = [transformations[mapping] for mapping in self.pullback_mappings.values()]
         unit = LinearCombination([one], [numpy.eye(1)])
         forward = reduce(LinearCombination.kron, (pullback.forward for pullback in pullbacks), unit)
@@ -431,6 +433,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
             J = coordinate_mapping.jacobian_at(bary)
         J = numpy.array([[J[i, k] for k in range(J.shape[1])] for i in range(J.shape[0])], dtype=object)
         adjJ, detJ = adjugate_and_determinant(J)
+        G, adjG = metric_and_adjugate(J)
         h = coordinate_mapping.cell_size()
 
         closures = self._element.entity_closure_dofs()
@@ -441,7 +444,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         for i, functional in enumerate(self._physical_functionals):
             key = functional.pullback_key
             if key not in pullbacks:
-                pullbacks[key] = functional.pullback(J, adjJ, detJ)
+                pullbacks[key] = functional.pullback(J, adjJ, detJ, G, adjG)
             order = functional.node.max_deriv_order
             points, _ = functional.node.get_order_tensors(order)
             point_index, D = derivatives[order]
@@ -669,6 +672,24 @@ def adjugate_and_determinant(J):
     return (adjugate(JTJ) @ J.T / detJ, detJ)
 
 
+def metric_and_adjugate(J):
+    r"""Return the metric :math:`G=J^TJ` and its adjugate, which equals :math:`\operatorname{adj}(J)\operatorname{adj}(J)^T`.
+
+    :arg J: Full-column-rank Jacobian as an object array of GEM scalars.
+    :returns: The symmetric matrices :math:`G` and :math:`\operatorname{adj}(G)`.
+    """
+    G = symmetric(J.T @ J)
+    return G, symmetric(adjugate(G))
+
+
+def symmetric(A):
+    """The symmetric matrix with the upper triangle of A."""
+    A = A.copy()
+    i, j = numpy.tril_indices(len(A), -1)
+    A[i, j] = A[j, i]
+    return A
+
+
 class LinearCombination:
     r"""A matrix :math:`G=\sum_t g_t C_t` of GEM scalars :math:`g_t` and constant matrices :math:`C_t`.
 
@@ -738,18 +759,21 @@ def cartesian_transformations(J, adjJ, detJ):
             "L2 piola": Pullback(pairing, pairing_inverse)}
 
 
-def frame_transformations(ref_el, frame, J, adjJ, detJ):
+def frame_transformations(ref_el, frame, G, adjG, detJ):
     """The :class:`Pullback` of each mapping in the frame of an entity.
 
     :arg frame: The entity ``(dim, entity)``, a facet or an edge of a tetrahedron.
+    :arg G: The metric :math:`J^TJ`.
+    :arg adjG: The adjugate of the metric.
+    :arg detJ: The determinant of the Jacobian.
     """
     dim, entity = frame
     if dim == ref_el.get_spatial_dimension() - 1:
-        return facet_transformations(ref_el, entity, J, adjJ, detJ)
-    return edge_transformations(ref_el, entity, J, adjJ, detJ)
+        return facet_transformations(ref_el, entity, G, adjG, detJ)
+    return edge_transformations(ref_el, entity, G)
 
 
-def facet_transformations(ref_el, facet, J, adjJ, detJ):
+def facet_transformations(ref_el, facet, G, adjG, detJ):
     r"""The :class:`Pullback` of each mapping in the frame of a facet.
 
     The frame consists of the tangents of the facet and its scaled normal :math:`\nu`.
@@ -758,16 +782,17 @@ def facet_transformations(ref_el, facet, J, adjJ, detJ):
     affine = LinearCombination([one], [numpy.eye(sd)])
     tangents = ref_el.compute_tangents(sd - 1, facet)
     nu = ref_el.compute_scaled_normal(facet)
-    # The cofactor normal
-    x = adjJ.T @ nu
-    length = ((x @ x) * (nu @ nu))**0.5
+    # The cofactor normal x = adj(J)^T nu has |x|^2 = nu^T adj(G) nu and adj(J) x = adj(G) nu.
+    z = adjG @ nu
+    xx = z @ nu
+    length = (xx * (nu @ nu))**0.5
     # Covariant weights are unchanged along the tangents, and the normal maps
     # to the pullback of the unit physical normal.  The inverse takes the
     # components along the pushed forward tangents and the unit physical normal.
-    Jt = J @ tangents.T
-    gJ = Jt.T @ Jt
-    components = adjugate(gJ) @ Jt.T @ J / determinant(gJ)
-    covariant = LinearCombination([*(adjJ @ x / (detJ * length)), one],
+    GT = G @ tangents.T
+    gJ = symmetric(GT.T @ tangents.T)
+    components = adjugate(gJ) @ GT.T / determinant(gJ)
+    covariant = LinearCombination([*(z / (detJ * length)), one],
                                   [*(numpy.outer(e, nu) for e in numpy.eye(sd)), tangential_projector(tangents)])
     covariant_inverse = LinearCombination([detJ / length, *components.ravel()],
                                           [numpy.outer(nu, nu), *(numpy.outer(tau, e) for tau in tangents
@@ -779,18 +804,17 @@ def facet_transformations(ref_el, facet, J, adjJ, detJ):
     dual_tangents = adjugate(g) @ tangents / determinant(g)
     P = facet_normal_projector(ref_el, facet)
     Q = tangential_projector(tangents)
-    z = adjJ @ x
-    contravariant = LinearCombination([one, (x @ x) / (detJ * (nu @ nu)),
+    contravariant = LinearCombination([one, xx / (detJ * (nu @ nu)),
                                        *(z @ -tau / (detJ * (nu @ nu)) for tau in tangents)],
                                       [P, Q, *(numpy.outer(nu, s) for s in dual_tangents)])
-    contravariant_inverse = LinearCombination([one, detJ * (nu @ nu) / (x @ x), *(z @ tau / (x @ x) for tau in tangents)],
+    contravariant_inverse = LinearCombination([one, detJ * (nu @ nu) / xx, *(z @ tau / xx for tau in tangents)],
                                               [P, Q, *(numpy.outer(nu, s) for s in dual_tangents)])
     return {"affine": Pullback(affine, affine),
             "covariant piola": Pullback(covariant, covariant_inverse),
             "contravariant piola": Pullback(contravariant, contravariant_inverse)}
 
 
-def edge_transformations(ref_el, edge, J, adjJ, detJ):
+def edge_transformations(ref_el, edge, G):
     r"""The :class:`Pullback` of each mapping in the frame of an edge of a tetrahedron.
 
     The frame consists of the edge tangent :math:`t` and the normals
@@ -808,11 +832,10 @@ def edge_transformations(ref_el, edge, J, adjJ, detJ):
     t_dual, *m_dual = adjugate(F) / determinant(F)
     # The physical normal to the edge within facet i is J w_i, where w_i lies
     # in the plane of the facet and J w_i is orthogonal to J t.
-    Jt = J @ t
-    Gt = J.T @ Jt
+    Gt = G @ t
     w = [numpy.cross(Gt, ref_el.compute_scaled_normal(f)) for f in facets]
-    Jw = [J @ wi for wi in w]
-    norms = [(Jwi @ Jwi)**0.5 for Jwi in Jw]
+    Gw = [G @ wi for wi in w]
+    norms = [(wi @ Gwi)**0.5 for wi, Gwi in zip(w, Gw)]
     lengths = [(mi @ mi)**0.5 for mi in m]
     # Covariant weights are unchanged along t, and each m_i maps to the
     # pullback of the unit physical normal within facet i, scaled by |m_i|.
@@ -821,13 +844,13 @@ def edge_transformations(ref_el, edge, J, adjJ, detJ):
         covariant += LinearCombination(wi * (length / norm), [numpy.outer(e, mi_dual) for e in numpy.eye(sd)])
     # The inverse takes the component along J t, and the components along the
     # unit physical normals N_i, which are orthogonal to J t, through the
-    # inverse of their Gram matrix [[1, c], [c, 1]].
-    N = [Jwi / norm for Jwi, norm in zip(Jw, norms)]
-    c = N[0] @ N[1]
+    # inverse of their Gram matrix [[1, c], [c, 1]].  Here J^T N_i = G w_i / |J w_i|.
+    JN = [Gwi / norm for Gwi, norm in zip(Gw, norms)]
+    c = (w[0] @ Gw[1]) / (norms[0] * norms[1])
     K = numpy.array([[one, -c], [-c, one]], dtype=object) / (1 - c * c)
-    covariant_inverse = LinearCombination(Gt / (Jt @ Jt), [numpy.outer(t, e) for e in numpy.eye(sd)])
+    covariant_inverse = LinearCombination(Gt / (Gt @ t), [numpy.outer(t, e) for e in numpy.eye(sd)])
     for i, (mi, length) in enumerate(zip(m, lengths)):
-        row = sum((J.T @ N[j]) * K[i, j] for j in range(2)) / length
+        row = sum(JN[j] * K[i, j] for j in range(2)) / length
         covariant_inverse += LinearCombination(row, [numpy.outer(mi, e) for e in numpy.eye(sd)])
     return {"affine": Pullback(affine, affine),
             "covariant piola": Pullback(covariant, covariant_inverse)}
