@@ -278,7 +278,7 @@ class PhysicallyMappedFunctional:
             T = self.ref_el.compute_tangents(self.dim, self.entity)
             JT = J @ T.T
             volume = self.ref_el.volume_of_subcomplex(self.dim, self.entity)
-            measure = volume / numpy.sqrt(numpy.linalg.det(T @ T.T)) * determinant(JT.T @ JT)**0.5
+            measure = volume * (determinant(JT.T @ JT) / determinant(T @ T.T))**0.5
 
         dilation = one
         p = self.scaling_exponent
@@ -802,45 +802,53 @@ def cartesian_transformations(J, adjJ, detJ):
 def frame_transformations(ref_el, facet, support, J, adjJ, detJ):
     r"""The weight transformation of each mapping in the frame of the facet.
 
-    On an edge support, the frame is :math:`(t, t \times n, n)` for the
-    edge tangent :math:`t` and the facet normal :math:`n`.
+    The frame consists of the tangents of the support, the normals to the
+    support, and the scaled normal :math:`\nu` of the facet.  On an edge
+    support, the normal to the edge tangent :math:`t` within the facet is
+    :math:`t \times \nu`.
     """
     sd = ref_el.get_spatial_dimension()
-    tangents = list(numpy.linalg.qr(ref_el.compute_tangents(sd - 1, facet).T)[0].T)
+    tangents = ref_el.compute_tangents(sd - 1, facet)
     nu = ref_el.compute_scaled_normal(facet)
-    K = adjJ.T
-    n = nu / numpy.linalg.norm(nu)
-    Kn = K @ n
-    # Each normal satisfies J^{-1} n_phys = u/d in the given reference frame.
-    normals = []
+    # The cofactor normal
+    x = adjJ.T @ nu
+    # Covariant weights are unchanged along the tangents of the support, and
+    # each normal maps to the pullback of the unit physical normal.
+    normal = adjJ @ x / (detJ * ((x @ x) * (nu @ nu))**0.5)
+    covariant = WeightTransformation(normal, [numpy.outer(e, nu) for e in numpy.eye(sd)])
     if support[0] == sd - 2 >= 1:
         t = ref_el.compute_edge_tangent(support[1])
-        m = numpy.cross(t, n)
-        m /= numpy.linalg.norm(m)
-        edge_tangents = [t / numpy.linalg.norm(t)]
-        w = numpy.cross(J.T @ (J @ t), n)
+        m = numpy.cross(t, nu)
+        # The physical normal to the edge within the facet is J w, where w
+        # lies in the span of the orthogonal t and m.
+        w = numpy.cross(J.T @ (J @ t), nu)
         Jw = J @ w
-        normals.append((m, w, (Jw @ Jw)**0.5, edge_tangents + [m]))
+        length = ((Jw @ Jw) * (m @ m))**0.5
+        covariant += WeightTransformation([w @ f / ((f @ f) * length) for f in (t, m)],
+                                          [numpy.outer(f, m) for f in (t, m)])
+        covariant += WeightTransformation([one], [tangential_projector(t[None])])
     else:
-        edge_tangents = tangents
-    frame = edge_tangents + [m for m, *_ in normals] + [n]
-    normals.append((n, adjJ @ Kn, detJ * (Kn @ Kn)**0.5, frame))
-    # Covariant weights are unchanged along the tangents, and each normal
-    # component maps through the frame.
-    covariant = WeightTransformation([one], [numpy.eye(sd) - sum(numpy.outer(n, n) for n, *_ in normals)])
-    for n, u, d, frame in normals:
-        covariant += WeightTransformation([u @ f / d for f in frame], [numpy.outer(f, n) for f in frame])
+        covariant += WeightTransformation([one], [tangential_projector(tangents)])
+
     # Contravariant weights keep their normal component, and their
-    # tangential components map through the frame.
-    nn = nu @ nu
-    Knu = K @ nu
-    KtKnu = K.T @ Knu
-    P = numpy.outer(nu, nu) / nn
-    d = detJ * nn
-    contravariant = WeightTransformation([one, Knu @ Knu / d, *(KtKnu @ -tau / d for tau in tangents)],
-                                         [P, numpy.eye(sd) - P, *(numpy.outer(nu, tau) for tau in tangents)])
+    # tangential components map through the dual tangents of the facet.
+    g = tangents @ tangents.T
+    dual_tangents = adjugate(g) @ tangents / determinant(g)
+    P = numpy.outer(nu, nu) / (nu @ nu)
+    y = adjJ @ x / (detJ * (nu @ nu))
+    contravariant = WeightTransformation([one, (x @ x) / (detJ * (nu @ nu)), *(y @ -tau for tau in tangents)],
+                                         [P, tangential_projector(tangents), *(numpy.outer(nu, s) for s in dual_tangents)])
     return {"affine": WeightTransformation([one], [numpy.eye(sd)]), "covariant piola": covariant,
             "contravariant piola": contravariant}
+
+
+def tangential_projector(tangents):
+    r"""The projector :math:`t^T\operatorname{adj}(g)\,t/\det g` onto the span of the tangents t.
+
+    :arg tangents: The tangents as rows, with the Gram matrix :math:`g=tt^T`.
+    """
+    g = tangents @ tangents.T
+    return tangents.T @ adjugate(g) @ tangents / determinant(g)
 
 
 def in_range_of(weights, projector, axes, tol):
