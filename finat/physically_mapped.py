@@ -272,15 +272,14 @@ class PhysicallyMappedFunctional:
             the axes of the weights followed by the basis.
         :returns: An object array of GEM scalars, one for each basis function.
         """
-        # The weights and the derivatives with the axes of the groups flattened
-        # in the order of the Kronecker product
+        # Contract the weights with the derivatives at the points, and order
+        # the axes of the groups as in the Kronecker product
         axes = list(chain.from_iterable(self.pullback_mappings))
-        W = numpy.moveaxis(self.weights, axes, range(len(axes)))
-        W = W.reshape(-1, W.shape[-1])
-        D = numpy.moveaxis(D, axes, range(len(axes)))
-        D = D.reshape(-1, *D.shape[len(axes):])
-        # Contract the weights with the derivatives at the points
-        return G.contract(numpy.einsum("bx,ax...->ab...", W, D), self.tol)
+        rank = len(axes)
+        A = numpy.tensordot(self.weights, D, axes=(-1, -2))
+        A = A.transpose(*(rank + k for k in axes), *axes, -1)
+        n = self.weights.size // self.weights.shape[-1]
+        return G.contract(A.reshape(n, n, -1), self.tol)
 
     def scaling(self, J, h):
         r"""The factor :math:`h^p\,|e|` of the row of the physical Vandermonde matrix :math:`B=SB_0`.
