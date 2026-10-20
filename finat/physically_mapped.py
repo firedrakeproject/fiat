@@ -7,6 +7,7 @@ where :math:`B_{ij} = n_i(\mathcal{P}\hat\psi_j)` and :math:`M = B^{-T}`
 """
 
 from abc import ABCMeta, abstractmethod
+from collections import defaultdict
 from collections.abc import Mapping
 from functools import cached_property, reduce
 from itertools import chain, product
@@ -223,18 +224,20 @@ class PhysicallyMappedFunctional:
             exponent -= self.dim
         return exponent
 
-    def vandermonde_row(self, uncontracted_riesz, transformations, J, h):
+    def vandermonde_row(self, transformations, D, J, h):
         r"""The row of the physical Vandermonde matrix for this node.
 
-        The row is :math:`B_j = h^p\,|e|\sum_{a,b}G_{ba}R_{abj}`, where
+        The row is :math:`B_j = h^p\,|e|\,(GW):D_j`, where :math:`W` are
+        the :attr:`weights`, :math:`D` are the derivatives of the basis,
         :math:`G` is the Kronecker product of the weight transformations of
         :attr:`pullback_mappings`, :math:`p` is :attr:`scaling_exponent`, and
         :math:`|e|` is the physical measure of the entity if :attr:`avg` is
         False and there is a :attr:`support_facet`, and 1 otherwise.
 
-        :arg uncontracted_riesz: See :attr:`PhysicallyMappedElement._uncontracted_riesz`.
         :arg transformations: The :class:`WeightTransformation` of each mapping,
             in Cartesian components or in the frame of :attr:`support_facet`.
+        :arg D: The derivatives of the basis at the points of the node, with
+            the axes of the weights followed by the basis.
         :arg J: The Jacobian as an object array of GEM scalars.
         :arg h: The cell size at each vertex.
         :returns: The numerator and denominator of the Vandermonde row.
@@ -250,8 +253,7 @@ class PhysicallyMappedFunctional:
         G = reduce(WeightTransformation.kron, map(transformations.get, self.pullback_mappings.values()),
                    WeightTransformation([one], [numpy.eye(1)]))
         axes = list(chain.from_iterable(self.pullback_mappings))
-        W = self.weights.transpose(*axes, -1).reshape(len(G.matrices[0]), -1)
-        numerator = G.to_riesz(W, uncontracted_riesz, self.tol)
+        numerator = G.to_riesz(self.weights, axes, D, self.tol)
         numerator *= measure
         denominator = G.denominator
 
@@ -345,42 +347,40 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         return tuple(functionals)
 
     @cached_property
-    def _uncontracted_riesz(self):
-        r"""Uncontracted Riesz representation of each node in the source nodal basis.
+    def _reference_derivatives(self):
+        r"""The derivatives of the source nodal basis at the points of the nodes.
 
-        For node :math:`i`, the rank-3 tensor
-        :math:`R_{(a,\beta),(b,\gamma),j}=\sum_q W_{i,a,\beta,q}(\partial^\gamma\psi^0_j)_b(x_q)`,
-        where :math:`\psi^0` is the nodal basis of the nodes before
-        recombination.  The axes of the node and of the basis are each
-        flattened in the order of :attr:`PhysicallyMappedFunctional.pullback_mappings`.
+        A dict from each derivative order k and point x to the tensor
+        :math:`D_{b\gamma j}=(\partial^\gamma\psi^0_j)_b(x)` with k
+        derivative axes :math:`\gamma`, where :math:`\psi^0` is the nodal
+        basis of the nodes before recombination.  The basis is tabulated one
+        time for each order.
         """
-        dual = self._element.get_dual_set()
-        coeffs = self._element.get_coeffs()
-        C = dual.get_coeffs()
-        if C is not None:
-            # The source nodal basis is C^T times the basis dual to C n_0.
-            coeffs = numpy.tensordot(C.T, coeffs, axes=(1, 0))
         sd = self.cell.get_spatial_dimension()
-        value_shape = coeffs.shape[1:-1]
-        num_bf, num_exp = coeffs.shape[0], coeffs.shape[-1]
-        coeffs = coeffs.reshape(num_bf, -1, num_exp)
-        riesz = dual.to_uncontracted_riesz(self._element.get_nodal_basis())
-        for order, R in riesz.items():
-            R = R.reshape(len(R), -1, sd**order, num_exp)
-            # (i, a beta, gamma, e) x (j, b, e) -> (i, a beta, gamma, j, b) -> (i, a beta, b, gamma, j)
-            R = numpy.tensordot(R, coeffs, axes=(-1, -1)).transpose(0, 1, 4, 2, 3)
-            shape = (*value_shape, *(sd,) * order)
-            riesz[order] = R.reshape(len(R), *shape, *shape, num_bf)
+        dual = self._element.get_dual_set()
+        points = defaultdict(set)
+        for node in dual.nodes:
+            order = node.max_deriv_order
+            node_points, _ = node.get_order_tensors(order)
+            points[order].update(node_points)
 
-        result = []
-        for i, functional in enumerate(self._physical_functionals):
-            R = riesz[functional.node.max_deriv_order][i]
-            # Flatten the axes of the node, and then the matching axes of the
-            # basis, in the order of the pullback mappings.
-            axes = list(chain.from_iterable(functional.pullback_mappings))
-            R = R.transpose(*axes, *(len(axes) + k for k in axes), -1)
-            result.append(R.reshape(-1, num_bf))
-        return result
+        C = dual.get_coeffs()
+        derivatives = {}
+        for order in points:
+            pts = sorted(points[order])
+            tabulation = self._element.tabulate(order, pts)
+            values = tabulation[(0,) * sd]
+            rank = values.ndim - 2
+            D = numpy.zeros((sd,) * order + values.shape)
+            for index in numpy.ndindex(D.shape[:order]):
+                D[index] = tabulation[tuple(map(index.count, range(sd)))]
+            # (gamma, j, b, x) -> (x, b, gamma, j)
+            D = D.transpose(-1, *range(order + 1, order + 1 + rank), *range(order), order)
+            if C is not None:
+                # The source nodal basis is C^T times the basis dual to C n_0.
+                D = D @ C
+            derivatives[order] = dict(zip(pts, D))
+        return derivatives
 
     def _vandermonde_rows(self, coordinate_mapping):
         """The rows of the physical Vandermonde matrix that differ from the identity.
@@ -405,6 +405,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
 
         cartesian = cartesian_transformations(J, adjJ, detJ)
         frames = {}
+        derivatives = self._reference_derivatives
 
         closures = self._element.entity_closure_dofs()
         rows = {}
@@ -416,7 +417,10 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
                 transformations = frames[key]
             else:
                 transformations = cartesian
-            numerator, denominator = functional.vandermonde_row(self._uncontracted_riesz[i], transformations, J, h)
+            order = functional.node.max_deriv_order
+            points, _ = functional.node.get_order_tensors(order)
+            D = numpy.stack([derivatives[order][x] for x in points], axis=-2)
+            numerator, denominator = functional.vandermonde_row(transformations, D, J, h)
             nonzeros = [j for j, entry in enumerate(numerator) if not isinstance(entry, gem.Zero)]
             if nonzeros == [i] and numerator[i] == denominator:
                 continue
@@ -750,24 +754,33 @@ class WeightTransformation:
         c = round_to_int(c, tol)
         return sum((g * ct for g, ct in zip(self.coefficients, c) if ct), zero)
 
-    def to_riesz(self, W, R, tol):
-        r"""The numerator of the Riesz representation :math:`\sum_{a,b}G_{ba}R_{abj}` of the transformed node.
+    def to_riesz(self, W, axes, D, tol):
+        r"""The numerator of the Riesz representation :math:`\sum_t g_t\,(C_tW):D` of the transformed node.
 
-        If :math:`GW=\lambda W`, this is the trace :math:`\lambda\sum_a R_{aaj}`.
+        If :math:`GW=\lambda W`, this is :math:`\lambda\,W:D`.
 
-        :arg W: The weights of the node as a matrix, with the transformed
-            axes as rows.
-        :arg R: The uncontracted Riesz representation of the node, with
-            rows :math:`(a,b)` and columns :math:`j`.
-        :arg tol: Tolerance relative to :math:`R` below which terms are dropped.
+        :arg W: The weights of the node.
+        :arg axes: The axes of W that G transforms, in the order of its
+            Kronecker factors.
+        :arg D: The derivatives of the basis at the points of the node, with
+            the axes of W followed by the basis.
+        :arg tol: Tolerance relative to W and D below which terms are dropped.
         """
-        coefficients, matrices = self.coefficients, self.matrices
-        eigenvalue = self.eigenvalue(W, tol)
+        # The transformed axes of W as rows
+        transposed = numpy.moveaxis(W, axes, range(len(axes)))
+        X = transposed.reshape(len(self.matrices[0]), -1)
+        coefficients = self.coefficients
+        matrices = self.matrices
+        eigenvalue = self.eigenvalue(X, tol)
         if eigenvalue is not None:
-            coefficients, matrices = [eigenvalue], numpy.eye(len(W))[None]
-        rows = matrices.transpose(0, 2, 1).reshape(len(matrices), -1) @ R
-        cutoffs = tol * numpy.abs(R).max() * numpy.abs(matrices).max(axis=(1, 2))
-        numerator = numpy.full(R.shape[1], zero, dtype=object)
+            coefficients = [eigenvalue]
+            matrices = numpy.eye(len(X))[None]
+        # The weights C_t W of each term, with the axes of W restored
+        CW = (matrices @ X).reshape(len(matrices), *transposed.shape)
+        CW = numpy.moveaxis(CW, range(1, len(axes) + 1), [1 + k for k in axes])
+        rows = numpy.tensordot(CW, D, axes=W.ndim)
+        cutoffs = tol * numpy.abs(W).max() * numpy.abs(D).max() * numpy.abs(matrices).max(axis=(1, 2))
+        numerator = numpy.full(D.shape[-1], zero, dtype=object)
         for g, row, cutoff in zip(coefficients, rows, cutoffs):
             row = round_to_int(row, cutoff)
             for j in numpy.flatnonzero(numpy.abs(row) > cutoff):
