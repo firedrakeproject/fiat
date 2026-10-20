@@ -165,7 +165,7 @@ class PhysicallyMappedFunctional:
     def pullback_mappings(self):
         """A dict from each group of axes of :attr:`weights` that map together to its mapping."""
         # vandermonde_row takes the Kronecker product of the weight transformations
-        # in the order of this dict.
+        # in the order of this dict, where the pairs come before the single axes.
         sd = self.ref_el.get_spatial_dimension()
         W = self.weights
         axis_mappings = self.axis_mappings
@@ -178,12 +178,14 @@ class PhysicallyMappedFunctional:
 
         # A contravariant axis contracted with a covariant axis through the
         # identity is a trace, and the pair maps as L2 piola.
+        delta = numpy.eye(sd).ravel()
+        trace = numpy.outer(delta, delta) / sd
         groups = {}
         for k, vector in enumerate(axis_mappings):
             for l, covector in enumerate(axis_mappings):
                 if (vector == "contravariant piola" and covector == "covariant piola"
                         and not any(k in axes or l in axes for axes in groups)
-                        and in_range_of(W, pairing_projector(sd), (k, l), self.tol)):
+                        and in_range_of(W, trace, (k, l), self.tol)):
                     groups[k, l] = "L2 piola"
         # A derivative along the edge maps as affine.
         # Every other axis keeps its own mapping.
@@ -198,6 +200,19 @@ class PhysicallyMappedFunctional:
                 mapping = "affine"
             groups[k,] = mapping
         return groups
+
+    @cached_property
+    def unpaired_weights(self):
+        r"""The weights :math:`W'` such that :math:`W=\delta_{a_ka_l}W'` for each pair (k, l) of :attr:`pullback_mappings`.
+
+        These are the :attr:`weights` without the axes of the pairs.
+        """
+        index = [slice(None)] * self.weights.ndim
+        for axes in self.pullback_mappings:
+            if len(axes) == 2:
+                index[axes[0]] = 0
+                index[axes[1]] = 0
+        return self.weights[tuple(index)]
 
     @cached_property
     def scaling_exponent(self):
@@ -252,8 +267,12 @@ class PhysicallyMappedFunctional:
 
         G = reduce(WeightTransformation.kron, map(transformations.get, self.pullback_mappings.values()),
                    WeightTransformation([one], [numpy.eye(1)]))
+        # The weights and the derivatives with the axes of the groups flattened in order
         axes = list(chain.from_iterable(self.pullback_mappings))
-        numerator = G.to_riesz(self.weights, axes, D, self.tol)
+        W = self.unpaired_weights.reshape(-1, self.weights.shape[-1])
+        D = numpy.moveaxis(D, axes, range(len(axes)))
+        D = D.reshape(-1, *D.shape[len(axes):])
+        numerator = G.to_riesz(W, D, self.tol)
         numerator *= measure
         denominator = G.denominator
 
@@ -737,51 +756,19 @@ class WeightTransformation:
                                     [numpy.kron(C, D) for C, D in product(self.matrices, other.matrices)],
                                     self.denominator * other.denominator)
 
-    def eigenvalue(self, W, tol):
-        r"""The numerator :math:`\lambda d` such that :math:`GW=\lambda W`, or None.
-
-        This holds when each :math:`C_tW=c_tW`, and then
-        :math:`\lambda d=\sum_t c_t g_t`.
-
-        :arg W: The weights as a matrix, with the transformed axes as rows.
-        :arg tol: Relative tolerance on :math:`C_tW-c_tW`.
-        """
-        CW = self.matrices @ W
-        c = numpy.tensordot(CW, W, axes=2) / numpy.tensordot(W, W, axes=2)
-        residual = numpy.abs(CW - c[:, None, None] * W).max(axis=(1, 2))
-        if (residual > tol * numpy.abs(self.matrices).max(axis=(1, 2)) * numpy.abs(W).max()).any():
-            return None
-        c = round_to_int(c, tol)
-        return sum((g * ct for g, ct in zip(self.coefficients, c) if ct), zero)
-
-    def to_riesz(self, W, axes, D, tol):
+    def to_riesz(self, W, D, tol):
         r"""The numerator of the Riesz representation :math:`\sum_t g_t\,(C_tW):D` of the transformed node.
 
-        If :math:`GW=\lambda W`, this is :math:`\lambda\,W:D`.
-
-        :arg W: The weights of the node.
-        :arg axes: The axes of W that G transforms, in the order of its
-            Kronecker factors.
+        :arg W: The weights of the node, with the transformed axes as rows
+            and the points as columns.
         :arg D: The derivatives of the basis at the points of the node, with
-            the axes of W followed by the basis.
+            the axes of the transformed weights, the points, and the basis.
         :arg tol: Tolerance relative to W and D below which terms are dropped.
         """
-        # The transformed axes of W as rows
-        transposed = numpy.moveaxis(W, axes, range(len(axes)))
-        X = transposed.reshape(len(self.matrices[0]), -1)
-        coefficients = self.coefficients
-        matrices = self.matrices
-        eigenvalue = self.eigenvalue(X, tol)
-        if eigenvalue is not None:
-            coefficients = [eigenvalue]
-            matrices = numpy.eye(len(X))[None]
-        # The weights C_t W of each term, with the axes of W restored
-        CW = (matrices @ X).reshape(len(matrices), *transposed.shape)
-        CW = numpy.moveaxis(CW, range(1, len(axes) + 1), [1 + k for k in axes])
-        rows = numpy.tensordot(CW, D, axes=W.ndim)
-        cutoffs = tol * numpy.abs(W).max() * numpy.abs(D).max() * numpy.abs(matrices).max(axis=(1, 2))
+        rows = numpy.tensordot(self.matrices @ W, D, axes=2)
+        cutoffs = tol * numpy.abs(W).max() * numpy.abs(D).max() * numpy.abs(self.matrices).max(axis=(1, 2))
         numerator = numpy.full(D.shape[-1], zero, dtype=object)
-        for g, row, cutoff in zip(coefficients, rows, cutoffs):
+        for g, row, cutoff in zip(self.coefficients, rows, cutoffs):
             row = round_to_int(row, cutoff)
             for j in numpy.flatnonzero(numpy.abs(row) > cutoff):
                 numerator[j] += g * row[j]
@@ -799,25 +786,12 @@ def cartesian_transformations(J, adjJ, detJ):
     sd = J.shape[1]
     contravariant = WeightTransformation.from_matrix(J.T, detJ)
     covariant = WeightTransformation.from_matrix(adjJ, detJ)
-    # The pairing of a contravariant axis with a covariant axis scales the
-    # identity by 1/detJ, so it is expanded in the identity and its complement.
-    pairing = contravariant.kron(covariant)
-    P = pairing_projector(sd)
-    pairing = WeightTransformation([detJ, *pairing.coefficients], [P, *(pairing.matrices @ (numpy.eye(sd * sd) - P))],
-                                   pairing.denominator)
+    # The identity on a contravariant axis and a covariant axis pulls back
+    # as (J^T/detJ) K^T = I/detJ, so the pair maps the unpaired weights to
+    # the identity over detJ.
+    pairing = WeightTransformation([one], [numpy.eye(sd).reshape(-1, 1)], detJ)
     return {"affine": WeightTransformation([one], [numpy.eye(sd)]), "contravariant piola": contravariant,
             "covariant piola": covariant, "L2 piola": pairing}
-
-
-def pairing_projector(sd):
-    r"""Orthogonal projector onto the span of the flattened identity :math:`\delta_{ab}`.
-
-    Weights on a contravariant axis :math:`a` and a covariant axis
-    :math:`b` lie in its range when they only contract :math:`a` with
-    :math:`b`, as in the divergence :math:`\delta_{ab}\partial_b u_a`.
-    """
-    delta = numpy.eye(sd).ravel()
-    return numpy.outer(delta, delta) / sd
 
 
 def frame_transformations(ref_el, facet, support, J, adjJ, detJ):
