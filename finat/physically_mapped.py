@@ -11,6 +11,7 @@ from collections import defaultdict, namedtuple
 from collections.abc import Mapping
 from functools import cached_property, reduce
 from itertools import chain, product
+from operator import add
 
 import gem
 import numpy
@@ -155,8 +156,8 @@ class PhysicallyMappedFunctional:
             return (self.dim, self.entity)
         if moment and 0 < self.dim < sd - 1:
             covectors = [k for k, mapping in enumerate(self.axis_mappings) if mapping == "covariant piola"]
-            t = ref_el.compute_edge_tangent(self.entity)
-            if not all(in_range_of(self.weights, numpy.outer(t, t) / (t @ t), (k,), self.tol) for k in covectors):
+            Q = tangential_projector(ref_el.compute_tangents(self.dim, self.entity))
+            if not all(in_range_of(self.weights, Q, (k,), self.tol) for k in covectors):
                 return (self.dim, self.entity)
         return None
 
@@ -193,8 +194,8 @@ class PhysicallyMappedFunctional:
             if any(k in axes for axes in groups):
                 continue
             if on_edge and mapping == "covariant piola":
-                t = self.ref_el.compute_edge_tangent(self.entity)
-                if not in_range_of(W, numpy.outer(t, t) / (t @ t), (k,), self.tol):
+                Q = tangential_projector(self.ref_el.compute_tangents(self.dim, self.entity))
+                if not in_range_of(W, Q, (k,), self.tol):
                     raise NotImplementedError(f"Cannot map derivatives normal to an edge of {type(self.node).__name__}.")
                 mapping = "affine"
             groups[k,] = mapping
@@ -709,6 +710,16 @@ class LinearCombination:
         entries = [(A[a, b], units[a, b]) for a, b in numpy.ndindex(A.shape) if not isinstance(A[a, b], gem.Zero)]
         return cls(*zip(*entries))
 
+    @classmethod
+    def outer(cls, u, v):
+        """The outer product of a vector u of GEM scalars and a constant vector v."""
+        return cls(u, [numpy.outer(e, v) for e in numpy.eye(len(u))])
+
+    @property
+    def T(self):
+        """The transpose."""
+        return LinearCombination(self.coefficients, self.matrices.transpose(0, 2, 1))
+
     def __add__(self, other):
         return LinearCombination([*self.coefficients, *other.coefficients], [*self.matrices, *other.matrices])
 
@@ -768,92 +779,98 @@ def frame_transformations(ref_el, frame, G, adjG, detJ):
     :arg detJ: The determinant of the Jacobian.
     """
     dim, entity = frame
-    if dim == ref_el.get_spatial_dimension() - 1:
-        return facet_transformations(ref_el, entity, G, adjG, detJ)
-    return edge_transformations(ref_el, entity, G)
+    sd = ref_el.get_spatial_dimension()
+    if dim == sd - 1:
+        transformations = facet_transformations(ref_el, entity, G, adjG, detJ)
+    else:
+        transformations = edge_transformations(ref_el, entity, G)
+    affine = LinearCombination([one], [numpy.eye(sd)])
+    return {"affine": Pullback(affine, affine), **transformations}
 
 
 def facet_transformations(ref_el, facet, G, adjG, detJ):
-    r"""The :class:`Pullback` of each mapping in the frame of a facet.
+    r"""The :class:`Pullback` of each Piola mapping in the frame of a facet.
 
     The frame consists of the tangents of the facet and its scaled normal :math:`\nu`.
     """
     sd = ref_el.get_spatial_dimension()
-    affine = LinearCombination([one], [numpy.eye(sd)])
     tangents = ref_el.compute_tangents(sd - 1, facet)
     nu = ref_el.compute_scaled_normal(facet)
-    # The cofactor normal x = adj(J)^T nu has |x|^2 = nu^T adj(G) nu and adj(J) x = adj(G) nu.
+    # The physical normal is the cofactor normal x = adj(J)^T nu = J w, with
+    # w = adj(G) nu / detJ and |x|^2 = nu^T adj(G) nu.
     z = adjG @ nu
     xx = z @ nu
-    length = (xx * (nu @ nu))**0.5
-    # Covariant weights are unchanged along the tangents, and the normal maps
-    # to the pullback of the unit physical normal.  The inverse takes the
-    # components along the pushed forward tangents and the unit physical normal.
-    GT = G @ tangents.T
-    gJ = symmetric(GT.T @ tangents.T)
-    components = adjugate(gJ) @ GT.T / determinant(gJ)
-    covariant = LinearCombination([*(z / (detJ * length)), one],
-                                  [*(numpy.outer(e, nu) for e in numpy.eye(sd)), tangential_projector(tangents)])
-    covariant_inverse = LinearCombination([detJ / length, *components.ravel()],
-                                          [numpy.outer(nu, nu), *(numpy.outer(tau, e) for tau in tangents
-                                                                  for e in numpy.eye(sd))])
+    covariant = covariant_frame_transformation(G, tangents, [nu], [z / detJ], [xx**0.5])
 
     # Contravariant weights keep their normal component, and their
     # tangential components map through the dual tangents of the facet.
-    g = tangents @ tangents.T
-    dual_tangents = adjugate(g) @ tangents / determinant(g)
-    P = facet_normal_projector(ref_el, facet)
-    Q = tangential_projector(tangents)
-    contravariant = LinearCombination([one, xx / (detJ * (nu @ nu)),
-                                       *(z @ -tau / (detJ * (nu @ nu)) for tau in tangents)],
-                                      [P, Q, *(numpy.outer(nu, s) for s in dual_tangents)])
-    contravariant_inverse = LinearCombination([one, detJ * (nu @ nu) / xx, *(z @ tau / xx for tau in tangents)],
-                                              [P, Q, *(numpy.outer(nu, s) for s in dual_tangents)])
-    return {"affine": Pullback(affine, affine),
-            "covariant piola": Pullback(covariant, covariant_inverse),
+    nn = nu @ nu
+    zt = [z @ tau for tau in tangents]
+    dual_tangents = numpy.linalg.solve(tangents @ tangents.T, tangents)
+    matrices = [facet_normal_projector(ref_el, facet), tangential_projector(tangents),
+                *(numpy.outer(nu, s) for s in dual_tangents)]
+    contravariant = LinearCombination([one, xx / (detJ * nn), *(-c / (detJ * nn) for c in zt)], matrices)
+    contravariant_inverse = LinearCombination([one, detJ * nn / xx, *(c / xx for c in zt)], matrices)
+    return {"covariant piola": covariant,
             "contravariant piola": Pullback(contravariant, contravariant_inverse)}
 
 
 def edge_transformations(ref_el, edge, G):
-    r"""The :class:`Pullback` of each mapping in the frame of an edge of a tetrahedron.
+    r"""The :class:`Pullback` of the covariant mapping in the frame of an edge of a tetrahedron.
 
     The frame consists of the edge tangent :math:`t` and the normals
-    :math:`m_i = t \times \nu_i` to :math:`t` within the two facets that
-    contain the edge, with scaled normals :math:`\nu_i`.
+    :math:`t \times \nu_i` to :math:`t` within the two facets that contain
+    the edge, with scaled normals :math:`\nu_i`.
     """
     sd = ref_el.get_spatial_dimension()
-    affine = LinearCombination([one], [numpy.eye(sd)])
-    top = ref_el.get_topology()
     t = ref_el.compute_edge_tangent(edge)
-    facets = [f for f in sorted(top[sd - 1]) if set(top[1][edge]) <= set(top[sd - 1][f])]
-    m = [numpy.cross(t, ref_el.compute_scaled_normal(f)) for f in facets]
-    # The dual basis of the frame, as rows
-    F = numpy.array([t, *m]).T
-    t_dual, *m_dual = adjugate(F) / determinant(F)
+    nus = [ref_el.compute_scaled_normal(f) for f in ref_el.get_connectivity()[(1, sd - 1)][edge]]
     # The physical normal to the edge within facet i is J w_i, where w_i lies
     # in the plane of the facet and J w_i is orthogonal to J t.
     Gt = G @ t
-    w = [numpy.cross(Gt, ref_el.compute_scaled_normal(f)) for f in facets]
-    Gw = [G @ wi for wi in w]
-    norms = [(wi @ Gwi)**0.5 for wi, Gwi in zip(w, Gw)]
-    lengths = [(mi @ mi)**0.5 for mi in m]
-    # Covariant weights are unchanged along t, and each m_i maps to the
-    # pullback of the unit physical normal within facet i, scaled by |m_i|.
-    covariant = LinearCombination([one], [numpy.outer(t, t_dual)])
-    for wi, norm, length, mi_dual in zip(w, norms, lengths, m_dual):
-        covariant += LinearCombination(wi * (length / norm), [numpy.outer(e, mi_dual) for e in numpy.eye(sd)])
-    # The inverse takes the component along J t, and the components along the
-    # unit physical normals N_i, which are orthogonal to J t, through the
-    # inverse of their Gram matrix [[1, c], [c, 1]].  Here J^T N_i = G w_i / |J w_i|.
-    JN = [Gwi / norm for Gwi, norm in zip(Gw, norms)]
-    c = (w[0] @ Gw[1]) / (norms[0] * norms[1])
-    K = numpy.array([[one, -c], [-c, one]], dtype=object) / (1 - c * c)
-    covariant_inverse = LinearCombination(Gt / (Gt @ t), [numpy.outer(t, e) for e in numpy.eye(sd)])
-    for i, (mi, length) in enumerate(zip(m, lengths)):
-        row = sum(JN[j] * K[i, j] for j in range(2)) / length
-        covariant_inverse += LinearCombination(row, [numpy.outer(mi, e) for e in numpy.eye(sd)])
-    return {"affine": Pullback(affine, affine),
-            "covariant piola": Pullback(covariant, covariant_inverse)}
+    w = [numpy.cross(Gt, nu) for nu in nus]
+    norms = [(wi @ G @ wi)**0.5 for wi in w]
+    covariant = covariant_frame_transformation(G, t[None], [numpy.cross(t, nu) for nu in nus], w, norms)
+    return {"covariant piola": covariant}
+
+
+def covariant_frame_transformation(G, tangents, normals, w, norms):
+    r"""The :class:`Pullback` of the covariant mapping in the frame of an entity.
+
+    The frame :math:`F` consists of the tangents of the entity and its
+    normals :math:`n_i`.  Its pullback :math:`A` from the physical cell
+    consists of the same tangents and the pullbacks :math:`w_i|n_i|/|Jw_i|`
+    of the unit physical normals, scaled by :math:`|n_i|`.  Covariant
+    weights map by :math:`AF^{-1}`, and back by :math:`FA^{-1}`.
+
+    :arg G: The metric :math:`J^TJ`.
+    :arg tangents: The tangents as rows.
+    :arg normals: The normals :math:`n_i`.
+    :arg w: The pullbacks :math:`w_i` of the physical normals, with
+        :math:`\tau^TGw_i = 0` for each tangent :math:`\tau`.
+    :arg norms: The lengths :math:`|Jw_i|` of the physical normals.
+    """
+    normals = numpy.asarray(normals)
+    lengths = numpy.linalg.norm(normals, axis=1)
+    # The columns of A for the normals
+    A = [wi * (length / norm) for wi, norm, length in zip(w, norms, lengths)]
+    # The dual basis of the frame, as rows
+    dual = numpy.linalg.inv(numpy.concatenate([tangents, normals]).T)
+    tangents_dual, normals_dual = dual[:len(tangents)], dual[len(tangents):]
+    forward = reduce(add, (LinearCombination.outer(a, n_dual) for a, n_dual in zip(A, normals_dual)),
+                     LinearCombination([one], [tangents.T @ tangents_dual]))
+
+    # The rows of A^{-1} for the tangents are (T G T^T)^{-1} T G, which vanish
+    # on the w_i.  The rows for the normals vanish on the tangents, so they
+    # combine the dual normals through the inverse of N_ij = n_i^* . A_j.
+    GT = G @ tangents.T
+    gJ = symmetric(GT.T @ tangents.T)
+    components = adjugate(gJ) @ GT.T / determinant(gJ)
+    N = numpy.array([[n_dual @ a for a in A] for n_dual in normals_dual])
+    inverse = reduce(add, (LinearCombination.outer(row, tau).T for tau, row in zip(tangents, components)),
+                     LinearCombination((adjugate(N) / determinant(N)).ravel(),
+                                       [numpy.outer(n, n_dual) for n in normals for n_dual in normals_dual]))
+    return Pullback(forward, inverse)
 
 
 def facet_normal_projector(ref_el, facet):
