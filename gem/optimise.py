@@ -15,7 +15,7 @@ from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
                      Product, Sum, Comparison, Conditional, Division, Power,
                      Index, VariableIndex, Indexed, FlexiblyIndexed,
                      IndexSum, ComponentTensor, ListTensor, Delta,
-                     partial_indexed, one)
+                     partial_indexed, one, unique)
 
 
 @singledispatch
@@ -817,13 +817,13 @@ def aggressive_unroll(expression):
     return expression
 
 
-def _factor_deltas(factor):
-    r"""Factor Kronecker deltas out of an indexed constant.
+def _factor_deltas(factor, sum_indices, tol):
+    r"""Factor Kronecker deltas over pairs of sum indices out of an indexed constant.
 
     Rewrites :math:`C_{\ldots i \ldots j \ldots} = \delta_{ij} D_{\ldots i}`
     for each pair of axes on which :math:`C` vanishes off the diagonal, and
     drops the index :math:`i` from :math:`D` if it is constant along the
-    diagonal.
+    diagonal, both up to ``tol`` relative to the largest entry of :math:`C`.
 
     :returns: a list of factors
     """
@@ -838,6 +838,7 @@ def _factor_deltas(factor):
         array = array[tuple(i if isinstance(i, Integral) else slice(None) for i in multiindex)]
         multiindex = tuple(i for i in multiindex if not isinstance(i, Integral))
 
+    atol = tol * numpy.abs(array).max(initial=0)
     deltas = []
     found = True
     while found:
@@ -845,16 +846,16 @@ def _factor_deltas(factor):
         for p, q in combinations(range(len(multiindex)), 2):
             i, j = multiindex[p], multiindex[q]
             n = array.shape[p]
-            if not (isinstance(i, Index) and isinstance(j, Index)) or i == j or n != array.shape[q]:
+            if i not in sum_indices or j not in sum_indices or i == j or n != array.shape[q]:
                 continue
             shape = [1] * array.ndim
             shape[p] = shape[q] = n
-            if numpy.any(numpy.where(numpy.eye(n, dtype=bool).reshape(shape), 0, array)):
+            if numpy.any(numpy.abs(numpy.where(numpy.eye(n, dtype=bool).reshape(shape), 0, array)) > atol):
                 continue
             # The diagonal is moved to the last axis
             array = numpy.diagonal(array, axis1=p, axis2=q)
             multiindex = tuple(k for k in multiindex if k not in (i, j)) + (i,)
-            if numpy.array_equal(array, numpy.broadcast_to(array[..., :1], array.shape)):
+            if numpy.all(numpy.abs(array - array[..., :1]) <= atol):
                 array = array[..., 0]
                 multiindex = multiindex[:-1]
             deltas.append(Delta(i, j))
@@ -869,40 +870,86 @@ def _factor_deltas(factor):
 def _match_inverse(sum_indices, factors, inverses):
     r"""Find a contraction :math:`\sum_k A_{ak} B_{kb}` of a pair of inverses.
 
-    The index :math:`k` must not appear in any other factor.
+    The index :math:`k` must not appear in any other factor.  A sum over
+    an index of extent 1 is unrolled on construction, which leaves the fixed
+    index 0 in place of :math:`k`.
 
-    :returns: (positions of the two factors, k, the equivalent Delta), or None
+    :returns: (positions of the two factors, k, the equivalent factors), or None
     """
     for (p, f), (q, g) in permutations(enumerate(factors), 2):
-        if not (isinstance(f, Indexed) and isinstance(g, Indexed)
-                and (f.children[0], g.children[0]) in inverses):
+        if not (isinstance(f, Indexed) and isinstance(g, Indexed)):
+            continue
+        scale = inverses.get((f.children[0], g.children[0]))
+        if scale is None:
             continue
         (a, k), (k_, b) = f.multiindex, g.multiindex
-        if (k == k_ and k in sum_indices and k not in (a, b)
+        if k != k_:
+            continue
+        if k == 0 and f.children[0].shape[1] == 1:
+            return (p, q), None, [scale, Delta(a, b)]
+        if (k in sum_indices and k not in (a, b)
                 and not any(k in h.free_indices for r, h in enumerate(factors) if r not in (p, q))):
-            return (p, q), k, Delta(a, b)
+            return (p, q), k, [scale, Delta(a, b)]
     return None
 
 
-def _cancel_inverses_contraction(expression, inverses, index_replacer):
-    """Cancel the contractions of inverses in the tensor product at the root of expression."""
-    renamer = make_renamer(make_rename_map())
-    renamer(expression.free_indices)
-    sum_indices, factors = traverse_product(expression, renamer=renamer, index_replacer=index_replacer)
+def _cancel_inverses_product(sum_indices, factors, inverses, renamer, index_replacer, tol):
+    """Cancel the contractions of inverses in a tensor product.
+
+    The contraction is distributed over the factors that are sums over
+    a sum index.
+
+    :returns: the simplified expression, or None if the product has no
+        such sums and nothing cancels
+    """
+    sum_indices = list(sum_indices)
+    flat = []
+    for f in factors:
+        indices, fs = traverse_product(index_replacer(f, ()), renamer=renamer, index_replacer=index_replacer)
+        sum_indices.extend(indices)
+        flat.extend(fs)
+    factors = flat
+    for p, f in enumerate(factors):
+        if isinstance(f, Sum) and set(f.free_indices) & set(sum_indices):
+            terms = []
+            for term in traverse_sum(f):
+                term_factors = factors[:p] + [term] + factors[p + 1:]
+                result = _cancel_inverses_product(sum_indices, term_factors, inverses, renamer, index_replacer, tol)
+                terms.append(_contract_product(sum_indices, term_factors) if result is None else result)
+            return Sum(*terms)
+
     num_indices = len(sum_indices)
-    factors = list(chain.from_iterable(map(_factor_deltas, factors)))
+    factors = list(chain.from_iterable(_factor_deltas(f, sum_indices, tol) for f in factors))
+    cancelled = False
     while True:
         sum_indices, factors = delta_elimination(sum_indices, factors, index_replacer=index_replacer)
         factors = [index_replacer(f, ()) for f in factors]
         match = _match_inverse(sum_indices, factors, inverses)
         if match is None:
             break
-        positions, k, delta = match
-        factors = [f for p, f in enumerate(factors) if p not in positions] + [delta]
-        sum_indices.remove(k)
-    if len(sum_indices) == num_indices:
-        return expression
-    return sum_factorise(sum_indices, factors)
+        positions, k, replacement = match
+        factors = [f for p, f in enumerate(factors) if p not in positions] + replacement
+        if k is not None:
+            sum_indices.remove(k)
+        cancelled = True
+    if not cancelled and len(sum_indices) == num_indices:
+        return None
+    return _contract_product(sum_indices, factors)
+
+
+def _contract_product(sum_indices, factors):
+    """A tensor product, where a sum over an index that no factor carries counts its extent."""
+    free_indices = set(chain.from_iterable(f.free_indices for f in factors))
+    factors = factors + [Literal(i.extent) for i in sum_indices if i not in free_indices]
+    return IndexSum(Product(*factors), tuple(i for i in sum_indices if i in free_indices))
+
+
+def _cancel_inverses_contraction(expression, inverses, index_replacer, tol):
+    """Cancel the contractions of inverses in the tensor product at the root of expression."""
+    renamer = make_renamer(make_rename_map())
+    renamer(expression.free_indices)
+    result = _cancel_inverses_product((), [expression], inverses, renamer, index_replacer, tol)
+    return expression if result is None else result
 
 
 @singledispatch
@@ -916,22 +963,28 @@ _cancel_inverses.register(Node)(reuse_if_untouched)
 @_cancel_inverses.register(IndexSum)
 def _cancel_inverses_indexsum(node, self):
     node = reuse_if_untouched(node, self)
-    return _cancel_inverses_contraction(node, self.inverses, self.index_replacer)
+    return _cancel_inverses_contraction(node, self.inverses, self.index_replacer, self.tol)
 
 
-def cancel_inverses(expressions, inverses):
+def cancel_inverses(expressions, inverses, tol=0):
     r"""Cancel contractions of matrices with their inverses.
 
-    Rewrites :math:`\sum_k A_{ak} B_{kb} \to \delta_{ab}` for each pair
+    Rewrites :math:`\sum_k A_{ak} B_{kb} \to s\delta_{ab}` for each pair
     :math:`(A, B)` in ``inverses``, and eliminates the resulting Kronecker
-    deltas, together with those factored out of constant tensors.
+    deltas, together with those factored out of constant tensors.  Each
+    contraction is distributed over the factors that are sums over a
+    contracted index.
 
     :arg expressions: list of expression DAGs
-    :arg inverses: pairs of matrices :math:`(A, B)` such that :math:`AB = I`
+    :arg inverses: dict from pairs of matrices :math:`(A, B)` to the scalar
+        :math:`s` such that :math:`AB = sI`
+    :arg tol: relative tolerance on the entries of the constant tensors
+        when factoring out Kronecker deltas
     :returns: list of expression DAGs
     """
     mapper = Memoizer(_cancel_inverses)
-    mapper.inverses = frozenset(inverses)
+    mapper.inverses = dict(inverses)
+    mapper.tol = tol
     mapper.index_replacer = MemoizerArg(filtered_replace_indices)
     return list(map(mapper, expressions))
 
@@ -998,4 +1051,113 @@ def cancel_reciprocals(expressions):
     :returns: list of expression DAGs
     """
     mapper = Memoizer(_cancel_reciprocals)
+    return list(map(mapper, expressions))
+
+
+def common_denominator(expressions):
+    """Write expressions as numerators over a common denominator.
+
+    The denominator is the product of each base that appears with a negative
+    exponent in a term of the expressions, raised to the largest such power.
+
+    :arg expressions: list of scalar expression DAGs
+    :returns: (numerators, denominator)
+    """
+    exponents = {}
+    for expression in expressions:
+        for term in traverse_sum(expression):
+            powers = defaultdict(list)
+            _collect_powers(term, 1, powers)
+            for base, es in powers.items():
+                if sum(es) < 0 and not base.free_indices:
+                    exponents[base] = max(exponents.get(base, 0), -sum(es))
+    if not exponents:
+        return list(expressions), one
+    denominator = Product(*(_make_power(b, e) for b, e in exponents.items()))
+    mapper = Memoizer(_cancel_reciprocals)
+    numerators = [Sum(*(mapper(Product(term, denominator)) for term in traverse_sum(expression)))
+                  for expression in expressions]
+    return numerators, denominator
+
+
+def _constant_array(node):
+    """The array of a constant scalar expression over its free indices, or None.
+
+    :returns: (array, indices) with an axis of the array for each index
+    """
+    if isinstance(node, Delta):
+        node = Indexed(Identity(next(i.extent for i in (node.i, node.j) if isinstance(i, Index))), (node.i, node.j))
+    if isinstance(node, Constant) and not node.shape:
+        return numpy.asarray(node.array), ()
+    if not (isinstance(node, Indexed) and isinstance(node.children[0], Constant)):
+        return None
+    multiindex = node.multiindex
+    if not all(isinstance(i, (Index, Integral)) for i in multiindex):
+        return None
+    array = node.children[0].array[tuple(i if isinstance(i, Integral) else slice(None) for i in multiindex)]
+    indices = tuple(i for i in multiindex if isinstance(i, Index))
+    # A repeated index selects the diagonal, which numpy moves to the last axis.
+    for i in unique(indices):
+        while indices.count(i) > 1:
+            p, q = [k for k, j in enumerate(indices) if j == i][:2]
+            array = numpy.diagonal(array, axis1=p, axis2=q)
+            indices = tuple(j for k, j in enumerate(indices) if k not in (p, q)) + (i,)
+    return array, indices
+
+
+def _align(array, indices, target):
+    """Transpose and broadcast an array over indices to the target indices."""
+    array = numpy.transpose(array, [indices.index(i) for i in target if i in indices])
+    return array.reshape([i.extent if i in indices else 1 for i in target])
+
+
+@singledispatch
+def _fold_constants(node, self):
+    raise AssertionError("cannot handle type %s" % type(node))
+
+
+_fold_constants.register(Node)(reuse_if_untouched)
+
+
+@_fold_constants.register(Product)
+@_fold_constants.register(Sum)
+@_fold_constants.register(Division)
+@_fold_constants.register(Power)
+def _fold_constants_operator(node, self):
+    node = reuse_if_untouched(node, self)
+    operands = list(map(_constant_array, node.children))
+    if not isinstance(node, (Product, Sum, Division, Power)) or None in operands:
+        return node
+    op = {Product: numpy.multiply, Sum: numpy.add, Division: numpy.divide, Power: numpy.power}[type(node)]
+    target = unique(tuple(chain.from_iterable(indices for _, indices in operands)))
+    array = op(*(_align(array, indices, target) for array, indices in operands))
+    return Indexed(Literal(array), target) if target else Literal(array)
+
+
+@_fold_constants.register(IndexSum)
+def _fold_constants_indexsum(node, self):
+    # Contract the factors one at a time, summing each index once no
+    # other factor carries it.
+    sum_indices, factors = traverse_product(node)
+    operands = [_constant_array(self(f)) for f in factors]
+    if None in operands:
+        return reuse_if_untouched(node, self)
+    array, indices = numpy.asarray(1.0), ()
+    for k, (other, other_indices) in enumerate(operands):
+        target = unique(indices + other_indices)
+        array = _align(array, indices, target) * _align(other, other_indices, target)
+        later = set(chain.from_iterable(i for _, i in operands[k + 1:]))
+        done = [i for i in target if i in sum_indices and i not in later]
+        array = array.sum(axis=tuple(target.index(i) for i in done))
+        indices = tuple(i for i in target if i not in done)
+    return Indexed(Literal(array), indices) if indices else Literal(array)
+
+
+def fold_constants(expressions):
+    """Evaluate the sums, products and contractions of constants.
+
+    :arg expressions: list of expression DAGs
+    :returns: list of expression DAGs
+    """
+    mapper = Memoizer(_fold_constants)
     return list(map(mapper, expressions))

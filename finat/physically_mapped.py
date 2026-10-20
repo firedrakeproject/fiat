@@ -7,12 +7,18 @@ where :math:`B_{ij} = n_i(\mathcal{P}\hat\psi_j)` and :math:`M = B^{-T}`
 """
 
 from abc import ABCMeta, abstractmethod
+from collections import Counter
 from collections.abc import Mapping
-from functools import cached_property, reduce
-from itertools import chain, product
+from functools import cached_property, reduce, singledispatch
+from itertools import chain
 
 import gem
 import numpy
+from gem.node import Memoizer, reuse_if_untouched
+from gem.optimise import (cancel_inverses, cancel_reciprocals, common_denominator, fold_constants,
+                          remove_componenttensors, sum_factorise, traverse_product, traverse_sum,
+                          unroll_indexsum)
+from gem.refactorise import ATOMIC, COMPOUND, OTHER
 
 from FIAT.functional import IntegralMoment
 from finat.citations import cite
@@ -76,12 +82,11 @@ class MappedTabulation(Mapping):
 class PhysicallyMappedFunctional:
     r"""A FIAT node and the data that maps it to the physical cell.
 
-    :attr:`pullback_mappings` assigns a mapping to each group of axes of
-    :attr:`weights`: ``affine``, ``covariant piola``, ``contravariant
-    piola``, or ``L2 piola`` for a contravariant axis paired with a
-    covariant axis through the identity.  These mappings act on Cartesian
-    components if :attr:`support_facet` is None, and on components in the
-    frame of :attr:`support_facet` otherwise.
+    Each axis of :attr:`weights` holds components in a physical frame: the
+    Cartesian frame if :attr:`support_facet` is None, and otherwise the
+    frame of the support entity within :attr:`support_facet`.  The frame
+    pushes the reference tangents forward by the Jacobian, and replaces
+    the reference normals by the physical normals.
 
     :arg node: The FIAT node.
     :arg ref_el: The reference cell.
@@ -129,7 +134,7 @@ class PhysicallyMappedFunctional:
 
     @cached_property
     def support_facet(self):
-        r"""The facet in whose frame :attr:`pullback_mappings` act, or None for Cartesian components.
+        r"""The facet that holds the frame of the weights, or None for the Cartesian frame.
 
         For integral moments on a facet, and for nodes on a facet with
         derivatives or matrix values, this is the facet itself, with the
@@ -161,106 +166,185 @@ class PhysicallyMappedFunctional:
         return None
 
     @cached_property
-    def pullback_mappings(self):
-        """A dict from each group of axes of :attr:`weights` that map together to its mapping."""
-        # vandermonde_row takes the Kronecker product of the weight transformations
-        # in the order of this dict.
-        sd = self.ref_el.get_spatial_dimension()
-        W = self.weights
-        axis_mappings = self.axis_mappings
-        # Interior moments map every axis as affine.
-        if self.dim == sd and isinstance(self.node, IntegralMoment):
-            return {(k,): "affine" for k in range(len(axis_mappings))}
-        # In the frame of a support facet, each axis keeps its own mapping.
-        if self.support_facet is not None:
-            return {(k,): mapping for k, mapping in enumerate(axis_mappings)}
-
-        # A contravariant axis contracted with a covariant axis through the
-        # identity is a trace, and the pair maps as L2 piola.
-        groups = {}
-        for k, vector in enumerate(axis_mappings):
-            for l, covector in enumerate(axis_mappings):
-                if (vector == "contravariant piola" and covector == "covariant piola"
-                        and not any(k in axes or l in axes for axes in groups)
-                        and in_range_of(W, pairing_projector(sd), (k, l), self.tol)):
-                    groups[k, l] = "L2 piola"
-        # A derivative along the edge maps as affine.
-        # Every other axis keeps its own mapping.
-        on_edge = 0 < self.dim < sd - 1
-        for k, mapping in enumerate(axis_mappings):
-            if any(k in axes for axes in groups):
-                continue
-            if on_edge and mapping == "covariant piola":
-                t = self.ref_el.compute_edge_tangent(self.entity)
-                if not in_range_of(W, numpy.outer(t, t) / (t @ t), (k,), self.tol):
-                    raise NotImplementedError(f"Cannot map derivatives normal to an edge of {type(self.node).__name__}.")
-                mapping = "affine"
-            groups[k,] = mapping
-        return groups
+    def interior(self):
+        """Whether the node is an interior moment, whose weights stay in the reference frame."""
+        return self.dim == self.ref_el.get_spatial_dimension() and isinstance(self.node, IntegralMoment)
 
     @cached_property
     def scaling_exponent(self):
         """The exponent :math:`p` such that the physical node dilates as :math:`h^{-p}`.
 
-        Each group in :attr:`pullback_mappings` contributes its scaling.  If
-        :attr:`avg` is False, an integral moment with a :attr:`support_facet`
-        is a plain integral over its entity, which contributes :math:`-dim`.
+        In the Cartesian frame, a covariant axis contributes 1, and a
+        contravariant axis contributes :math:`sd-1`.  In the frame of a
+        :attr:`support_facet`, a covariant axis contributes 1, and a
+        contravariant axis with tangential components contributes
+        :math:`2-sd`.  If :attr:`avg` is False, an integral moment with a
+        :attr:`support_facet` is a plain integral over its entity, which
+        contributes :math:`-dim`.
         """
         sd = self.ref_el.get_spatial_dimension()
+        if self.interior:
+            return 0
         if self.support_facet is None:
-            weights = {"covariant piola": 1, "contravariant piola": sd - 1, "L2 piola": sd}
-            return sum(weights.get(mapping, 0) for mapping in self.pullback_mappings.values())
+            on_edge = 0 < self.dim < sd - 1
+            weights = {"covariant piola": 0 if on_edge else 1, "contravariant piola": sd - 1}
+            return sum(weights.get(mapping, 0) for mapping in self.axis_mappings)
         nu = self.ref_el.compute_scaled_normal(self.support_facet)
         exponent = 0
-        for axes, mapping in self.pullback_mappings.items():
+        for k, mapping in enumerate(self.axis_mappings):
             if mapping == "covariant piola":
                 exponent += 1
             elif mapping == "contravariant piola" and not in_range_of(
-                    self.weights, numpy.outer(nu, nu) / (nu @ nu), axes, self.tol):
-                # Tangential components of a contravariant axis
+                    self.weights, numpy.outer(nu, nu) / (nu @ nu), (k,), self.tol):
                 exponent += 2 - sd
         if isinstance(self.node, IntegralMoment) and not self.avg:
             exponent -= self.dim
         return exponent
 
-    def vandermonde_row(self, uncontracted_riesz, transformations, J, h):
+    @cached_property
+    def tangents(self):
+        r"""The reference tangents :math:`t_i` of :attr:`support_facet`, as columns.
+
+        On an edge support, these are the edge tangent :math:`t` and
+        :math:`t \times \nu`, where :math:`\nu` is the scaled normal of
+        :attr:`support_facet`.
+        """
+        ref_el = self.ref_el
+        sd = ref_el.get_spatial_dimension()
+        if self.dim == sd - 2 >= 1:
+            t = ref_el.compute_edge_tangent(self.entity)
+            return numpy.stack([t, numpy.cross(t, ref_el.compute_scaled_normal(self.support_facet))], axis=1)
+        return ref_el.compute_tangents(sd - 1, self.support_facet).T
+
+    @cached_property
+    def gram(self):
+        r"""Opaque placeholders for the Gram matrix :math:`G_{ij} = Jt_i \cdot Jt_j` of the pushed forward
+        :attr:`tangents`, its adjugate, its determinant, and the products :math:`J\nu \cdot Jt_i` with
+        the pushed forward scaled normal."""
+        r = 0 if self.support_facet is None else self.tangents.shape[1]
+        name = f"{self.dim}_{self.entity}_{self.support_facet}"
+        return (gem.Variable(f"G_{name}", (r, r)), gem.Variable(f"adjG_{name}", (r, r)),
+                gem.Variable(f"detG_{name}", ()), gem.Variable(f"Gnu_{name}", (r,)))
+
+    def gram_replacements(self, J):
+        """The :attr:`gram` placeholders in terms of the Jacobian J."""
+        if self.support_facet is None or not self.tangents.size:
+            return {}
+        Jt = entries(J) @ self.tangents
+        G = Jt.T @ Jt
+        Jnu = entries(J) @ self.ref_el.compute_scaled_normal(self.support_facet)
+        return dict(zip(self.gram, (as_tensor(G), as_tensor(adjugate(G)), determinant(G), as_tensor(Jnu @ Jt))))
+
+    def pullback(self, k, b, a, J, K, detJ):
+        r"""The matrix :math:`G_{ba}` that pulls back axis k of the weights.
+
+        A physical node with weights :math:`w` on axis k acts on the
+        reference function as the weights :math:`Gw`.
+
+        :arg k: The axis of the weights.
+        :arg b: The index of the reference axis.
+        :arg a: The index of the physical axis.
+        :arg J: The Jacobian.
+        :arg K: The inverse of the Jacobian.
+        :arg detJ: The determinant of the Jacobian.
+        :returns: A GEM scalar with free indices b and a.
+        """
+        ref_el = self.ref_el
+        sd = ref_el.get_spatial_dimension()
+        mapping = self.axis_mappings[k]
+        c, e, l, m, p, q = gem.indices(6)
+        if mapping == "affine" or self.interior:
+            return gem.Delta(b, a)
+
+        if self.support_facet is None:
+            if mapping == "contravariant piola":
+                return J[a, b] / detJ
+            if 0 < self.dim < sd - 1:
+                # A derivative along an edge pushes forward by J.
+                t = ref_el.compute_edge_tangent(self.entity)
+                if not in_range_of(self.weights, numpy.outer(t, t) / (t @ t), (k,), self.tol):
+                    raise NotImplementedError(f"Cannot map derivatives normal to an edge of {type(self.node).__name__}.")
+                return gem.IndexSum(K[b, c] * J[c, a], (c,))
+            return K[b, a]
+
+        # The reference frame of the tangents t and the scaled normal nu, with the
+        # Gram matrix g of the tangents
+        G, adjG, detG, Gnu = self.gram
+        tangents = self.tangents
+        nu = ref_el.compute_scaled_normal(self.support_facet)
+        g = tangents.T @ tangents
+        adjg = adjugate(g)
+        detg = determinant(g)
+        t = gem.Literal(tangents)
+        n = gem.Literal(nu)
+        if mapping == "contravariant piola":
+            # The normal maps to the cofactor normal.  The tangents map to the
+            # reciprocal frame of the pushed forward tangents, scaled by detG/detg.
+            return (gem.IndexSum(J[c, b] * K[e, c] * n[e], (c, e)) * n[a] / (nu @ nu)
+                    + gem.IndexSum(t[b, l] * gem.Literal(adjg)[l, m] * G[m, p] * adjG[p, q] * t[a, q],
+                                   (l, m, p, q)) / (detg**2 * detJ)
+                    + n[b] * gem.IndexSum(Gnu[m] * adjG[m, p] * t[a, p], (m, p)) / ((nu @ nu) * detg * detJ))
+
+        # The tangents push forward by J, and each normal maps to the unit
+        # physical normal.
+        if self.dim == sd - 2 >= 1:
+            # The normal to the edge within the facet is the reciprocal frame of the
+            # pushed forward edge tangent.
+            t0, t1 = tangents.T
+            P = numpy.outer(t0, t0) / (t0 @ t0)
+            norm = (gem.IndexSum(adjG[l, 1] * G[l, m] * adjG[m, 1], (l, m)) * (t1 @ t1))**0.5
+            edge_normal = gem.IndexSum(K[b, c] * J[c, e] * t[e, l] * adjG[l, 1], (c, e, l)) * t[a, 1] / norm
+        else:
+            P = tangents @ adjg @ tangents.T / detg
+            edge_normal = gem.Zero()
+        tangential = gem.IndexSum(K[b, c] * J[c, e] * gem.Literal(P)[e, a], (c, e)) if tangents.size else gem.Zero()
+        # The cofactor normal
+        x = (detJ * entries(K)).T @ nu
+        return (tangential + edge_normal
+                + detJ * gem.IndexSum(K[b, c] * K[e, c] * n[e], (c, e)) * n[a] / ((x @ x) * (nu @ nu))**0.5)
+
+    def vandermonde_row(self, riesz, j, J, K, detJ):
         r"""The row of the physical Vandermonde matrix for this node.
 
-        The row is :math:`B_j = h^p\,|e|\sum_{a,b}G_{ba}R_{abj}`, where
-        :math:`G` is the Kronecker product of the weight transformations of
-        :attr:`pullback_mappings`, :math:`p` is :attr:`scaling_exponent`, and
+        The row is :math:`B_j = \sum_{a,b}G_{ba}R_{abj}`, where :math:`G` is
+        the tensor product of the :meth:`pullback` of each axis, and
+        :math:`R` is the uncontracted Riesz representation.
+
+        :arg riesz: See :attr:`PhysicallyMappedElement._uncontracted_riesz`.
+        :arg j: The index of the reference basis.
+        :arg J: The Jacobian.
+        :arg K: The inverse of the Jacobian.
+        :arg detJ: The determinant of the Jacobian.
+        :returns: A GEM scalar with the free index j.
+        """
+        rank = len(self.axis_mappings)
+        a = gem.indices(rank)
+        b = gem.indices(rank)
+        pullbacks = [self.pullback(k, b[k], a[k], J, K, detJ) for k in range(rank)]
+        return gem.IndexSum(gem.Product(*pullbacks, gem.Literal(riesz)[(*a, *b, j)]), a + b)
+
+    def scaling(self, J, h):
+        r"""The factor :math:`h^p\,|e|` of the row, see :attr:`scaling_exponent`.
+
         :math:`|e|` is the physical measure of the entity if :attr:`avg` is
         False and there is a :attr:`support_facet`, and 1 otherwise.
 
-        :arg uncontracted_riesz: See :attr:`PhysicallyMappedElement._uncontracted_riesz`.
-        :arg transformations: The :class:`WeightTransformation` of each mapping,
-            in Cartesian components or in the frame of :attr:`support_facet`.
         :arg J: The Jacobian as an object array of GEM scalars.
         :arg h: The cell size at each vertex.
-        :returns: The numerator and denominator of the Vandermonde row.
         """
-        measure = one
+        result = one
         if self.support_facet is not None and isinstance(self.node, IntegralMoment) and not self.avg:
             # The physical measure of the support, from the Gram determinant of its tangents
-            T = self.ref_el.compute_tangents(self.dim, self.entity)
-            JT = J @ T.T
+            t = self.ref_el.compute_tangents(self.dim, self.entity).T
+            Jt = J @ t
             volume = self.ref_el.volume_of_subcomplex(self.dim, self.entity)
-            measure = volume / numpy.sqrt(numpy.linalg.det(T @ T.T)) * determinant(JT.T @ JT)**0.5
-
-        G = reduce(WeightTransformation.kron, map(transformations.get, self.pullback_mappings.values()),
-                   WeightTransformation([one], [numpy.eye(1)]))
-        axes = list(chain.from_iterable(self.pullback_mappings))
-        W = self.weights.transpose(*axes, -1).reshape(len(G.matrices[0]), -1)
-        numerator = G.to_riesz(W, uncontracted_riesz, self.tol)
-        numerator *= measure
-        denominator = G.denominator
-
+            result = volume / numpy.sqrt(numpy.linalg.det(t.T @ t)) * determinant(Jt.T @ Jt)**0.5
         p = self.scaling_exponent
         if p:
             vertices = self.ref_el.get_topology()[self.dim][self.entity]
             havg = sum(h[v] for v in vertices) / len(vertices)
-            denominator *= havg**-p
-        return numerator, denominator
+            result = result * havg**p
+        return result
 
 
 class PhysicallyMappedElement(NeedsCoordinateMappingElement):
@@ -349,10 +433,10 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         r"""Uncontracted Riesz representation of each node in the source nodal basis.
 
         For node :math:`i`, the rank-3 tensor
-        :math:`R_{(a,\beta),(b,\gamma),j}=\sum_q W_{i,a,\beta,q}(\partial^\gamma\psi^0_j)_b(x_q)`,
+        :math:`R_{a\beta b\gamma j}=\sum_q W_{i,a,\beta,q}(\partial^\gamma\psi^0_j)_b(x_q)`,
         where :math:`\psi^0` is the nodal basis of the nodes before
-        recombination.  The axes of the node and of the basis are each
-        flattened in the order of :attr:`PhysicallyMappedFunctional.pullback_mappings`.
+        recombination.  The axes are
+        unflattened, with the axes of the node followed by those of the basis.
         """
         dual = self._element.get_dual_set()
         coeffs = self._element.get_coeffs()
@@ -372,23 +456,15 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
             shape = (*value_shape, *(sd,) * order)
             riesz[order] = R.reshape(len(R), *shape, *shape, num_bf)
 
-        result = []
-        for i, functional in enumerate(self._physical_functionals):
-            R = riesz[functional.node.max_deriv_order][i]
-            # Flatten the axes of the node, and then the matching axes of the
-            # basis, in the order of the pullback mappings.
-            axes = list(chain.from_iterable(functional.pullback_mappings))
-            R = R.transpose(*axes, *(len(axes) + k for k in axes), -1)
-            result.append(R.reshape(-1, num_bf))
-        return result
+        return [riesz[functional.node.max_deriv_order][i] for i, functional in enumerate(self._physical_functionals)]
 
     def _vandermonde_rows(self, coordinate_mapping):
         """The rows of the physical Vandermonde matrix that differ from the identity.
 
         :arg coordinate_mapping: Object providing the physical geometry
             as GEM expressions.
-        :returns: A dict from each node number to the numerator and
-            denominator of its :meth:`PhysicallyMappedFunctional.vandermonde_row`.
+        :returns: A dict from each node number to its
+            :meth:`PhysicallyMappedFunctional.vandermonde_row`.
         :raises NotImplementedError: If a row couples to a dof outside the
             closure of the entity of the node.
         """
@@ -399,33 +475,48 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
             J = gem.ListTensor([[coordinate_mapping.detJ_at(bary)]])
         else:
             J = coordinate_mapping.jacobian_at(bary)
-        J = numpy.array([[J[i, k] for k in range(J.shape[1])] for i in range(J.shape[0])], dtype=object)
-        adjJ, detJ = adjugate_and_determinant(J)
+        J_ = entries(J)
+        adjJ, detJ = adjugate_and_determinant(J_)
         h = coordinate_mapping.cell_size()
 
-        cartesian = cartesian_transformations(J, adjJ, detJ)
-        frames = {}
+        # Opaque placeholders keep the Jacobian algebra syntactic until the rows are built.
+        gdim, tdim = J.shape
+        placeholders = (gem.Variable("J", (gdim, tdim)), gem.Variable("K", (tdim, gdim)), gem.Variable("detJ", ()))
+        Jp, Kp, detJp = placeholders
+        K = numpy.vectorize(lambda x: x * (one / detJ), otypes=[object])(adjJ)
+        geometry = dict(zip(placeholders, (as_tensor(J_), as_tensor(K), detJ)))
+
+        functionals = self._physical_functionals
+        riesz = self._uncontracted_riesz
+        inverses = {(Kp, Jp): one}
+        if gdim == tdim:
+            inverses[Jp, Kp] = one
+        gram = {}
+        for functional in functionals:
+            G, adjG, detG, _ = functional.gram
+            inverses[G, adjG] = inverses[adjG, G] = detG
+            gram.update(functional.gram_replacements(Jp))
+        geometry.update(zip(gram, substitute(list(gram.values()), geometry)))
+
+        j = gem.Index()
+        exprs = [functional.vandermonde_row(R, j, *placeholders) for functional, R in zip(functionals, riesz)]
+        exprs = cancel_reciprocals(cancel_inverses(exprs, inverses, self.tol))
+        tables = numpy.array(to_riesz(exprs, j, [self.tol * numpy.abs(R).max() for R in riesz]))
+        tables = numpy.reshape(cancel_reciprocals(substitute(list(tables.ravel()), geometry)), tables.shape)
 
         closures = self._element.entity_closure_dofs()
         rows = {}
-        for i, functional in enumerate(self._physical_functionals):
-            if functional.support_facet is not None:
-                key = (functional.support_facet, (functional.dim, functional.entity))
-                if key not in frames:
-                    frames[key] = frame_transformations(self.cell, *key, J, adjJ, detJ)
-                transformations = frames[key]
-            else:
-                transformations = cartesian
-            numerator, denominator = functional.vandermonde_row(self._uncontracted_riesz[i], transformations, J, h)
-            nonzeros = [j for j, entry in enumerate(numerator) if not isinstance(entry, gem.Zero)]
-            if nonzeros == [i] and numerator[i] == denominator:
+        for i, (functional, row) in enumerate(zip(functionals, tables)):
+            row = row * functional.scaling(J_, h)
+            nonzeros = [j for j, entry in enumerate(row) if not isinstance(entry, gem.Zero)]
+            if nonzeros == [i] and row[i] == one:
                 continue
             closure = closures[functional.dim][functional.entity]
             outside = [j for j in nonzeros if j not in closure]
             if outside:
                 raise NotImplementedError(f"Dof {i} on entity {(functional.dim, functional.entity)} "
                                           f"couples outside its closure: {outside}")
-            rows[i] = numerator, denominator
+            rows[i] = row
         return rows
 
     def _recombine(self, A):
@@ -438,16 +529,18 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
     def _physical_vandermonde(self, coordinate_mapping):
         """The physical Vandermonde matrix :math:`B` over all reference dofs."""
         B = identity(self._element.space_dimension())
-        for i, (numerator, denominator) in self._vandermonde_rows(coordinate_mapping).items():
-            B[i] = numerator / denominator
+        for i, row in self._vandermonde_rows(coordinate_mapping).items():
+            B[i] = row
         return self._recombine(B)
 
     def _inverse_physical_vandermonde(self, coordinate_mapping):
         """:math:`B^{-1}` over all reference dofs.
 
         Solve entity blocks in closure order, retaining completion functions.
+        Each row is scaled by its common denominator, so that the blocks
+        are solved without divisions.
         """
-        rows = self._vandermonde_rows(coordinate_mapping)
+        rows = {i: common_denominator(row) for i, row in self._vandermonde_rows(coordinate_mapping).items()}
         nbf = self._element.space_dimension()
         closures = self._element.entity_closure_dofs()
         entity_dofs = self._element.entity_dofs()
@@ -468,6 +561,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
                         rhs[k, i] = one
                         continue
                     numerator, denominator = rows[i]
+                    numerator = numpy.array(numerator, dtype=object)
                     Bee[k] = numerator[block]
                     rhs[k, i] = denominator
                     for j in closure:
@@ -697,158 +791,157 @@ def solve(A, B, cache=None):
     return X
 
 
-class WeightTransformation:
-    r"""A matrix :math:`G=\frac{1}{d}\sum_t g_t C_t` that transforms the weights on a group of tensor axes.
-
-    The coefficients :math:`g_t` and the denominator :math:`d` are GEM
-    scalars, and the matrices :math:`C_t` are constant, so that
-    contractions with constant tensors cancel numerically.
-
-    :arg coefficients: The coefficients :math:`g_t`.
-    :arg matrices: The matrices :math:`C_t`.
-    :arg denominator: The denominator :math:`d`.
-    """
-
-    def __init__(self, coefficients, matrices, denominator=one):
-        self.coefficients = tuple(coefficients)
-        self.matrices = numpy.asarray(matrices, dtype=float)
-        self.denominator = denominator
-
-    @classmethod
-    def from_matrix(cls, A, denominator=one):
-        """The transformation :math:`A/d` of a matrix of GEM scalars, expanded in its entries."""
-        n = len(A)
-        units = numpy.eye(n * n).reshape(n, n, n, n)
-        entries = [(A[a, b], units[a, b]) for a, b in numpy.ndindex(A.shape) if not isinstance(A[a, b], gem.Zero)]
-        return cls(*zip(*entries), denominator)
-
-    def __add__(self, other):
-        d, e = self.denominator, other.denominator
-        return WeightTransformation([g * e for g in self.coefficients] + [g * d for g in other.coefficients],
-                                    numpy.concatenate([self.matrices, other.matrices]), d * e)
-
-    def kron(self, other):
-        """The Kronecker product, which transforms the axes of self followed by the axes of other."""
-        return WeightTransformation([g * h for g, h in product(self.coefficients, other.coefficients)],
-                                    [numpy.kron(C, D) for C, D in product(self.matrices, other.matrices)],
-                                    self.denominator * other.denominator)
-
-    def eigenvalue(self, W, tol):
-        r"""The numerator :math:`\lambda d` such that :math:`GW=\lambda W`, or None.
-
-        This holds when each :math:`C_tW=c_tW`, and then
-        :math:`\lambda d=\sum_t c_t g_t`.
-
-        :arg W: The weights as a matrix, with the transformed axes as rows.
-        :arg tol: Relative tolerance on :math:`C_tW-c_tW`.
-        """
-        CW = self.matrices @ W
-        c = numpy.tensordot(CW, W, axes=2) / numpy.tensordot(W, W, axes=2)
-        residual = numpy.abs(CW - c[:, None, None] * W).max(axis=(1, 2))
-        if (residual > tol * numpy.abs(self.matrices).max(axis=(1, 2)) * numpy.abs(W).max()).any():
-            return None
-        c = round_to_int(c, tol)
-        return sum((g * ct for g, ct in zip(self.coefficients, c) if ct), zero)
-
-    def to_riesz(self, W, R, tol):
-        r"""The numerator of the Riesz representation :math:`\sum_{a,b}G_{ba}R_{abj}` of the transformed node.
-
-        If :math:`GW=\lambda W`, this is the trace :math:`\lambda\sum_a R_{aaj}`.
-
-        :arg W: The weights of the node as a matrix, with the transformed
-            axes as rows.
-        :arg R: The uncontracted Riesz representation of the node, with
-            rows :math:`(a,b)` and columns :math:`j`.
-        :arg tol: Tolerance relative to :math:`R` below which terms are dropped.
-        """
-        coefficients, matrices = self.coefficients, self.matrices
-        eigenvalue = self.eigenvalue(W, tol)
-        if eigenvalue is not None:
-            coefficients, matrices = [eigenvalue], numpy.eye(len(W))[None]
-        rows = matrices.transpose(0, 2, 1).reshape(len(matrices), -1) @ R
-        cutoffs = tol * numpy.abs(R).max() * numpy.abs(matrices).max(axis=(1, 2))
-        numerator = numpy.full(R.shape[1], zero, dtype=object)
-        for g, row, cutoff in zip(coefficients, rows, cutoffs):
-            row = round_to_int(row, cutoff)
-            for j in numpy.flatnonzero(numpy.abs(row) > cutoff):
-                numerator[j] += g * row[j]
-        return numerator
-
-
 def round_to_int(x, tol):
     """Round the entries of x that lie within tol of an integer."""
     rounded = numpy.round(x)
     return numpy.where(numpy.abs(x - rounded) <= tol, rounded, x)
 
 
-def cartesian_transformations(J, adjJ, detJ):
-    """The weight transformation of each mapping in Cartesian components."""
-    sd = J.shape[1]
-    contravariant = WeightTransformation.from_matrix(J.T, detJ)
-    covariant = WeightTransformation.from_matrix(adjJ, detJ)
-    # The pairing of a contravariant axis with a covariant axis scales the
-    # identity by 1/detJ, so it is expanded in the identity and its complement.
-    pairing = contravariant.kron(covariant)
-    P = pairing_projector(sd)
-    pairing = WeightTransformation([detJ, *pairing.coefficients], [P, *(pairing.matrices @ (numpy.eye(sd * sd) - P))],
-                                   pairing.denominator)
-    return {"affine": WeightTransformation([one], [numpy.eye(sd)]), "contravariant piola": contravariant,
-            "covariant piola": covariant, "L2 piola": pairing}
+def entries(A):
+    """The entries of a GEM matrix as an object array of GEM scalars."""
+    return numpy.array([[A[i, k] for k in range(A.shape[1])] for i in range(A.shape[0])], dtype=object)
 
 
-def pairing_projector(sd):
-    r"""Orthogonal projector onto the span of the flattened identity :math:`\delta_{ab}`.
+def as_tensor(A):
+    """A GEM tensor from an object array of GEM scalars or numbers."""
+    A = numpy.asarray(A)
+    if A.dtype != object:
+        return gem.Literal(A)
+    return gem.ListTensor(numpy.vectorize(gem.as_gem, otypes=[object])(A))
 
-    Weights on a contravariant axis :math:`a` and a covariant axis
-    :math:`b` lie in its range when they only contract :math:`a` with
-    :math:`b`, as in the divergence :math:`\delta_{ab}\partial_b u_a`.
+
+@singledispatch
+def _substitute(node, self):
+    raise AssertionError(f"cannot handle type {type(node)}")
+
+
+_substitute.register(gem.Node)(reuse_if_untouched)
+
+
+@_substitute.register(gem.Variable)
+def _substitute_variable(node, self):
+    return self.replacements.get(node, node)
+
+
+def substitute(expressions, replacements):
+    """Replace variables in GEM expressions.
+
+    :arg expressions: A list of GEM expressions.
+    :arg replacements: A dict from each :class:`gem.Variable` to its replacement.
     """
-    delta = numpy.eye(sd).ravel()
-    return numpy.outer(delta, delta) / sd
+    mapper = Memoizer(_substitute)
+    mapper.replacements = replacements
+    return list(map(mapper, expressions))
 
 
-def frame_transformations(ref_el, facet, support, J, adjJ, detJ):
-    r"""The weight transformation of each mapping in the frame of the facet.
+def symbolic_classifier():
+    """A classifier of GEM expressions that keeps the constants apart.
 
-    On an edge support, the frame is :math:`(t, t \times n, n)` for the
-    edge tangent :math:`t` and the facet normal :math:`n`.
+    Expressions without a :class:`gem.Variable` are constants.  Sums,
+    products, and contractions with constant tensors are broken up, and
+    the other expressions of variables are atomic.
     """
-    sd = ref_el.get_spatial_dimension()
-    tangents = list(numpy.linalg.qr(ref_el.compute_tangents(sd - 1, facet).T)[0].T)
-    nu = ref_el.compute_scaled_normal(facet)
-    K = adjJ.T
-    n = nu / numpy.linalg.norm(nu)
-    Kn = K @ n
-    # Each normal satisfies J^{-1} n_phys = u/d in the given reference frame.
-    normals = []
-    if support[0] == sd - 2 >= 1:
-        t = ref_el.compute_edge_tangent(support[1])
-        m = numpy.cross(t, n)
-        m /= numpy.linalg.norm(m)
-        edge_tangents = [t / numpy.linalg.norm(t)]
-        w = numpy.cross(J.T @ (J @ t), n)
-        Jw = J @ w
-        normals.append((m, w, (Jw @ Jw)**0.5, edge_tangents + [m]))
-    else:
-        edge_tangents = tangents
-    frame = edge_tangents + [m for m, *_ in normals] + [n]
-    normals.append((n, adjJ @ Kn, detJ * (Kn @ Kn)**0.5, frame))
-    # Covariant weights are unchanged along the tangents, and each normal
-    # component maps through the frame.
-    covariant = WeightTransformation([one], [numpy.eye(sd) - sum(numpy.outer(n, n) for n, *_ in normals)])
-    for n, u, d, frame in normals:
-        covariant += WeightTransformation([u @ f for f in frame], [numpy.outer(f, n) for f in frame], d)
-    # Contravariant weights keep their normal component, and their
-    # tangential components map through the frame.
-    nn = nu @ nu
-    Knu = K @ nu
-    KtKnu = K.T @ Knu
-    P = numpy.outer(nu, nu) / nn
-    d = detJ * nn
-    contravariant = WeightTransformation([d, Knu @ Knu, *(KtKnu @ -tau for tau in tangents)],
-                                         [P, numpy.eye(sd) - P, *(numpy.outer(nu, tau) for tau in tangents)], d)
-    return {"affine": WeightTransformation([one], [numpy.eye(sd)]), "covariant piola": covariant,
-            "contravariant piola": contravariant}
+    symbolic = {}
+    tensors = {}
+
+    def visit(node):
+        stack = [node]
+        while stack:
+            n = stack[-1]
+            pending = [c for c in n.children if c not in symbolic]
+            if pending:
+                stack.extend(pending)
+                continue
+            stack.pop()
+            symbolic[n] = isinstance(n, gem.Variable) or any(symbolic[c] for c in n.children)
+            constant_tensor = isinstance(n, gem.Delta) or (
+                isinstance(n, gem.Indexed) and isinstance(n.children[0], gem.gem.Constant) and n.free_indices)
+            tensors[n] = constant_tensor or any(tensors[c] for c in n.children)
+
+    def classify(node):
+        if node not in symbolic:
+            visit(node)
+        if not symbolic[node]:
+            return OTHER
+        if isinstance(node, gem.IndexSum):
+            return COMPOUND if tensors[node] else ATOMIC
+        if isinstance(node, (gem.Product, gem.Sum)) or (isinstance(node, gem.Division) and node.children[0] != one):
+            return COMPOUND
+        return ATOMIC
+    return classify
+
+
+def to_riesz(expressions, j, tol):
+    r"""The rows over the index j of GEM scalars of expressions in symbolic and constant factors.
+
+    The constant factors of each term are folded into one tensor, and the
+    term is unrolled over the indices that this tensor shares with the
+    symbolic factors.  The constants that multiply the same symbolic factors
+    are rounded to integers within the tolerance and dropped below it,
+    both before and after they are summed.
+
+    :arg expressions: A list of GEM scalars with the free index j.
+    :arg j: The free index, which only appears in constant factors.
+    :arg tol: The tolerance of each expression.
+    :returns: A list of object arrays of GEM scalars over j.
+    """
+    classifier = symbolic_classifier()
+    terms = []
+    constants = []
+    for owner, expression in enumerate(remove_componenttensors(expressions)):
+        for term in traverse_sum(expression):
+            sum_indices, factors = traverse_product(term, stop_at=lambda e: classifier(e) != COMPOUND)
+            others = [f for f in factors if classifier(f) != OTHER]
+            other_indices = set(chain.from_iterable(f.free_indices for f in others))
+            constant = [f for f in factors if classifier(f) == OTHER]
+            terms.append((owner, [i for i in sum_indices if i in other_indices], others))
+            constants.append(gem.IndexSum(gem.Product(*constant), tuple(i for i in sum_indices if i not in other_indices)))
+
+    # Fix the indices that the symbolic factors share with the constants
+    keys = []
+    fixed = []
+    for (owner, sum_indices, others), rest in zip(terms, fold_constants(constants)):
+        shared = tuple(i for i in sum_indices if i in rest.free_indices)
+        local = [i for i in sum_indices if i not in rest.free_indices]
+        # Contract the indices that only the symbolic factors carry
+        contracted = [f for f in others if set(f.free_indices) & set(local)]
+        factors = [f for f in others if not set(f.free_indices) & set(local)]
+        if contracted:
+            factors.append(sum_factorise(local, contracted))
+        if isinstance(rest, gem.Zero):
+            continue
+        array, indices = (rest.children[0].array, rest.multiindex) if isinstance(rest, gem.Indexed) else (rest.array, ())
+        array = numpy.transpose(array, [indices.index(i) for i in shared + (j,)])
+        array = round_to_int(array, tol[owner])
+        array[numpy.abs(array) <= tol[owner]] = 0
+        for beta in numpy.ndindex(array.shape[:-1]):
+            if array[beta].any():
+                keys.append((owner, len(factors), array[beta]))
+                for f in factors:
+                    axes = [k for k, i in enumerate(shared) if i in f.free_indices]
+                    fixed.append(gem.Indexed(gem.ComponentTensor(f, tuple(shared[k] for k in axes)),
+                                             tuple(beta[k] for k in axes)))
+    fixed = remove_componenttensors(unroll_indexsum(remove_componenttensors(fixed), predicate=lambda index: True))
+
+    # Sum the constants of the same symbolic factors
+    coefficients = [{} for _ in expressions]
+    fixed = iter(fixed)
+    for owner, n, c in keys:
+        factors = tuple(next(fixed) for _ in range(n))
+        key = frozenset(Counter(factors).items())
+        factors, total = coefficients[owner].get(key, (factors, 0))
+        coefficients[owner][key] = factors, total + c
+
+    rows = []
+    for coefficient, cutoff in zip(coefficients, tol):
+        row = [[] for _ in range(j.extent)]
+        for factors, c in coefficient.values():
+            c = round_to_int(c, cutoff)
+            g = gem.Product(*factors)
+            for k in numpy.flatnonzero(numpy.abs(c) > cutoff):
+                row[k].append(g * c[k])
+        rows.append(numpy.array([reduce(gem.Sum, terms, zero) for terms in row], dtype=object))
+    return rows
 
 
 def in_range_of(weights, projector, axes, tol):

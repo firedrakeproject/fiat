@@ -10,8 +10,7 @@ import finat.ufl
 from finat.element_factory import create_element
 from finat.enriched import as_enriched
 from finat.fiat_elements import FiatElement
-from finat.physically_mapped import (PhysicallyMappedElement, cartesian_transformations, pairing_projector,
-                                     in_range_of, adjugate_and_determinant)
+from finat.physically_mapped import PhysicallyMappedElement
 from finat.point_set import PointSet, UnionPointSet
 from finat.quadrature import QuadratureRule
 from finat.quadrature_element import QuadratureElement
@@ -364,44 +363,6 @@ def test_mixed_subelement_dual_evaluation():
 
 class MappedElement(PhysicallyMappedElement, FiatElement):
     pass
-
-
-def test_pairing_respects_tolerance():
-    """Near-divergence weights are not paired using NumPy's default tolerance."""
-    ref_el = FIAT.ufc_simplex(2)
-    node = FIAT.functional.Functional(
-        ref_el, (2,), {},
-        {(0.0, 0.0): [(1.0, (1, 0), (0,)),
-                      (1.0 + 1.0e-6, (0, 1), (1,))]},
-        "NearDivergence")
-    assert node.orders == (1,)
-    _, W = node.get_order_tensors(1)
-    P = pairing_projector(2)
-    assert in_range_of(numpy.eye(2)[..., None], P, (0, 1), 1.0e-12)
-    assert not in_range_of(W, P, (0, 1), 1.0e-12)
-
-
-def transformation_matrix(G):
-    coefficients, d = (result.arr for result in evaluate([gem.ListTensor(G.coefficients), G.denominator]))
-    return numpy.tensordot(coefficients, G.matrices, axes=1) / d
-
-
-@pytest.mark.parametrize("sd", [2, 3])
-def test_pairing_transformation(sd):
-    """Pairing a contravariant axis with a covariant axis only splits the Kronecker product."""
-    J = numpy.eye(sd) + numpy.random.default_rng(0).random((sd, sd))
-    adjJ, detJ = adjugate_and_determinant(numpy.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object))
-    J = numpy.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object)
-    transformations = cartesian_transformations(J, adjJ, detJ)
-    contravariant, covariant, pair = (transformation_matrix(transformations[mapping])
-                                      for mapping in ("contravariant piola", "covariant piola", "L2 piola"))
-    J, = evaluate([gem.ListTensor(J)])
-    J = J.arr
-    assert numpy.allclose(contravariant, J.T / numpy.linalg.det(J))
-    assert numpy.allclose(covariant, numpy.linalg.inv(J))
-    assert numpy.allclose(pair, numpy.kron(contravariant, covariant))
-    P = pairing_projector(sd)
-    assert numpy.allclose(pair @ P, P / numpy.linalg.det(J))
 
 
 @pytest.mark.parametrize("scaled", [False, True])
