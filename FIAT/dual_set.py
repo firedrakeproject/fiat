@@ -158,37 +158,6 @@ class DualSet:
         """
         tshape = self.nodes[0].target_shape
         sd = self.ref_el.get_spatial_dimension()
-        num_exp = poly_set.get_expansion_set().get_num_members(poly_set.get_embedded_degree())
-        mat = numpy.zeros((len(self.nodes), *tshape, num_exp))
-        for order, R in self.to_uncontracted_riesz(poly_set).items():
-            for index in numpy.ndindex((sd,) * order):
-                mat += R[..., *index, *index, :]
-        coeffs = self.get_coeffs()
-        if coeffs is not None:
-            mat = numpy.tensordot(coeffs, mat, axes=(1, 0))
-        return mat
-
-    def to_uncontracted_riesz(self, poly_set):
-        r"""Riesz representation of the nodes with their derivative axes left uncontracted.
-
-        Writing each node as :math:`\ell_i(f) = \sum_k \sum_q W^k_{i,q} : D^k f(x_q)`
-        (see :meth:`.Functional.get_order_tensors`), return for each derivative
-        order :math:`k` the tensor
-
-        .. math::
-
-            R^k_{i,a,\beta,\gamma,j} = \sum_q W^k_{i,a,\beta,q}\,\partial^\gamma \phi_j(x_q)
-
-        over the expansion set :math:`\phi` underlying ``poly_set``, where
-        :math:`a` are the value axes and :math:`\beta, \gamma` are :math:`k`
-        derivative axes each. Contracting :math:`\beta` with :math:`\gamma` and
-        summing over :math:`k` gives :meth:`to_riesz`; leaving them
-        uncontracted allows a linear map on the values and derivatives of
-        :math:`f` to be inserted in between. There is one row per node in
-        :meth:`get_nodes`, without the recombination coefficients.
-        """
-        tshape = self.nodes[0].target_shape
-        sd = self.ref_el.get_spatial_dimension()
         es = poly_set.get_expansion_set()
         ed = poly_set.get_embedded_degree()
         num_exp = es.get_num_members(ed)
@@ -203,8 +172,8 @@ class DualSet:
         # Tabulate the expansion set one time for all the values and another
         # for all the derivatives, and contract nodes with the same point set
         # in a single product.
+        mat = numpy.zeros((len(self.nodes), *tshape, num_exp))
         all_orders = set(points)
-        riesz = {}
         for orders in (all_orders & {0}, all_orders - {0}):
             if not orders:
                 continue
@@ -219,16 +188,19 @@ class DualSet:
                 for index in numpy.ndindex(dphi.shape[:order]):
                     dphi[index] = tabulation[tuple(map(index.count, range(sd)))]
 
-                R = numpy.zeros((len(self.nodes), *tshape, *dshape, *dshape, num_exp))
                 point_groups = defaultdict(list)
                 for node_id, node_points in points[order].items():
                     point_groups[node_points].append(node_id)
                 for node_points, node_ids in point_groups.items():
                     wts = numpy.stack([weights[order][node_id] for node_id in node_ids])
                     indices = [columns[pt] for pt in node_points]
-                    R[node_ids] = numpy.tensordot(wts, dphi[..., indices], axes=(-1, -1))
-                riesz[order] = R
-        return riesz
+                    # Contract the derivative axes and the points
+                    mat[node_ids] += numpy.tensordot(wts, dphi[..., indices],
+                                                     axes=(range(-order - 1, 0), (*range(order), -1)))
+        coeffs = self.get_coeffs()
+        if coeffs is not None:
+            mat = numpy.tensordot(coeffs, mat, axes=(1, 0))
+        return mat
 
     def get_indices(self, restriction_domain, take_closure=True):
         """Returns the list of dofs with support on a given restriction domain.
