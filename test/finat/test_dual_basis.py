@@ -383,8 +383,8 @@ def test_pairing_respects_tolerance():
 
 
 def transformation_matrix(G):
-    coefficients, d = (result.arr for result in evaluate([gem.ListTensor(G.coefficients), G.denominator]))
-    return numpy.tensordot(coefficients, G.matrices, axes=1) / d
+    coefficients, = evaluate([gem.ListTensor(G.coefficients)])
+    return numpy.tensordot(coefficients.arr, G.matrices, axes=1)
 
 
 @pytest.mark.parametrize("sd", [2, 3])
