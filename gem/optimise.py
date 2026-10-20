@@ -228,15 +228,25 @@ def constant_fold_zero(exprs):
     return list(map(mapper, exprs))
 
 
-def _select_expression(expressions, index):
+def _select_expression(expressions, index, cache):
     """Helper function to select an expression from a list of
     expressions with an index.  This function expect sanitised input,
     one should normally call :py:func:`select_expression` instead.
 
-    :arg expressions: a list of expressions
+    :arg expressions: a tuple of expressions
     :arg index: an index (free, fixed or variable)
+    :arg cache: a dict from the tuples of expressions already selected
+        with this index to their selection, so that subexpressions shared
+        within the DAGs are selected once
     :returns: an expression
     """
+    try:
+        return cache[expressions]
+    except KeyError:
+        return cache.setdefault(expressions, _select_expression_uncached(expressions, index, cache))
+
+
+def _select_expression_uncached(expressions, index, cache):
     expr = expressions[0]
     if all(e == expr for e in expressions):
         return expr
@@ -252,7 +262,7 @@ def _select_expression(expressions, index):
                 return expression.children[0]
             elif isinstance(expression, Zero):
                 return Zero(shape)
-        return Indexed(_select_expression(list(map(child, expressions)), index), multiindex)
+        return Indexed(_select_expression(tuple(map(child, expressions)), index, cache), multiindex)
 
     if types <= {Literal, Zero, Failure}:
         return partial_indexed(ListTensor(expressions), (index,))
@@ -261,7 +271,7 @@ def _select_expression(expressions, index):
         shape, = set(e.shape for e in expressions)
         multiindex = tuple(Index(extent=d) for d in shape)
         children = remove_componenttensors([Indexed(e, multiindex) for e in expressions])
-        return ComponentTensor(_select_expression(children, index), multiindex)
+        return ComponentTensor(_select_expression(tuple(children), index, cache), multiindex)
 
     if types == {Delta}:
         if all(e.i == k and e.j == expr.j for k, e in enumerate(expressions)):
@@ -276,7 +286,7 @@ def _select_expression(expressions, index):
         assert all(len(e.children) == len(expr.children) for e in expressions)
         assert len(expr.children) > 0
 
-        return expr.reconstruct(*(_select_expression(nth_children, index)
+        return expr.reconstruct(*(_select_expression(nth_children, index, cache)
                                   for nth_children in zip(*(e.children
                                                             for e in expressions))))
 
@@ -304,7 +314,7 @@ def select_expression(expressions, index):
     exprs = remove_componenttensors([Indexed(e, alpha) for e in expressions])
 
     # Factor the expressions recursively and convert result
-    selected = _select_expression(exprs, index)
+    selected = _select_expression(tuple(exprs), index, {})
     return ComponentTensor(selected, alpha)
 
 
