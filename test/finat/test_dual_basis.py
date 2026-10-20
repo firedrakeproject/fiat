@@ -406,21 +406,20 @@ def test_pairing_transformation(sd):
     assert numpy.allclose(pair, numpy.eye(sd * sd) / numpy.linalg.det(J))
 
 
-@pytest.mark.parametrize("sd,support", [(2, (1, 0)), (3, (2, 0)), (3, (1, 1))])
-def test_transformation_inverse(sd, support):
+@pytest.mark.parametrize("sd,frame", [(2, (1, 0)), (3, (2, 0)), (3, (1, 1))])
+def test_transformation_inverse(sd, frame):
     """The inverse of each weight transformation is the inverse of the matrix."""
     ref_el = FIAT.ufc_simplex(sd)
     J = numpy.eye(sd) + numpy.random.default_rng(0).random((sd, sd))
     J = numpy.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object)
     adjJ, detJ = adjugate_and_determinant(J)
-    # The facet 0 contains the support
     cartesian = cartesian_transformations(J, adjJ, detJ)
-    frame = frame_transformations(ref_el, 0, support, J, adjJ, detJ)
-    for mapping in ("affine", "contravariant piola", "covariant piola"):
-        for transformations in (cartesian, frame):
+    framed = frame_transformations(ref_el, frame, J, adjJ, detJ)
+    for transformations in (cartesian, framed):
+        for mapping in transformations:
             G = transformation_matrix(transformations[mapping].forward)
             inverse = transformation_matrix(transformations[mapping].inverse)
-            assert numpy.allclose(inverse @ G, numpy.eye(sd))
+            assert numpy.allclose(inverse @ G, numpy.eye(len(G)))
 
 
 @pytest.mark.parametrize("scaled", [False, True])

@@ -71,16 +71,16 @@ class PhysicallyMappedFunctional:
     :attr:`weights`: ``affine``, ``covariant piola``, ``contravariant
     piola``, or ``L2 piola`` for a contravariant axis paired with a
     covariant axis through the identity.  These mappings act on Cartesian
-    components if :attr:`support_facet` is None, and on components in the
-    frame of :attr:`support_facet` otherwise.
+    components if :attr:`frame` is None, and on components in the frame of
+    the entity :attr:`frame` otherwise.
 
     :arg node: The FIAT node.
     :arg ref_el: The reference cell.
     :arg dim: The dimension of the entity that supports the node.
     :arg entity: The entity that supports the node.
     :arg mapping: The FIAT mapping of the node.
-    :arg avg: If False, an integral moment with a :attr:`support_facet` is
-        a plain integral over its entity instead of an average.
+    :arg avg: If False, an integral moment with a :attr:`frame` is a plain
+        integral over its entity instead of an average.
     :arg tol: Relative tolerance for the range tests on the weights, and
         below which entries of the Riesz representation are dropped.
     """
@@ -119,36 +119,28 @@ class PhysicallyMappedFunctional:
         return value_mappings + ("covariant piola",) * self.node.max_deriv_order
 
     @cached_property
-    def support_facet(self):
-        r"""The facet in whose frame :attr:`pullback_mappings` act, or None for Cartesian components.
+    def frame(self):
+        r"""The entity ``(dim, entity)`` in whose frame :attr:`pullback_mappings` act, or None for Cartesian components.
 
         For integral moments on a facet, and for nodes on a facet with
-        derivatives or matrix values, this is the facet itself, with the
-        frame of its tangents and normal.  For an integral moment on an edge
-        with derivatives normal to the edge, this is the facet :math:`f`
-        whose plane contains those derivatives, with the frame
-        :math:`(t, t \times n_f, n_f)` of the edge tangent :math:`t` and
-        the normal :math:`n_f`.  Otherwise it is None.
+        derivatives or matrix values, this is the facet, with the frame of
+        its tangents and normal.  For an integral moment on an edge of a
+        tetrahedron with derivatives normal to the edge, this is the edge,
+        with the frame :math:`(t, t \times n_1, t \times n_2)` of the edge
+        tangent :math:`t` and the normals to :math:`t` within the two facets
+        that contain the edge.  Otherwise it is None.
         """
         ref_el = self.ref_el
         sd = ref_el.get_spatial_dimension()
         node = self.node
         moment = isinstance(node, IntegralMoment)
         if self.dim == sd - 1 and (moment or node.max_deriv_order > 0 or len(node.target_shape) > 1):
-            return self.entity
+            return (self.dim, self.entity)
         if moment and 0 < self.dim < sd - 1:
             covectors = [k for k, mapping in enumerate(self.axis_mappings) if mapping == "covariant piola"]
             t = ref_el.compute_edge_tangent(self.entity)
             if not all(in_range_of(self.weights, numpy.outer(t, t) / (t @ t), (k,), self.tol) for k in covectors):
-                top = ref_el.get_topology()
-                vertices = set(top[self.dim][self.entity])
-                for facet in sorted(top[sd - 1]):
-                    nu = ref_el.compute_scaled_normal(facet)
-                    P = numpy.eye(sd) - numpy.outer(nu, nu) / (nu @ nu)
-                    if (vertices <= set(top[sd - 1][facet])
-                            and all(in_range_of(self.weights, P, (k,), self.tol) for k in covectors)):
-                        return facet
-                raise NotImplementedError(f"No facet contains the derivatives of {type(node).__name__}.")
+                return (self.dim, self.entity)
         return None
 
     @cached_property
@@ -162,8 +154,8 @@ class PhysicallyMappedFunctional:
         # Interior moments map every axis as affine.
         if self.dim == sd and isinstance(self.node, IntegralMoment):
             return {(k,): "affine" for k in range(len(axis_mappings))}
-        # In the frame of a support facet, each axis keeps its own mapping.
-        if self.support_facet is not None:
+        # In a frame, each axis keeps its own mapping.
+        if self.frame is not None:
             return {(k,): mapping for k, mapping in enumerate(axis_mappings)}
 
         # A contravariant axis contracted with a covariant axis through the
@@ -196,20 +188,19 @@ class PhysicallyMappedFunctional:
         """The exponent :math:`p` such that the physical node dilates as :math:`h^{-p}`.
 
         Each group in :attr:`pullback_mappings` contributes its scaling.  If
-        :attr:`avg` is False, an integral moment with a :attr:`support_facet`
-        is a plain integral over its entity, which contributes :math:`-dim`.
+        :attr:`avg` is False, an integral moment with a :attr:`frame` is a
+        plain integral over its entity, which contributes :math:`-dim`.
         """
         sd = self.ref_el.get_spatial_dimension()
-        if self.support_facet is None:
+        if self.frame is None:
             weights = {"covariant piola": 1, "contravariant piola": sd - 1, "L2 piola": sd}
             return sum(weights.get(mapping, 0) for mapping in self.pullback_mappings.values())
-        nu = self.ref_el.compute_scaled_normal(self.support_facet)
         exponent = 0
         for axes, mapping in self.pullback_mappings.items():
             if mapping == "covariant piola":
                 exponent += 1
             elif mapping == "contravariant piola" and not in_range_of(
-                    self.weights, numpy.outer(nu, nu) / (nu @ nu), axes, self.tol):
+                    self.weights, facet_normal_projector(self.ref_el, self.entity), axes, self.tol):
                 # Tangential components of a contravariant axis
                 exponent += 2 - sd
         if isinstance(self.node, IntegralMoment) and not self.avg:
@@ -218,11 +209,8 @@ class PhysicallyMappedFunctional:
 
     @cached_property
     def pullback_key(self):
-        """The frame of :attr:`support_facet`, or None for Cartesian components, and the :attr:`pullback_mappings`."""
-        mappings = tuple(self.pullback_mappings.values())
-        if self.support_facet is None:
-            return (None, mappings)
-        return ((self.support_facet, (self.dim, self.entity)), mappings)
+        """The :attr:`frame` and the :attr:`pullback_mappings`."""
+        return (self.frame, tuple(self.pullback_mappings.values()))
 
     def pullback(self, J, adjJ, detJ):
         """The Kronecker product of the weight transformations of :attr:`pullback_mappings`.
@@ -232,11 +220,10 @@ class PhysicallyMappedFunctional:
         :arg detJ: The determinant of the Jacobian.
         :returns: A :class:`Pullback`.
         """
-        if self.support_facet is None:
+        if self.frame is None:
             transformations = cartesian_transformations(J, adjJ, detJ)
         else:
-            transformations = frame_transformations(self.ref_el, self.support_facet, (self.dim, self.entity),
-                                                    J, adjJ, detJ)
+            transformations = frame_transformations(self.ref_el, self.frame, J, adjJ, detJ)
         pullbacks = [transformations[mapping] for mapping in self.pullback_mappings.values()]
         unit = LinearCombination([one], [numpy.eye(1)])
         forward = reduce(LinearCombination.kron, (pullback.forward for pullback in pullbacks), unit)
@@ -269,14 +256,14 @@ class PhysicallyMappedFunctional:
 
         Here :math:`p` is :attr:`scaling_exponent`, and :math:`|e|` is the
         physical measure of the entity if :attr:`avg` is False and there is
-        a :attr:`support_facet`, and 1 otherwise.
+        a :attr:`frame`, and 1 otherwise.
 
         :arg J: The Jacobian as an object array of GEM scalars.
         :arg h: The cell size at each vertex.
         :returns: A GEM scalar.
         """
         measure = one
-        if self.support_facet is not None and isinstance(self.node, IntegralMoment) and not self.avg:
+        if self.frame is not None and isinstance(self.node, IntegralMoment) and not self.avg:
             # The physical measure of the support, from the Gram determinant of its tangents
             T = self.ref_el.compute_tangents(self.dim, self.entity)
             JT = J @ T.T
@@ -300,7 +287,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
     #: and below which entries of the Riesz representation are dropped.
     tol = 1e-10
 
-    #: If False, an integral moment with a support facet is a plain
+    #: If False, an integral moment with a frame is a plain
     #: integral over its entity instead of an average.
     avg = True
 
@@ -787,13 +774,21 @@ def cartesian_transformations(J, adjJ, detJ):
             "L2 piola": Pullback(pairing, pairing_inverse)}
 
 
-def frame_transformations(ref_el, facet, support, J, adjJ, detJ):
-    r"""The :class:`Pullback` of each mapping in the frame of the facet.
+def frame_transformations(ref_el, frame, J, adjJ, detJ):
+    """The :class:`Pullback` of each mapping in the frame of an entity.
 
-    The frame consists of the tangents of the support, the normals to the
-    support, and the scaled normal :math:`\nu` of the facet.  On an edge
-    support, the normal to the edge tangent :math:`t` within the facet is
-    :math:`t \times \nu`.
+    :arg frame: The entity ``(dim, entity)``, a facet or an edge of a tetrahedron.
+    """
+    dim, entity = frame
+    if dim == ref_el.get_spatial_dimension() - 1:
+        return facet_transformations(ref_el, entity, J, adjJ, detJ)
+    return edge_transformations(ref_el, entity, J, adjJ, detJ)
+
+
+def facet_transformations(ref_el, facet, J, adjJ, detJ):
+    r"""The :class:`Pullback` of each mapping in the frame of a facet.
+
+    The frame consists of the tangents of the facet and its scaled normal :math:`\nu`.
     """
     sd = ref_el.get_spatial_dimension()
     affine = LinearCombination([one], [numpy.eye(sd)])
@@ -802,38 +797,23 @@ def frame_transformations(ref_el, facet, support, J, adjJ, detJ):
     # The cofactor normal
     x = adjJ.T @ nu
     length = ((x @ x) * (nu @ nu))**0.5
-    # Covariant weights are unchanged along the tangents of the support, and
-    # each normal maps to the pullback of the unit physical normal.  The
-    # inverse takes the components along the pushed forward tangents and the
-    # unit physical normals.
-    covariant = LinearCombination(adjJ @ x / (detJ * length), [numpy.outer(e, nu) for e in numpy.eye(sd)])
-    covariant_inverse = LinearCombination([detJ / length], [numpy.outer(nu, nu)])
-    if support[0] == sd - 2 >= 1:
-        t = ref_el.compute_edge_tangent(support[1])
-        m = numpy.cross(t, nu)
-        # The physical normal to the edge within the facet is J w, where w
-        # lies in the span of the orthogonal t and m.
-        w = numpy.cross(J.T @ (J @ t), nu)
-        Jw = J @ w
-        edge_length = ((Jw @ Jw) * (m @ m))**0.5
-        covariant += LinearCombination([w @ f / ((f @ f) * edge_length) for f in (t, m)],
-                                       [numpy.outer(f, m) for f in (t, m)])
-        covariant_inverse += LinearCombination(J.T @ Jw / edge_length, [numpy.outer(m, e) for e in numpy.eye(sd)])
-        support_tangents = t[None]
-    else:
-        support_tangents = tangents
-    Jt = J @ support_tangents.T
+    # Covariant weights are unchanged along the tangents, and the normal maps
+    # to the pullback of the unit physical normal.  The inverse takes the
+    # components along the pushed forward tangents and the unit physical normal.
+    Jt = J @ tangents.T
     gJ = Jt.T @ Jt
     components = adjugate(gJ) @ Jt.T @ J / determinant(gJ)
-    covariant += LinearCombination([one], [tangential_projector(support_tangents)])
-    covariant_inverse += LinearCombination(components.ravel(), [numpy.outer(tau, e) for tau in support_tangents
-                                                                for e in numpy.eye(sd)])
+    covariant = LinearCombination([*(adjJ @ x / (detJ * length)), one],
+                                  [*(numpy.outer(e, nu) for e in numpy.eye(sd)), tangential_projector(tangents)])
+    covariant_inverse = LinearCombination([detJ / length, *components.ravel()],
+                                          [numpy.outer(nu, nu), *(numpy.outer(tau, e) for tau in tangents
+                                                                  for e in numpy.eye(sd))])
 
     # Contravariant weights keep their normal component, and their
     # tangential components map through the dual tangents of the facet.
     g = tangents @ tangents.T
     dual_tangents = adjugate(g) @ tangents / determinant(g)
-    P = numpy.outer(nu, nu) / (nu @ nu)
+    P = facet_normal_projector(ref_el, facet)
     Q = tangential_projector(tangents)
     z = adjJ @ x
     contravariant = LinearCombination([one, (x @ x) / (detJ * (nu @ nu)),
@@ -844,6 +824,55 @@ def frame_transformations(ref_el, facet, support, J, adjJ, detJ):
     return {"affine": Pullback(affine, affine),
             "covariant piola": Pullback(covariant, covariant_inverse),
             "contravariant piola": Pullback(contravariant, contravariant_inverse)}
+
+
+def edge_transformations(ref_el, edge, J, adjJ, detJ):
+    r"""The :class:`Pullback` of each mapping in the frame of an edge of a tetrahedron.
+
+    The frame consists of the edge tangent :math:`t` and the normals
+    :math:`m_i = t \times \nu_i` to :math:`t` within the two facets that
+    contain the edge, with scaled normals :math:`\nu_i`.
+    """
+    sd = ref_el.get_spatial_dimension()
+    affine = LinearCombination([one], [numpy.eye(sd)])
+    top = ref_el.get_topology()
+    t = ref_el.compute_edge_tangent(edge)
+    facets = [f for f in sorted(top[sd - 1]) if set(top[1][edge]) <= set(top[sd - 1][f])]
+    m = [numpy.cross(t, ref_el.compute_scaled_normal(f)) for f in facets]
+    # The dual basis of the frame, as rows
+    F = numpy.array([t, *m]).T
+    t_dual, *m_dual = adjugate(F) / determinant(F)
+    # The physical normal to the edge within facet i is J w_i, where w_i lies
+    # in the plane of the facet and J w_i is orthogonal to J t.
+    Jt = J @ t
+    Gt = J.T @ Jt
+    w = [numpy.cross(Gt, ref_el.compute_scaled_normal(f)) for f in facets]
+    Jw = [J @ wi for wi in w]
+    norms = [(Jwi @ Jwi)**0.5 for Jwi in Jw]
+    lengths = [(mi @ mi)**0.5 for mi in m]
+    # Covariant weights are unchanged along t, and each m_i maps to the
+    # pullback of the unit physical normal within facet i, scaled by |m_i|.
+    covariant = LinearCombination([one], [numpy.outer(t, t_dual)])
+    for wi, norm, length, mi_dual in zip(w, norms, lengths, m_dual):
+        covariant += LinearCombination(wi * (length / norm), [numpy.outer(e, mi_dual) for e in numpy.eye(sd)])
+    # The inverse takes the component along J t, and the components along the
+    # unit physical normals N_i, which are orthogonal to J t, through the
+    # inverse of their Gram matrix [[1, c], [c, 1]].
+    N = [Jwi / norm for Jwi, norm in zip(Jw, norms)]
+    c = N[0] @ N[1]
+    K = numpy.array([[one, -c], [-c, one]], dtype=object) / (1 - c * c)
+    covariant_inverse = LinearCombination(Gt / (Jt @ Jt), [numpy.outer(t, e) for e in numpy.eye(sd)])
+    for i, (mi, length) in enumerate(zip(m, lengths)):
+        row = sum((J.T @ N[j]) * K[i, j] for j in range(2)) / length
+        covariant_inverse += LinearCombination(row, [numpy.outer(mi, e) for e in numpy.eye(sd)])
+    return {"affine": Pullback(affine, affine),
+            "covariant piola": Pullback(covariant, covariant_inverse)}
+
+
+def facet_normal_projector(ref_el, facet):
+    """The projector onto the normal of a facet."""
+    nu = ref_el.compute_scaled_normal(facet)
+    return numpy.outer(nu, nu) / (nu @ nu)
 
 
 def tangential_projector(tangents):
