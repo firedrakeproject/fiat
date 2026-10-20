@@ -255,9 +255,9 @@ class PhysicallyMappedFunctional:
             transformations = frame_transformations(self.ref_el, self.support_facet, (self.dim, self.entity),
                                                     J, adjJ, detJ)
         pullbacks = [transformations[mapping] for mapping in self.pullback_mappings.values()]
-        unit = WeightTransformation([one], [numpy.eye(1)])
-        forward = reduce(WeightTransformation.kron, (pullback.forward for pullback in pullbacks), unit)
-        inverse = reduce(WeightTransformation.kron, (pullback.inverse for pullback in pullbacks), unit)
+        unit = LinearCombination([one], [numpy.eye(1)])
+        forward = reduce(LinearCombination.kron, (pullback.forward for pullback in pullbacks), unit)
+        inverse = reduce(LinearCombination.kron, (pullback.inverse for pullback in pullbacks), unit)
         return Pullback(forward, inverse)
 
     def vandermonde_row(self, G, D):
@@ -267,7 +267,7 @@ class PhysicallyMappedFunctional:
         :math:`B_0`, and for its inverse and the basis of the entity of the
         node, the row of the inverse of the diagonal block.
 
-        :arg G: The :class:`WeightTransformation` of the axes of the weights.
+        :arg G: The pullback of the weights, a :class:`LinearCombination` on their axes.
         :arg D: The derivatives of the basis at the points of the node, with
             the axes of the weights followed by the basis.
         :returns: An object array of GEM scalars, one for each basis function.
@@ -279,7 +279,8 @@ class PhysicallyMappedFunctional:
         W = W.reshape(-1, W.shape[-1])
         D = numpy.moveaxis(D, axes, range(len(axes)))
         D = D.reshape(-1, *D.shape[len(axes):])
-        return G.to_riesz(W, D, self.tol)
+        # Contract the weights with the derivatives at the points
+        return G.contract(numpy.einsum("bx,ax...->ab...", W, D), self.tol)
 
     def scaling(self, J, h):
         r"""The factor :math:`h^p\,|e|` of the row of the physical Vandermonde matrix :math:`B=SB_0`.
@@ -681,54 +682,49 @@ def adjugate_and_determinant(J):
     return (adjugate(JTJ) @ J.T / detJ, detJ)
 
 
-class WeightTransformation:
-    r"""A matrix :math:`G=\sum_t g_t C_t` that transforms the weights on a group of tensor axes.
-
-    The coefficients :math:`g_t` are GEM scalars, and the matrices
-    :math:`C_t` are constant, so that contractions with constant tensors
-    cancel numerically.
+class LinearCombination:
+    r"""A matrix :math:`G=\sum_t g_t C_t` of GEM scalars :math:`g_t` and constant matrices :math:`C_t`.
 
     :arg coefficients: The coefficients :math:`g_t`.
     :arg matrices: The matrices :math:`C_t`.
     """
 
     def __init__(self, coefficients, matrices):
-        self.coefficients = tuple(coefficients)
+        self.coefficients = numpy.asarray(coefficients, dtype=object)
         self.matrices = numpy.asarray(matrices, dtype=float)
 
     @classmethod
     def from_matrix(cls, A):
-        """The transformation by a matrix of GEM scalars, expanded in its entries."""
+        """The linear combination of the entries of a matrix of GEM scalars."""
         n = len(A)
         units = numpy.eye(n * n).reshape(n, n, n, n)
         entries = [(A[a, b], units[a, b]) for a, b in numpy.ndindex(A.shape) if not isinstance(A[a, b], gem.Zero)]
         return cls(*zip(*entries))
 
     def __add__(self, other):
-        return WeightTransformation(self.coefficients + other.coefficients, [*self.matrices, *other.matrices])
+        return LinearCombination([*self.coefficients, *other.coefficients], [*self.matrices, *other.matrices])
 
     def kron(self, other):
-        """The Kronecker product, which transforms the axes of self followed by the axes of other."""
-        return WeightTransformation([g * h for g, h in product(self.coefficients, other.coefficients)],
-                                    [numpy.kron(C, D) for C, D in product(self.matrices, other.matrices)])
+        """The Kronecker product."""
+        return LinearCombination(numpy.multiply.outer(self.coefficients, other.coefficients).ravel(),
+                                 [numpy.kron(C, D) for C, D in product(self.matrices, other.matrices)])
 
-    def to_riesz(self, W, D, tol):
-        r"""The Riesz representation :math:`\sum_t g_t\,(C_tW):D` of the transformed node.
+    def contract(self, A, tol):
+        r"""The contraction :math:`G:A=g^TR` with a constant tensor, where :math:`R_t=C_t:A`.
 
-        :arg W: The weights of the node, with the transformed axes as rows
-            and the points as columns.
-        :arg D: The derivatives of the basis at the points of the node, with
-            the axes of the transformed weights, the points, and the basis.
-        :arg tol: Tolerance relative to W and D below which terms are dropped.
+        :arg A: A constant tensor whose first two axes match :math:`G`.
+        :arg tol: Tolerance relative to A and each :math:`C_t` below which
+            entries of :math:`R` are dropped.
+        :returns: An object array of GEM scalars with the remaining axes of A.
         """
-        rows = numpy.tensordot(self.matrices @ W, D, axes=2)
-        cutoffs = tol * numpy.abs(W).max() * numpy.abs(D).max() * numpy.abs(self.matrices).max(axis=(1, 2))
-        riesz = numpy.full(D.shape[-1], zero, dtype=object)
-        for g, row, cutoff in zip(self.coefficients, rows, cutoffs):
-            row = round_to_int(row, cutoff)
-            for j in numpy.flatnonzero(numpy.abs(row) > cutoff):
-                riesz[j] += g * row[j]
-        return riesz
+        R = numpy.tensordot(self.matrices, A, axes=2)
+        R = R.reshape(len(R), -1)
+        cutoffs = tol * numpy.abs(A).max() * numpy.abs(self.matrices).max(axis=(1, 2))[:, None]
+        R = round_to_int(R, cutoffs)
+        nonzero = numpy.abs(R) > cutoffs
+        R_gem = numpy.full(R.shape, zero, dtype=object)
+        R_gem[nonzero] = [gem.Literal(r) for r in R[nonzero]]
+        return sparse_matmul(self.coefficients[None, :], R_gem).reshape(A.shape[2:])
 
 
 def round_to_int(x, tol):
@@ -740,15 +736,15 @@ def round_to_int(x, tol):
 def cartesian_transformations(J, adjJ, detJ):
     """The :class:`Pullback` of each mapping in Cartesian components."""
     sd = J.shape[1]
-    affine = WeightTransformation([one], [numpy.eye(sd)])
-    contravariant = WeightTransformation.from_matrix(J.T / detJ)
-    contravariant_inverse = WeightTransformation.from_matrix(adjJ.T)
-    covariant = WeightTransformation.from_matrix(adjJ / detJ)
-    covariant_inverse = WeightTransformation.from_matrix(J)
+    affine = LinearCombination([one], [numpy.eye(sd)])
+    contravariant = LinearCombination.from_matrix(J.T / detJ)
+    contravariant_inverse = LinearCombination.from_matrix(adjJ.T)
+    covariant = LinearCombination.from_matrix(adjJ / detJ)
+    covariant_inverse = LinearCombination.from_matrix(J)
     # The identity on a contravariant axis and a covariant axis pulls back
     # as (J^T/detJ) K^T = I/detJ, so the pair scales its weights by 1/detJ.
-    pairing = WeightTransformation([one / detJ], [numpy.eye(sd * sd)])
-    pairing_inverse = WeightTransformation([detJ], [numpy.eye(sd * sd)])
+    pairing = LinearCombination([one / detJ], [numpy.eye(sd * sd)])
+    pairing_inverse = LinearCombination([detJ], [numpy.eye(sd * sd)])
     return {"affine": Pullback(affine, affine),
             "contravariant piola": Pullback(contravariant, contravariant_inverse),
             "covariant piola": Pullback(covariant, covariant_inverse),
@@ -764,7 +760,7 @@ def frame_transformations(ref_el, facet, support, J, adjJ, detJ):
     :math:`t \times \nu`.
     """
     sd = ref_el.get_spatial_dimension()
-    affine = WeightTransformation([one], [numpy.eye(sd)])
+    affine = LinearCombination([one], [numpy.eye(sd)])
     tangents = ref_el.compute_tangents(sd - 1, facet)
     nu = ref_el.compute_scaled_normal(facet)
     # The cofactor normal
@@ -774,8 +770,8 @@ def frame_transformations(ref_el, facet, support, J, adjJ, detJ):
     # each normal maps to the pullback of the unit physical normal.  The
     # inverse takes the components along the pushed forward tangents and the
     # unit physical normals.
-    covariant = WeightTransformation(adjJ @ x / (detJ * length), [numpy.outer(e, nu) for e in numpy.eye(sd)])
-    covariant_inverse = WeightTransformation([detJ / length], [numpy.outer(nu, nu)])
+    covariant = LinearCombination(adjJ @ x / (detJ * length), [numpy.outer(e, nu) for e in numpy.eye(sd)])
+    covariant_inverse = LinearCombination([detJ / length], [numpy.outer(nu, nu)])
     if support[0] == sd - 2 >= 1:
         t = ref_el.compute_edge_tangent(support[1])
         m = numpy.cross(t, nu)
@@ -784,18 +780,18 @@ def frame_transformations(ref_el, facet, support, J, adjJ, detJ):
         w = numpy.cross(J.T @ (J @ t), nu)
         Jw = J @ w
         edge_length = ((Jw @ Jw) * (m @ m))**0.5
-        covariant += WeightTransformation([w @ f / ((f @ f) * edge_length) for f in (t, m)],
-                                          [numpy.outer(f, m) for f in (t, m)])
-        covariant_inverse += WeightTransformation(J.T @ Jw / edge_length, [numpy.outer(m, e) for e in numpy.eye(sd)])
+        covariant += LinearCombination([w @ f / ((f @ f) * edge_length) for f in (t, m)],
+                                       [numpy.outer(f, m) for f in (t, m)])
+        covariant_inverse += LinearCombination(J.T @ Jw / edge_length, [numpy.outer(m, e) for e in numpy.eye(sd)])
         support_tangents = t[None]
     else:
         support_tangents = tangents
     Jt = J @ support_tangents.T
     gJ = Jt.T @ Jt
     components = adjugate(gJ) @ Jt.T @ J / determinant(gJ)
-    covariant += WeightTransformation([one], [tangential_projector(support_tangents)])
-    covariant_inverse += WeightTransformation(components.ravel(), [numpy.outer(tau, e) for tau in support_tangents
-                                                                   for e in numpy.eye(sd)])
+    covariant += LinearCombination([one], [tangential_projector(support_tangents)])
+    covariant_inverse += LinearCombination(components.ravel(), [numpy.outer(tau, e) for tau in support_tangents
+                                                                for e in numpy.eye(sd)])
 
     # Contravariant weights keep their normal component, and their
     # tangential components map through the dual tangents of the facet.
@@ -804,11 +800,11 @@ def frame_transformations(ref_el, facet, support, J, adjJ, detJ):
     P = numpy.outer(nu, nu) / (nu @ nu)
     Q = tangential_projector(tangents)
     z = adjJ @ x
-    contravariant = WeightTransformation([one, (x @ x) / (detJ * (nu @ nu)),
-                                          *(z @ -tau / (detJ * (nu @ nu)) for tau in tangents)],
-                                         [P, Q, *(numpy.outer(nu, s) for s in dual_tangents)])
-    contravariant_inverse = WeightTransformation([one, detJ * (nu @ nu) / (x @ x), *(z @ tau / (x @ x) for tau in tangents)],
-                                                 [P, Q, *(numpy.outer(nu, s) for s in dual_tangents)])
+    contravariant = LinearCombination([one, (x @ x) / (detJ * (nu @ nu)),
+                                       *(z @ -tau / (detJ * (nu @ nu)) for tau in tangents)],
+                                      [P, Q, *(numpy.outer(nu, s) for s in dual_tangents)])
+    contravariant_inverse = LinearCombination([one, detJ * (nu @ nu) / (x @ x), *(z @ tau / (x @ x) for tau in tangents)],
+                                              [P, Q, *(numpy.outer(nu, s) for s in dual_tangents)])
     return {"affine": Pullback(affine, affine),
             "covariant piola": Pullback(covariant, covariant_inverse),
             "contravariant piola": Pullback(contravariant, contravariant_inverse)}
