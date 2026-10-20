@@ -9,7 +9,7 @@ where :math:`B_{ij} = n_i(\mathcal{P}\hat\psi_j)` and :math:`M = B^{-T}`
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict, namedtuple
 from collections.abc import Mapping
-from functools import cached_property, reduce
+from functools import cached_property, partial, reduce
 from itertools import chain, product
 from operator import add
 
@@ -42,31 +42,14 @@ class MappedTabulation(Mapping):
     """A lazy tabulation dict that applies the basis transformation only
     on the requested derivatives.
 
-    :arg M: a gem.ListTensor with the basis transformation matrix.
+    :arg matvec: a callable that applies the basis transformation to a
+        reference tabulation, with the basis functions as the first axis.
     :arg ref_tabulation: a dict of tabulations on the reference cell.
     """
-    def __init__(self, M, ref_tabulation):
-        self.M = M
+    def __init__(self, matvec, ref_tabulation):
+        self.matvec = matvec
         self.ref_tabulation = ref_tabulation
-        # we expect M to be sparse with O(1) nonzeros per row
-        # for each row, get the column index of each nonzero entry
-        csr = [[j for j in range(M.shape[1]) if not isinstance(M.array[i, j], gem.Zero)]
-               for i in range(M.shape[0])]
-        self.csr = csr
         self._tabulation_cache = {}
-
-    def matvec(self, table):
-        # basis recombination using hand-rolled sparse-dense matrix multiplication
-        ii = gem.indices(len(table.shape)-1)
-        phi = [gem.Indexed(table, (j, *ii)) for j in range(self.M.shape[1])]
-        # the sum approach is faster than calling numpy.dot or gem.IndexSum
-        exprs = [gem.ComponentTensor(gem.Sum(*(self.M.array[i, j] * phi[j] for j in js)), ii)
-                 for i, js in enumerate(self.csr)]
-
-        result = gem.ListTensor(exprs)
-        result, = gem.optimise.unroll_indexsum((result,), lambda index: True)
-        # result = gem.optimise.aggressive_unroll(self.M @ table)
-        return result
 
     def __getitem__(self, alpha):
         try:
@@ -345,13 +328,55 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         indices = self._physical_indices
         B = gem.ListTensor(B[numpy.ix_(indices, indices)])
 
-        key = None
-        return MappedTabulation(B, {key: Q})[key]
+        return sparse_matvec(B, Q)
 
     def map_tabulation(self, ref_tabulation, coordinate_mapping):
         assert coordinate_mapping is not None
-        M = self.basis_transformation(coordinate_mapping)
-        return MappedTabulation(M, ref_tabulation)
+        rows = self._vandermonde_rows(coordinate_mapping)
+        return MappedTabulation(partial(self._inverse_matvec, rows), ref_tabulation)
+
+    def _inverse_matvec(self, rows, table):
+        r"""The physical tabulation :math:`B^{-T}\phi` on the exposed dofs, without forming :math:`B^{-1}`.
+
+        With :math:`B=SB_0`, back-substitute :math:`B_0^T\chi=\phi` over the
+        entity blocks in decreasing dimension,
+        :math:`\chi_e = B_{ee}^{-T}(\phi_e - \sum_f B_{fe}^T\chi_f)` over the
+        entities f whose closure contains e, using only the nonzero entries
+        of :math:`B_0` and of the inverses of its diagonal blocks.  Then the
+        physical basis is :math:`S^{-1}\chi`.
+
+        :arg rows: The :meth:`_vandermonde_rows`.
+        :arg table: A reference tabulation with the basis functions as the first axis.
+        :returns: The physical tabulation of the exposed dofs.
+        """
+        entity_dofs = self._element.entity_dofs()
+        ii = gem.indices(len(table.shape)-1)
+        phi = [gem.Indexed(table, (j, *ii)) for j in range(table.shape[0])]
+
+        # The entries of B_0 outside the diagonal blocks, by column
+        block = {i: dofs for entities in entity_dofs.values() for dofs in entities.values() for i in dofs}
+        couplings = defaultdict(list)
+        for i, row in rows.items():
+            for j, entry in enumerate(row.entries):
+                if not isinstance(entry, gem.Zero) and j not in block[i]:
+                    couplings[j].append((i, entry))
+
+        chi = [None] * len(phi)
+        for dim in sorted(entity_dofs, reverse=True):
+            for dofs in entity_dofs[dim].values():
+                rhs = [gem.Sum(phi[j], *(-(entry * chi[i]) for i, entry in couplings[j])) for j in dofs]
+                inverse = identity(len(dofs))
+                for k, i in enumerate(dofs):
+                    if i in rows:
+                        inverse[k] = rows[i].inverse
+                for k, j in enumerate(dofs):
+                    chi[j] = gem.Sum(*(inverse[m, k] * rhs[m] for m in range(len(dofs))
+                                       if not isinstance(inverse[m, k], gem.Zero)))
+
+        exprs = [gem.ComponentTensor(chi[i] / rows[i].scale if i in rows else chi[i], ii)
+                 for i in self._physical_indices]
+        result, = gem.optimise.unroll_indexsum((gem.ListTensor(exprs),), lambda index: True)
+        return result
 
     def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
         result = super().basis_evaluation(order, ps, entity=entity)
@@ -610,6 +635,18 @@ class PhysicalGeometry(metaclass=ABCMeta):
 
         :returns: a GEM expression for the physical vertices, shape
                 (gdim, )."""
+
+
+def sparse_matvec(M, table):
+    """The product of a gem.ListTensor M, with O(1) nonzeros per row, and a table."""
+    ii = gem.indices(len(table.shape)-1)
+    phi = [gem.Indexed(table, (j, *ii)) for j in range(M.shape[1])]
+    # the sum approach is faster than calling numpy.dot or gem.IndexSum
+    exprs = [gem.ComponentTensor(gem.Sum(*(M.array[i, j] * phi[j] for j in range(M.shape[1])
+                                           if not isinstance(M.array[i, j], gem.Zero))), ii)
+             for i in range(M.shape[0])]
+    result, = gem.optimise.unroll_indexsum((gem.ListTensor(exprs),), lambda index: True)
+    return result
 
 
 def identity(*shape):
