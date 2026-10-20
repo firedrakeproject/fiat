@@ -11,7 +11,7 @@ from finat.element_factory import create_element
 from finat.enriched import as_enriched
 from finat.fiat_elements import FiatElement
 from finat.physically_mapped import (PhysicallyMappedElement, cartesian_transformations, frame_transformations,
-                                     in_range_of, adjugate_and_determinant)
+                                     in_range_of, adjugate_and_determinant, metric_and_adjugate)
 from finat.point_set import PointSet, UnionPointSet
 from finat.quadrature import QuadratureRule
 from finat.quadrature_element import QuadratureElement
@@ -414,7 +414,7 @@ def test_transformation_inverse(sd, frame):
     J = numpy.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object)
     adjJ, detJ = adjugate_and_determinant(J)
     cartesian = cartesian_transformations(J, adjJ, detJ)
-    framed = frame_transformations(ref_el, frame, J, adjJ, detJ)
+    framed = frame_transformations(ref_el, frame, *metric_and_adjugate(J), detJ)
     for transformations in (cartesian, framed):
         for mapping in transformations:
             G = transformation_matrix(transformations[mapping].forward)
