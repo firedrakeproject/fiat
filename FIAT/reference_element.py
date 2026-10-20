@@ -34,6 +34,7 @@ from FIAT.orientation_utils import (
     make_cell_orientation_reflection_map_simplex,
     make_cell_orientation_reflection_map_tensorproduct,
     make_entity_permutations_simplex,
+    make_entity_permutations_tensorproduct
 )
 
 POINT = 0
@@ -1872,3 +1873,130 @@ def max_complex(complexes):
         return max_cell
     else:
         raise ValueError("Cannot find the maximal complex")
+
+
+def make_facet_embedding_maps(ref_cell):
+    """
+    For every local facet `lf` of the reference cell, extract the affine that maps
+    facet-local reference coordinates (X_lf) into the cell's reference coordinates (X):
+
+    X = A_lf @ X_lf + b_lf.
+
+    Parameters
+    ----------
+    ref_cell : Cell
+        The reference cell, which must be a simplex or a hypercube.
+
+    Returns
+    -------
+    tuple of lists (A, b, A_inv) each indexed by local facet ID.
+        (A[lf], b[lf]) defines the affine embedding of facet reference coordinates into the cell reference frame,
+        and A_inv[lf] defines the pseudoinverse for mapping cell coordinates on the facet back to facet-local coordinates.
+    """
+    facet_dim = ref_cell.get_spatial_dimension() - 1
+    num_facets = len(ref_cell.get_topology()[facet_dim])
+    A = []
+    b = []
+    A_inv = []
+
+    # For point facets, there are no unit vectors
+    if facet_dim == 0:
+        facet_vertices = numpy.asarray(ref_cell.get_vertices())
+        for lf in range(num_facets):
+            A_lf = numpy.empty((ref_cell.get_spatial_dimension(), 0))
+            b_lf = numpy.asarray(facet_vertices[lf])
+            A.append(A_lf)
+            b.append(b_lf)
+            A_inv.append(numpy.empty((0, ref_cell.get_spatial_dimension())))
+        return A, b, A_inv
+
+    ref_facet = ref_cell.construct_subelement(facet_dim)
+    for lf in range(num_facets):
+        facet_vertices = numpy.asarray(ref_facet.get_vertices())  # get the facet's corners in the facet's coordinates
+        phi = ref_cell.get_entity_transform(facet_dim, lf)
+        mapped = numpy.array([phi(v) for v in facet_vertices])  # evaluate the map at the facets' corners
+        Y = (mapped[1:facet_dim + 1] - mapped[0]).T
+        V = (facet_vertices[1:facet_dim + 1] - facet_vertices[0]).T
+        A_lf = Y @ numpy.linalg.inv(V)
+        b_lf = mapped[0] - A_lf @ facet_vertices[0]
+        A.append(A_lf)
+        b.append(b_lf)
+        A_inv.append(numpy.linalg.pinv(A_lf))
+
+    return A, b, A_inv
+
+
+def make_facet_orientation_maps(ref_cell):
+    """
+    When two adjacent cells share a facet, the ordering of the facet
+    vertices (and hence facet-local reference coordinates) may differ between
+    the two cells. This difference is encoded in the local facet orientation.
+    This method constructs, for every possible facet orientation `o`, an affine
+    map acting on facet-local coordinates:
+
+    X_f_can = Q_o @ X_f_o + t_o,
+
+    where X_f_can defines the facet-local coordinates in the facet's canonical orientation and
+    X_f_o defines the facet-local coordinates of the same point when the facet is in orientation `o`.
+
+    A vertex permutation is first obtained for each possible facet permutation and is then used to construct the corresponding coordinate map.
+
+    Parameters
+    ----------
+    ref_cell : Cell
+        The reference cell, which must be a simplex or a hypercube.
+
+    Returns
+    -------
+    dict
+        Maps each facet orientation integer o to an affine map (Q_o, t_o) acting on facet-local coordinates.
+    """
+    facet_dim = ref_cell.get_spatial_dimension() - 1
+
+    # Point facet
+    if facet_dim == 0:
+        return {
+            0: (
+                numpy.empty((0, 0)),
+                numpy.empty((0,)),
+            )
+        }
+
+    ref_facet = ref_cell.construct_subelement(facet_dim)
+    facet_verts = numpy.asarray(ref_facet.get_vertices())  # FIAT's canonical facet vertices
+
+    # Build the map: orientation -> vertex permutation
+    if isinstance(ref_facet, SimplicialComplex):
+        # 2D: quads and triangles (facet is an interval)
+        # 3D: tetrahedra (facet is a triangle)
+        o_p_maps = make_entity_permutations_simplex(dim=facet_dim, npoints=2)
+    elif isinstance(ref_facet, Hypercube):
+        # 3D: hexahedra (facet is a quad)
+        factors = ref_facet.product.cells  # exact interval factors
+        factor_dims = [f.get_spatial_dimension() for f in factors]
+        # build the vertex permutations of a hypercube out of the vertex permutations of its factors
+        tp_maps = make_entity_permutations_tensorproduct(factors, factor_dims, [make_entity_permutations_simplex(d, 2) for d in factor_dims])
+        # Convert the tuple keys (e0, io_0, io_1...) into FIAT's integer orientations.
+        # pass the nested dictionary { dimension tuple : { entity number : { orientation tuple : permutation } } } to flatten_permutations
+        o_p_maps = flatten_permutations({tuple(factor_dims): {0: tp_maps}})[facet_dim][0]
+    else:
+        raise NotImplementedError("Facet permutation maps not yet implemented for facets of type %s" % type(ref_facet))
+
+    # Finally, convert each vertex permutation into an affine map
+    o_coord_maps = {}
+    for o, p in o_p_maps.items():
+        permuted_facet_verts = facet_verts[p]
+        if facet_verts.shape[0] == facet_dim + 1:
+            # Simplex facet: use all vertices
+            xs = facet_verts
+            ys = permuted_facet_verts
+            o_int = o
+        else:
+            # Tensor-product facet: use a fixed simplex subset
+            subset = [0, 1, 2]  # any non-collinear triple works on a non-degenerate quad
+            xs = facet_verts[subset]
+            ys = permuted_facet_verts[subset]
+
+        Q, t = make_affine_mapping(xs, ys)
+        o_coord_maps[o_int] = (Q, t)
+    return o_coord_maps
