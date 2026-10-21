@@ -179,24 +179,24 @@ class DualSet:
                 continue
             pts = sorted(set(chain.from_iterable(
                 node_points for order in orders for node_points in points[order].values())))
-            columns = {pt: j for j, pt in enumerate(pts)}
+            point_index = {pt: j for j, pt in enumerate(pts)}
             tabulation = es._tabulate(ed, pts, max(orders))
             for order in sorted(orders):
-                # D^order phi with axes (gamma, j, point)
+                # D^order phi with axes (j, gamma, point)
                 dshape = (sd,) * order
-                dphi = numpy.zeros((*dshape, num_exp, len(pts)))
-                for index in numpy.ndindex(dphi.shape[:order]):
-                    dphi[index] = tabulation[tuple(map(index.count, range(sd)))]
+                dphi = numpy.zeros((num_exp, *dshape, len(pts)))
+                for index in numpy.ndindex(dshape):
+                    dphi[:, *index] = tabulation[tuple(map(index.count, range(sd)))]
 
                 point_groups = defaultdict(list)
                 for node_id, node_points in points[order].items():
                     point_groups[node_points].append(node_id)
                 for node_points, node_ids in point_groups.items():
                     wts = numpy.stack([weights[order][node_id] for node_id in node_ids])
-                    indices = [columns[pt] for pt in node_points]
+                    indices = [point_index[pt] for pt in node_points]
                     # Contract the derivative axes and the points
-                    mat[node_ids] += numpy.tensordot(wts, dphi[..., indices],
-                                                     axes=(range(-order - 1, 0), (*range(order), -1)))
+                    axes = range(-order - 1, 0)
+                    mat[node_ids] += numpy.tensordot(wts, dphi[..., indices], axes=(axes, axes))
         coeffs = self.get_coeffs()
         if coeffs is not None:
             mat = numpy.tensordot(coeffs, mat, axes=(1, 0))

@@ -269,15 +269,15 @@ class PhysicallyMappedFunctional:
 
         :arg G: The pullback of the weights, a :class:`LinearCombination` on their axes.
         :arg D: The derivatives of the basis at the points of the node, with
-            the axes of the weights followed by the basis.
+            the basis followed by the axes of the weights.
         :returns: An object array of GEM scalars, one for each basis function.
         """
         # Contract the weights with the derivatives at the points, and order
         # the axes of the groups as in the Kronecker product
         axes = list(chain.from_iterable(self.pullback_mappings))
         rank = len(axes)
-        A = numpy.tensordot(self.weights, D, axes=(-1, -2))
-        A = A.transpose(*(rank + k for k in axes), *axes, -1)
+        A = numpy.tensordot(self.weights, D, axes=(-1, -1))
+        A = A.transpose(*(rank + 1 + k for k in axes), *axes, rank)
         n = self.weights.size // self.weights.shape[-1]
         return G.contract(A.reshape(n, n, -1), self.tol)
 
@@ -394,8 +394,9 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
     def _reference_derivatives(self):
         r"""The derivatives of the source nodal basis at the points of the nodes.
 
-        A dict from each derivative order k and point x to the tensor
-        :math:`D_{b\gamma j}=(\partial^\gamma\psi^0_j)_b(x)` with k
+        A dict from each derivative order k to a tuple of a dict from each
+        point :math:`x_q` to its index q, and the tensor
+        :math:`D_{jb\gamma q}=(\partial^\gamma\psi^0_j)_b(x_q)` with k
         derivative axes :math:`\gamma`, where :math:`\psi^0` is the nodal
         basis of the nodes before recombination.  The basis is tabulated one
         time for each order.
@@ -413,17 +414,16 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         for order in points:
             pts = sorted(points[order])
             tabulation = self._element.tabulate(order, pts)
+            dshape = (sd,) * order
             values = tabulation[(0,) * sd]
-            rank = values.ndim - 2
-            D = numpy.zeros((sd,) * order + values.shape)
-            for index in numpy.ndindex(D.shape[:order]):
-                D[index] = tabulation[tuple(map(index.count, range(sd)))]
-            # (gamma, j, b, x) -> (x, b, gamma, j)
-            D = D.transpose(-1, *range(order + 1, order + 1 + rank), *range(order), order)
+            D = numpy.zeros((*values.shape[:-1], *dshape, values.shape[-1]))
+            for index in numpy.ndindex(dshape):
+                D[..., *index, :] = tabulation[tuple(map(index.count, range(sd)))]
             if C is not None:
                 # The source nodal basis is C^T times the basis dual to C n_0.
-                D = D @ C
-            derivatives[order] = dict(zip(pts, D))
+                D = numpy.tensordot(C, D, axes=(0, 0))
+            point_index = {pt: q for q, pt in enumerate(pts)}
+            derivatives[order] = (point_index, D)
         return derivatives
 
     def _vandermonde_rows(self, coordinate_mapping):
@@ -457,10 +457,11 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
                 pullbacks[key] = functional.pullback(J, adjJ, detJ)
             order = functional.node.max_deriv_order
             points, _ = functional.node.get_order_tensors(order)
-            D = numpy.stack([derivatives[order][x] for x in points], axis=-2)
+            point_index, D = derivatives[order]
+            D = D[..., [point_index[x] for x in points]]
             block = entity_dofs[functional.dim][functional.entity]
             row = functional.vandermonde_row(pullbacks[key].forward, D)
-            inverse = functional.vandermonde_row(pullbacks[key].inverse, D[..., block])
+            inverse = functional.vandermonde_row(pullbacks[key].inverse, D[block])
             scale = functional.scaling(J, h)
             nonzeros = [j for j, entry in enumerate(row) if not isinstance(entry, gem.Zero)]
             if nonzeros == [i] and row[i] == one and scale == one:
