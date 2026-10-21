@@ -1980,7 +1980,7 @@ def make_facet_orientation_maps(ref_cell):
         # pass the nested dictionary { dimension tuple : { entity number : { orientation tuple : permutation } } } to flatten_permutations
         o_p_maps = flatten_permutations({tuple(factor_dims): {0: tp_maps}})[facet_dim][0]
     else:
-        raise NotImplementedError("Facet permutation maps not yet implemented for facets of type %s" % type(ref_facet))
+        raise NotImplementedError(f"Facet permutation maps not yet implemented for facets of type {type(ref_facet)}.")
 
     # Finally, convert each vertex permutation into an affine map
     o_coord_maps = {}
