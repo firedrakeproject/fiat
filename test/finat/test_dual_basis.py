@@ -10,7 +10,7 @@ import finat.ufl
 from finat.element_factory import create_element
 from finat.enriched import as_enriched
 from finat.fiat_elements import FiatElement
-from finat.physically_mapped import (PhysicallyMappedElement, cartesian_transformations, frame_transformations,
+from finat.physically_mapped import (PhysicallyMappedElement, cartesian_pullbacks, frame_pullbacks,
                                      in_range_of, adjugate_and_determinant, metric_and_adjugate)
 from finat.point_set import PointSet, UnionPointSet
 from finat.quadrature import QuadratureRule
@@ -393,10 +393,10 @@ def test_pairing_transformation(sd):
     J = numpy.eye(sd) + numpy.random.default_rng(0).random((sd, sd))
     adjJ, detJ = adjugate_and_determinant(numpy.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object))
     J = numpy.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object)
-    transformations = cartesian_transformations(J, adjJ, detJ)
-    contravariant = transformation_matrix(transformations["contravariant piola"].forward)
-    covariant = transformation_matrix(transformations["covariant piola"].forward)
-    pair = transformation_matrix(transformations["L2 piola"].forward)
+    pullbacks = cartesian_pullbacks(J, adjJ, detJ)
+    contravariant = transformation_matrix(pullbacks["contravariant piola"].forward)
+    covariant = transformation_matrix(pullbacks["covariant piola"].forward)
+    pair = transformation_matrix(pullbacks["L2 piola"].forward)
     J, = evaluate([gem.ListTensor(J)])
     J = J.arr
     assert numpy.allclose(contravariant, J.T / numpy.linalg.det(J))
@@ -413,12 +413,12 @@ def test_transformation_inverse(sd, frame):
     J = numpy.eye(sd) + numpy.random.default_rng(0).random((sd, sd))
     J = numpy.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object)
     adjJ, detJ = adjugate_and_determinant(J)
-    cartesian = cartesian_transformations(J, adjJ, detJ)
-    framed = frame_transformations(ref_el, frame, *metric_and_adjugate(J), detJ)
-    for transformations in (cartesian, framed):
-        for mapping in transformations:
-            G = transformation_matrix(transformations[mapping].forward)
-            inverse = transformation_matrix(transformations[mapping].inverse)
+    cartesian = cartesian_pullbacks(J, adjJ, detJ)
+    framed = frame_pullbacks(ref_el, frame, *metric_and_adjugate(J), detJ)
+    for pullbacks in (cartesian, framed):
+        for mapping in pullbacks:
+            G = transformation_matrix(pullbacks[mapping].forward)
+            inverse = transformation_matrix(pullbacks[mapping].inverse)
             assert numpy.allclose(inverse @ G, numpy.eye(len(G)))
 
 
