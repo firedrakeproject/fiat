@@ -47,6 +47,15 @@ class AbstractPointSet(abc.ABC):
         """GEM expression describing the points, with free indices
         ``self.indices`` and shape (point dimension,)."""
 
+    @cached_property
+    def point_sets(self):
+        """The point sets this point set is a union of.
+
+        A plain point set is the union of just itself; overridden by
+        :class:`UnionPointSet` for the point sets it is actually a union of.
+        """
+        return (self,)
+
 
 class PointSingleton(AbstractPointSet):
     """A point set representing a single point.
@@ -231,6 +240,27 @@ class TensorPointSet(AbstractPointSet):
             len(self.factors) == len(other.factors) and \
             all(s.almost_equal(o, tolerance=tolerance)
                 for s, o in zip(self.factors, other.factors))
+
+
+class UnionPointSet(PointSet):
+    """All of the points of several point sets, along a single point index.
+
+    :arg point_sets: the point sets to take the union of, in the order they
+        occupy the point index.  A union of unions is flattened.
+
+    These are the points of a dual basis that evaluates summand by summand,
+    named so that a function space can be built on them.  The point sets are
+    kept because an element that needs their structure to tabulate -- a tensor
+    product, which cannot factor the union -- tabulates on each in turn.
+    """
+
+    def __init__(self, point_sets):
+        self.point_sets = tuple(chain(*(ps.point_sets for ps in point_sets)))
+        super().__init__(numpy.concatenate([ps.points
+                                            for ps in self.point_sets]))
+
+    def __repr__(self):
+        return f"{type(self).__name__}({self.point_sets!r})"
 
 
 class FacetPointSet(AbstractPointSet):

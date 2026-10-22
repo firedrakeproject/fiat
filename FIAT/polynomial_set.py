@@ -97,6 +97,28 @@ class PolynomialSet(object):
         scalar (2,) a vector of length 2, etc"""
         return self.coeffs.shape[1:-1]
 
+    def recombine(self, coefficients: numpy.ndarray) -> "PolynomialSet":
+        """Return a polynomial set formed from linear combinations.
+
+        Parameters
+        ----------
+        coefficients : numpy.ndarray
+            A matrix whose rows contain the coefficients of the new
+            polynomials in the current polynomial basis.
+
+        Returns
+        -------
+        PolynomialSet
+            A polynomial set with the same reference element, degree,
+            expansion set, and value shape as this set.
+        """
+        coefficients = numpy.asarray(coefficients)
+        if coefficients.ndim != 2 or coefficients.shape[1] != len(self):
+            raise ValueError("Polynomial recombination must have one column per polynomial")
+        new_coeffs = numpy.tensordot(coefficients, self.coeffs, axes=(1, 0))
+        return PolynomialSet(self.ref_el, self.degree, self.embedded_degree,
+                             self.expansion_set, new_coeffs)
+
     def take(self, items):
         """Extracts subset of polynomials given by items."""
         new_coeffs = numpy.take(self.get_coeffs(), items, 0)

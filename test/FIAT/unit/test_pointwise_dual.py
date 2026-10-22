@@ -8,7 +8,7 @@ import pytest
 import numpy
 
 from FIAT import (
-    BrezziDouglasMarini, Morley, Argyris, CubicHermite)
+    BrezziDouglasMarini, Morley, Argyris, Hermite)
 
 from FIAT.reference_element import (
     UFCTriangle,
@@ -20,7 +20,7 @@ T = UFCTriangle()
 
 
 @pytest.mark.parametrize("element",
-                         [CubicHermite(T),
+                         [Hermite(T),
                           Morley(T),
                           Argyris(T),
                           BrezziDouglasMarini(T, 1, variant="integral")])

@@ -19,3 +19,10 @@ from finat.ufl.hdivcurl import HCurlElement, HDivElement, WithMapping, HDiv, HCu
 from finat.ufl.mixedelement import MixedElement, TensorElement, VectorElement  # noqa: F401
 from finat.ufl.restrictedelement import RestrictedElement  # noqa: F401
 from finat.ufl.tensorproductelement import TensorProductElement  # noqa: F401
+
+__all__ = [
+    "BrokenElement", "EnrichedElement", "NodalEnrichedElement",
+    "FiniteElement", "FiniteElementBase", "HCurlElement",
+    "HDivElement", "WithMapping", "HDiv", "HCurl", "MixedElement",
+    "TensorElement", "VectorElement", "RestrictedElement", "TensorProductElement",
+]
