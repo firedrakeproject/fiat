@@ -1876,11 +1876,15 @@ def max_complex(complexes):
 
 
 def make_facet_embedding_maps(ref_cell):
-    """
-    For every local facet `lf` of the reference cell, extract the affine that maps
-    facet-local reference coordinates (X_lf) into the cell's reference coordinates (X):
+    """Return the affine maps from the reference coordinates of each facet to the
+    reference coordinates of the cell.
 
-    X = A_lf @ X_lf + b_lf.
+    For each local facet `lf`, the map is
+
+    X = A[lf] @ X_f + b[lf].
+
+    where ``X_f`` are the reference coordinates of a point on the facet and ``X``
+    are the reference coordinates of the same point in the cell.
 
     Parameters
     ----------
@@ -1889,40 +1893,24 @@ def make_facet_embedding_maps(ref_cell):
 
     Returns
     -------
-    tuple of lists (A, b, A_inv) each indexed by local facet ID.
-        (A[lf], b[lf]) defines the affine embedding of facet reference coordinates into the cell reference frame,
-        and A_inv[lf] defines the pseudoinverse for mapping cell coordinates on the facet back to facet-local coordinates.
+    A : numpy.ndarray
+        The matrix of each map, with shape ``(num_facets, dim, dim - 1)``.
+    b : numpy.ndarray
+        The translation vector of each map, with shape ``(num_facets, dim)``.
+    A_inv : numpy.ndarray
+        The pseudo-inverse of each matrix, with shape ``(num_facets, dim - 1, dim)``.
+        ``A_inv[lf] @ (X - b[lf])`` gives the facet coordinates of a point ``X``
+        that lies on facet ``lf``.
     """
     facet_dim = ref_cell.get_spatial_dimension() - 1
     num_facets = len(ref_cell.get_topology()[facet_dim])
-    A = []
-    b = []
-    A_inv = []
 
-    # For point facets, there are no unit vectors
-    if facet_dim == 0:
-        facet_vertices = numpy.asarray(ref_cell.get_vertices())
-        for lf in range(num_facets):
-            A_lf = numpy.empty((ref_cell.get_spatial_dimension(), 0))
-            b_lf = numpy.asarray(facet_vertices[lf])
-            A.append(A_lf)
-            b.append(b_lf)
-            A_inv.append(numpy.empty((0, ref_cell.get_spatial_dimension())))
-        return A, b, A_inv
-
-    ref_facet = ref_cell.construct_subelement(facet_dim)
-    for lf in range(num_facets):
-        facet_vertices = numpy.asarray(ref_facet.get_vertices())  # get the facet's corners in the facet's coordinates
-        phi = ref_cell.get_entity_transform(facet_dim, lf)
-        mapped = numpy.array([phi(v) for v in facet_vertices])  # evaluate the map at the facets' corners
-        Y = (mapped[1:facet_dim + 1] - mapped[0]).T
-        V = (facet_vertices[1:facet_dim + 1] - facet_vertices[0]).T
-        A_lf = Y @ numpy.linalg.inv(V)
-        b_lf = mapped[0] - A_lf @ facet_vertices[0]
-        A.append(A_lf)
-        b.append(b_lf)
-        A_inv.append(numpy.linalg.pinv(A_lf))
-
+    # Each facet embedding is affine and can be derived by evaluating the entity transform at the facet origin and unit vectors
+    facet_points = numpy.vstack([numpy.zeros(facet_dim), numpy.eye(facet_dim)])
+    mapped = numpy.stack([ref_cell.get_entity_transform(facet_dim, lf)(facet_points) for lf in range(num_facets)])
+    b = mapped[:, 0]
+    A = numpy.swapaxes(mapped[:, 1:] - b[:, None], 1, 2)
+    A_inv = numpy.linalg.pinv(A)
     return A, b, A_inv
 
 
@@ -1999,3 +1987,51 @@ def make_facet_orientation_maps(ref_cell):
         Q, t = make_affine_mapping(xs, ys)
         o_coord_maps[o] = (Q, t)
     return o_coord_maps
+
+
+def make_facet_neighbouring_cell_maps(ref_cell):
+    """Return the affine maps between the reference coordinates of two cells that share a facet.
+
+    Suppose the local facet ``lf_from``, with orientation ``o_from`` of one cell is the same mesh facet
+    as the local facet ``lf_to``, with orientation `o_to` of a neighbouring cell across that facet.
+
+    Then a point with reference coordinates ``X`` in the first cell has reference coordinates in the neighbouring cell:
+
+    X' = A[lf_from, lf_to, o_from, o_to] @ X + b[lf_from, lf_to, o_from, o_to]
+
+    Parameters
+    ----------
+    ref_cell : Cell
+        The reference cell.
+
+    Returns
+    -------
+    A : numpy.ndarray
+        The matrix of each map, with shape
+        ``(num_facets, num_facets, num_orientations, num_orientations, dim, dim)``.
+    b : numpy.ndarray
+        The translation vector of each map, with shape
+        ``(num_facets, num_facets, num_orientations, num_orientations, dim)``.
+    """
+
+    A_f, b_f, A_f_inv = make_facet_embedding_maps(ref_cell)
+    o_coord_maps = make_facet_orientation_maps(ref_cell)
+    Q = numpy.stack([o_coord_maps[o][0] for o in range(len(o_coord_maps))])
+    t = numpy.stack([o_coord_maps[o][1] for o in range(len(o_coord_maps))])
+    Q_inv = numpy.linalg.inv(Q)
+
+    # List all possible combinations of facets and orientations
+    nf, no = len(A_f), len(Q)  # number of local facets, number of facet orientations
+    lf_from, lf_to, o_from, o_to = numpy.meshgrid(numpy.arange(nf), numpy.arange(nf), numpy.arange(no), numpy.arange(no), indexing="ij")
+
+    # Changes the facet coordinates from orientation o_from to orientation o_to.
+    Q_to = Q_inv[o_to] @ Q[o_from]
+    t_to = numpy.einsum("...ij, ...j -> ...i", Q_inv[o_to], t[o_from] - t[o_to])
+
+    # Maps the cell coordinates to facet coordinates, changes the orientation,
+    # and then maps the facet coordinates into the neighbouring cell.
+    A = A_f[lf_to] @ Q_to @ A_f_inv[lf_from]
+    b = (b_f[lf_to] + numpy.einsum("...ij, ...j -> ...i", A_f[lf_to], t_to)
+         - numpy.einsum("...ij, ...j -> ...i", A, b_f[lf_from]))
+
+    return A, b
