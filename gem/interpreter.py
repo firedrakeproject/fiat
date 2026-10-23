@@ -175,6 +175,7 @@ def _evaluate_mathfunction(e, self):
     names = {
         "abs": abs,
         "log": numpy.log,
+        "sqrt": numpy.sqrt,
         "real": operator.attrgetter("real"),
         "imag": operator.attrgetter("imag"),
         "conj": operator.methodcaller("conjugate"),
