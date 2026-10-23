@@ -34,8 +34,8 @@ class RestrictedPhysicallyMappedElement(PhysicallyMappedElement, FiatElement):
         self._entity_dofs = {d: {e: [local[parent_indices[k]] for k in edofs[d][e] if parent_indices[k] in local]
                                  for e in edofs[d]} for d in edofs}
 
-    def _vandermonde_rows(self, coordinate_mapping):
-        return self._parent._vandermonde_rows(coordinate_mapping)
+    def _vandermonde_matrix(self, coordinate_mapping):
+        return self._parent._vandermonde_matrix(coordinate_mapping)
 
     def space_dimension(self):
         return len(self._physical_indices)
