@@ -22,7 +22,8 @@ from finat.citations import cite
 zero = gem.Zero()
 one = gem.Literal(1.0)
 
-#: A weight transformation and its inverse.
+#: The pullback of the weights of a node and its inverse, as
+#: :class:`LinearCombination` objects.
 Pullback = namedtuple("Pullback", ["forward", "inverse"])
 
 
@@ -143,8 +144,8 @@ class PhysicallyMappedFunctional:
     @cached_property
     def pullback_mappings(self):
         """A dict from each group of axes of :attr:`weights` that map together to its mapping."""
-        # pullback takes the Kronecker product of the weight transformations in
-        # the order of this dict.
+        # pullback takes the Kronecker product of the pullbacks of the groups
+        # in the order of this dict.
         sd = self.cell.get_spatial_dimension()
         W = self.weights
         axis_mappings = self.axis_mappings
@@ -210,7 +211,7 @@ class PhysicallyMappedFunctional:
         return (self.frame, tuple(self.pullback_mappings.items()))
 
     def pullback(self, J, adjJ, detJ, metric, adj_metric):
-        """The Kronecker product of the weight transformations of :attr:`pullback_mappings`.
+        """The Kronecker product of the :class:`Pullback` of each group of :attr:`pullback_mappings`.
 
         :arg J: The Jacobian as an object array of GEM scalars.
         :arg adjJ: The adjugate of the Jacobian.
@@ -339,40 +340,44 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
     @cached_property
     def _physical_dual_set(self):
         """The :class:`PhysicallyMappedDualSet` of the FIAT element."""
-        return PhysicallyMappedDualSet(self._element, self.cell, self.avg, self.tol)
+        return PhysicallyMappedDualSet(self._element.get_dual_set(), self._element.mapping(), self.avg, self.tol)
+
+    @cached_property
+    def _reference_tabulation(self):
+        """The :meth:`PhysicallyMappedDualSet.tabulate` of the nodal basis of the FIAT element."""
+        return self._physical_dual_set.tabulate(self._element.get_nodal_basis())
 
     def _vandermonde_matrix(self, coordinate_mapping):
         """The :class:`VandermondeMatrix` on the physical cell."""
-        return VandermondeMatrix(self._physical_dual_set, coordinate_mapping)
+        return VandermondeMatrix(self._physical_dual_set, self._reference_tabulation, coordinate_mapping)
 
 
 class PhysicallyMappedDualSet:
-    """The nodes of a FIAT dual set, as :class:`PhysicallyMappedFunctional` objects, and their reference data.
+    """The nodes of a FIAT dual set, as :class:`PhysicallyMappedFunctional` objects.
 
-    :arg element: The FIAT element.
-    :arg cell: The reference cell.
+    :arg dual: The FIAT dual set.
+    :arg mappings: The FIAT mapping of each node.
     :arg avg: If False, an integral moment with a frame is a plain
         integral over its entity instead of an average.
     :arg tol: Relative tolerance for the range tests on the weights, and
         below which entries of the Riesz representation are dropped.
     """
 
-    def __init__(self, element, cell, avg, tol):
-        dual = element.get_dual_set()
-        mappings = element.mapping()
-        functionals = [None] * len(dual.nodes)
+    def __init__(self, dual, mappings, avg, tol):
+        cell = dual.get_reference_element()
+        nodes = dual.get_nodes()
+        functionals = [None] * len(nodes)
         for dim, entities in dual.get_entity_ids().items():
             for entity, dofs in entities.items():
                 for i in dofs:
-                    functionals[i] = PhysicallyMappedFunctional(dual.nodes[i], cell, dim, entity,
+                    functionals[i] = PhysicallyMappedFunctional(nodes[i], cell, dim, entity,
                                                                 mappings[i], avg, tol)
-        self.element = element
         self.cell = cell
         self.tol = tol
         self.functionals = tuple(functionals)
         self.coeffs = dual.get_coeffs()
-        self.entity_dofs = element.entity_dofs()
-        self.entity_closure_dofs = element.entity_closure_dofs()
+        self.entity_ids = dual.get_entity_ids()
+        self.entity_closure_ids = dual.get_entity_closure_ids()
 
     @cached_property
     def groups(self):
@@ -382,11 +387,11 @@ class PhysicallyMappedDualSet:
             groups[functional.dim, functional.entity, functional.pullback_key].append(i)
         return dict(groups)
 
-    @cached_property
-    def tabulation(self):
-        r"""The tabulation of the source nodal basis at the points of the nodes.
+    def tabulate(self, poly_set):
+        r"""The tabulation of a nodal basis at the points of the nodes.
 
-        A dict from each derivative order k to a tuple of a dict from each
+        :arg poly_set: The nodal basis :math:`\psi`, dual to the nodes.
+        :returns: A dict from each derivative order k to a tuple of a dict from each
         point :math:`x_q` to its index q, and the tensor
         :math:`D_{jb\gamma q}=(\partial^\gamma\psi^0_j)_b(x_q)` with k
         derivative axes :math:`\gamma`, where :math:`\psi^0` is the nodal
@@ -394,8 +399,8 @@ class PhysicallyMappedDualSet:
         time for each order.
         """
         sd = self.cell.get_spatial_dimension()
-        num_members = self.element.space_dimension()
-        tshape = self.element.value_shape()
+        num_members = poly_set.get_num_members()
+        tshape = poly_set.get_shape()
         points = defaultdict(set)
         for functional in self.functionals:
             order = functional.node.max_deriv_order
@@ -405,7 +410,7 @@ class PhysicallyMappedDualSet:
         derivatives = {}
         for order in points:
             pts = sorted(points[order])
-            tabulation = self.element.tabulate(order, pts)
+            tabulation = poly_set.tabulate(pts, order)
             dshape = (sd,) * order
             D = numpy.zeros((num_members, *tshape, *dshape, len(pts)))
             for index in numpy.ndindex(dshape):
@@ -417,7 +422,7 @@ class PhysicallyMappedDualSet:
             derivatives[order] = (point_index, D)
         return derivatives
 
-    def to_riesz(self, nodes, G, columns):
+    def to_riesz(self, nodes, G, tabulation, columns):
         r"""The Riesz representations :math:`(GW_i):D_j` of nodes with the same :attr:`~PhysicallyMappedFunctional.pullback_mappings`.
 
         Here :math:`W_i` are the weights of node i and :math:`D_j` are the
@@ -427,6 +432,7 @@ class PhysicallyMappedDualSet:
 
         :arg nodes: The nodes i.
         :arg G: The pullback of the weights, a :class:`LinearCombination` on their axes.
+        :arg tabulation: The :meth:`tabulate` of the basis.
         :arg columns: The basis functions j.
         :returns: A :class:`LinearCombination` of constant matrices over
             the nodes and the basis functions.
@@ -441,16 +447,16 @@ class PhysicallyMappedDualSet:
             point_groups[order, points].append(k)
 
         R = numpy.zeros((len(G.matrices), len(nodes), len(columns)))
-        for (order, points), ks in point_groups.items():
-            point_index, D = self.tabulation[order]
+        for (order, points), positions in point_groups.items():
+            point_index, D = tabulation[order]
             D = D[columns][..., [point_index[x] for x in points]]
-            W = numpy.stack([self.functionals[nodes[k]].weights for k in ks])
+            W = numpy.stack([self.functionals[nodes[k]].weights for k in positions])
             # Contract the weights with the derivatives at the points, and
             # order the axes of the groups as in the Kronecker product
             A = numpy.tensordot(W, D, axes=(-1, -1))
             A = A.transpose(*(rank + 2 + k for k in axes), *(1 + k for k in axes), 0, rank + 1)
             n = W[0].size // W.shape[-1]
-            R[:, ks] = G.contract(A.reshape(n, n, len(ks), -1), self.tol).matrices
+            R[:, positions] = G.contract(A.reshape(n, n, len(positions), -1), self.tol).matrices
         return LinearCombination(G.coefficients, R)
 
 
@@ -475,13 +481,15 @@ class VandermondeMatrix:
     entry with a tabulated value.
 
     :arg dual: The :class:`PhysicallyMappedDualSet`.
+    :arg tabulation: The :meth:`PhysicallyMappedDualSet.tabulate` of the
+        reference basis.
     :arg coordinate_mapping: Object providing the physical geometry
         as GEM expressions.
     :raises NotImplementedError: If a row couples to a dof outside the
         closure of the entity of the node.
     """
 
-    def __init__(self, dual, coordinate_mapping):
+    def __init__(self, dual, tabulation, coordinate_mapping):
         sd = dual.cell.get_spatial_dimension()
         bary, = dual.cell.make_points(sd, 0, sd + 1)
         if sd == 1:
@@ -494,7 +502,7 @@ class VandermondeMatrix:
         metric, adj_metric = metric_and_adjugate(J)
         h = coordinate_mapping.cell_size()
 
-        columns = list(range(dual.element.space_dimension()))
+        columns = list(range(len(dual.functionals)))
         pullbacks = {}
         groups = defaultdict(list)
         for (dim, entity, key), nodes in dual.groups.items():
@@ -502,22 +510,23 @@ class VandermondeMatrix:
             if key not in pullbacks:
                 pullbacks[key] = dual.functionals[nodes[0]].pullback(J, adjJ, detJ, metric, adj_metric)
             pullback = pullbacks[key]
-            entries = dual.to_riesz(nodes, pullback.forward, columns)
+            entries = dual.to_riesz(nodes, pullback.forward, tabulation, columns)
 
             # The rows may only couple to the dofs in the closure of their entity
-            closure = dual.entity_closure_dofs[dim][entity]
+            closure = dual.entity_closure_ids[dim][entity]
             outside = [j for j in numpy.flatnonzero(entries.matrices.any(axis=(0, 1))) if j not in closure]
             if outside:
                 raise NotImplementedError(f"The pullback of dofs {nodes} on entity {(dim, entity)} "
                                           f"needs dofs {outside} outside its closure, so it is not local to the entity.")
 
-            inverse = dual.to_riesz(nodes, pullback.inverse, dual.entity_dofs[dim][entity]).merged().expand()
+            block = dual.entity_ids[dim][entity]
+            inverse = dual.to_riesz(nodes, pullback.inverse, tabulation, block).merged().expand()
             scales = [dual.functionals[i].scaling(J, h) for i in nodes]
             groups[dim, entity].append(RowGroup(nodes, entries, inverse, scales))
 
         # The negated rows of B_0 outside each diagonal block, on the entity
         # blocks of the support of the rows
-        owners = {j: (dim, entity) for dim, entities in dual.entity_dofs.items()
+        owners = {j: (dim, entity) for dim, entities in dual.entity_ids.items()
                   for entity, dofs in entities.items() for j in dofs}
         couplings = defaultdict(list)
         for (dim, entity), row_groups in groups.items():
@@ -525,10 +534,11 @@ class VandermondeMatrix:
                 support = {owners[j] for j in numpy.flatnonzero(group.entries.matrices.any(axis=(0, 1)))}
                 support.discard((dim, entity))
                 for other_dim, other_entity in sorted(support):
-                    R = group.entries.matrices[:, :, dual.entity_dofs[other_dim][other_entity]]
+                    R = group.entries.matrices[:, :, dual.entity_ids[other_dim][other_entity]]
                     coupling = LinearCombination(group.entries.coefficients, -R).merged().expand()
                     couplings[other_dim, other_entity].append((group.nodes, coupling))
         self.dual = dual
+        #: A dict from each entity to its :class:`RowGroup` objects.
         self.groups = dict(groups)
         #: A dict from each entity to the pairs of the nodes of another
         #: entity and the negated block of their rows of :math:`B_0` on the
@@ -537,7 +547,7 @@ class VandermondeMatrix:
 
     def array(self):
         """The physical Vandermonde matrix :math:`B` over all reference dofs, as an object array of GEM scalars."""
-        n = self.dual.element.space_dimension()
+        n = len(self.dual.functionals)
         B = numpy.full((n, n), zero, dtype=object)
         for groups in self.groups.values():
             for group in groups:
@@ -552,7 +562,7 @@ class VandermondeMatrix:
 
         The row j is :math:`B^{-T}e_j` from :meth:`transpose_solve`.
         """
-        n = self.dual.element.space_dimension()
+        n = len(self.dual.functionals)
         return numpy.array([self.transpose_solve([one if i == j else zero for i in range(n)])
                             for j in range(n)], dtype=object)
 
@@ -571,13 +581,13 @@ class VandermondeMatrix:
         """
         C = self.dual.coeffs
         if C is not None:
-            # B = C B_0' C^{-1}, with B_0' on the nodes before recombination
-            phi = sparse_vecmat(phi, LinearCombination([one], C[None]).expand())
+            # For n = C n_0, B^{-T} = C^{-T} B'^{-T} C^T, with B' on the nodes n_0
+            phi = sparse_vecmat(phi, literal_array(C))
 
-        entity_dofs = self.dual.entity_dofs
+        entity_ids = self.dual.entity_ids
         chi = [None] * len(phi)
-        for dim in sorted(entity_dofs, reverse=True):
-            for entity, dofs in entity_dofs[dim].items():
+        for dim in sorted(entity_ids, reverse=True):
+            for entity, dofs in entity_ids[dim].items():
                 rhs = [phi[j] for j in dofs]
                 for nodes, coupling in self.couplings.get((dim, entity), []):
                     y = sparse_vecmat([chi[i] for i in nodes], coupling)
@@ -595,7 +605,7 @@ class VandermondeMatrix:
                 for i, scale in zip(group.nodes, group.scales):
                     chi[i] = chi[i] / scale
         if C is not None:
-            chi = sparse_vecmat(chi, LinearCombination([one], numpy.linalg.inv(C)[None]).expand())
+            chi = sparse_vecmat(chi, literal_array(numpy.linalg.inv(C)))
         return chi
 
 
@@ -756,13 +766,13 @@ def adjugate_and_determinant(J):
 
 
 def metric_and_adjugate(J):
-    r"""Return the metric :math:`G=J^TJ` and its adjugate, which equals :math:`\operatorname{adj}(J)\operatorname{adj}(J)^T`.
+    r"""Return the metric :math:`G=J^TJ` and its adjugate.
 
     :arg J: Full-column-rank Jacobian as an object array of GEM scalars.
     :returns: The symmetric matrices :math:`G` and :math:`\operatorname{adj}(G)`.
     """
     G = symmetric(J.T @ J)
-    return G, symmetric(adjugate(G))
+    return (G, symmetric(adjugate(G)))
 
 
 def symmetric(A):
@@ -771,6 +781,14 @@ def symmetric(A):
     i, j = numpy.tril_indices(len(A), -1)
     A[i, j] = A[j, i]
     return A
+
+
+def literal_array(A):
+    """The constant array A as an object array of GEM literals, with GEM zeros for its zero entries."""
+    A_gem = numpy.full(A.shape, zero, dtype=object)
+    nonzero = A != 0
+    A_gem[nonzero] = [gem.Literal(a) for a in A[nonzero]]
+    return A_gem
 
 
 def sparse_matmul(A, B):
@@ -853,11 +871,8 @@ class LinearCombination:
 
     def expand(self):
         r"""The GEM scalars :math:`\sum_t g_tC_t`, as an object array of the shape of :math:`C_t`."""
-        C = self.matrices.reshape(len(self.matrices), -1)
-        C_gem = numpy.full(C.shape, zero, dtype=object)
-        nonzero = C != 0
-        C_gem[nonzero] = [gem.Literal(c) for c in C[nonzero]]
-        return sparse_matmul(self.coefficients[None, :], C_gem).reshape(self.matrices.shape[1:])
+        C = literal_array(self.matrices.reshape(len(self.matrices), -1))
+        return sparse_matmul(self.coefficients[None, :], C).reshape(self.matrices.shape[1:])
 
     def merged(self):
         r"""Drop the terms with :math:`C_t=0` and merge the terms with proportional :math:`C_t`.
@@ -910,6 +925,7 @@ def cartesian_pullbacks(J, adjJ, detJ):
 def frame_pullbacks(cell, frame, metric, adj_metric, detJ):
     """The :class:`Pullback` of each mapping in the frame of an entity.
 
+    :arg cell: The reference cell.
     :arg frame: The entity ``(dim, entity)``, a facet or an edge of a tetrahedron.
     :arg metric: The metric :math:`J^TJ`.
     :arg adj_metric: The adjugate of the metric.
