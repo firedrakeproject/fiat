@@ -8,8 +8,12 @@ from finat.point_set import PointSet, PointSingleton
 
 
 class FiatElement(FiniteElementBase):
-    """Base class for finite elements for which the tabulation is provided
-    by FIAT."""
+    """Base class for finite elements whose tabulation is provided by FIAT.
+
+    Subclasses may override ``space_dimension`` to report a smaller dimension
+    when trailing FIAT functionals represent constraints rather than
+    degrees of freedom.
+    """
     def __init__(self, fiat_element):
         super().__init__()
         self._element = fiat_element
