@@ -1,5 +1,6 @@
 import inspect
 from abc import ABCMeta, abstractmethod, abstractproperty
+from collections.abc import Hashable
 from functools import cache
 from itertools import chain
 
@@ -44,7 +45,7 @@ def _freeze(value):
     elif isinstance(value, numpy.ndarray):
         return (numpy.ndarray, value.dtype.str, value.shape, value.tobytes())
     else:
-        assert isinstance(value, collections.abc.Hashable)
+        assert isinstance(value, Hashable)
         return value
 
 
