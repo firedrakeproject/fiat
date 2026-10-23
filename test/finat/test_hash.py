@@ -98,3 +98,4 @@ def test_finat_pickle():
     """A pickled FInAT element should be equal to the original."""
     element = finat.TensorFiniteElement(finat.Lagrange(UFCTriangle(), 2), (2,))
     assert pickle.loads(pickle.dumps(element)) == element
+    assert hash(pickle.loads(pickle.dumps(element))) == hash(element)

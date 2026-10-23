@@ -44,6 +44,7 @@ def _freeze(value):
     elif isinstance(value, numpy.ndarray):
         return (numpy.ndarray, value.dtype.str, value.shape, value.tobytes())
     else:
+        assert isinstance(value, collections.abc.Hashable)
         return value
 
 
