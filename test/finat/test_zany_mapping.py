@@ -313,8 +313,8 @@ class SymbolicMapping:
 
 
 def transformations(element, sd):
-    mapping = SymbolicMapping(sd)
-    return element._physical_vandermonde(mapping), element._inverse_physical_vandermonde(mapping)
+    B = element._vandermonde_matrix(SymbolicMapping(sd))
+    return (B.array(), B.inverse_array())
 
 
 def nonzeros(row):
