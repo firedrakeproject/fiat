@@ -455,10 +455,9 @@ class PhysicallyMappedDualSet:
 
 
 #: The rows of :math:`B_0` of the nodes of an entity that share a pullback,
-#: and their rows of the inverse of the diagonal block of the entity, as
-#: :class:`LinearCombination` objects of constant matrices, the latter
-#: :meth:`~LinearCombination.merged`, and the scaling of each row of
-#: :math:`B=SB_0`.
+#: as a :class:`LinearCombination` of constant matrices, their rows of the
+#: inverse of the diagonal block of the entity, as an object array of GEM
+#: scalars, and the scaling of each row of :math:`B=SB_0`.
 RowGroup = namedtuple("RowGroup", ["nodes", "entries", "inverse", "scales"])
 
 
@@ -468,9 +467,12 @@ class VandermondeMatrix:
     The rows of :math:`B_0` of the nodes of an entity that share a pullback
     are :math:`\sum_t g_tR_t`, with the same GEM scalars :math:`g_t` from the
     geometry, and constant matrices :math:`R_t` from the reference cell, see
-    :class:`RowGroup`.  The constant part of the back-substitution in
-    :meth:`transpose_solve` is merged one time, in :attr:`couplings` and in
-    the inverses of the :class:`RowGroup` objects.
+    :class:`RowGroup`.  The blocks of the back-substitution in
+    :meth:`transpose_solve` are expanded one time from the
+    :meth:`~LinearCombination.merged` terms, in :attr:`couplings` and in the
+    inverses of the :class:`RowGroup` objects.  Their entries do not depend
+    on the points of a tabulation, so the back-substitution multiplies each
+    entry with a tabulated value.
 
     :arg dual: The :class:`PhysicallyMappedDualSet`.
     :arg coordinate_mapping: Object providing the physical geometry
@@ -509,25 +511,28 @@ class VandermondeMatrix:
                 raise NotImplementedError(f"The pullback of dofs {nodes} on entity {(dim, entity)} "
                                           f"needs dofs {outside} outside its closure, so it is not local to the entity.")
 
-            inverse = dual.to_riesz(nodes, pullback.inverse, dual.entity_dofs[dim][entity]).merged()
+            inverse = dual.to_riesz(nodes, pullback.inverse, dual.entity_dofs[dim][entity]).merged().expand()
             scales = [dual.functionals[i].scaling(J, h) for i in nodes]
             groups[dim, entity].append(RowGroup(nodes, entries, inverse, scales))
 
-        # The negated rows of B_0 outside each diagonal block, by entity block
+        # The negated rows of B_0 outside each diagonal block, on the entity
+        # blocks of the support of the rows
+        owners = {j: (dim, entity) for dim, entities in dual.entity_dofs.items()
+                  for entity, dofs in entities.items() for j in dofs}
         couplings = defaultdict(list)
         for (dim, entity), row_groups in groups.items():
             for group in row_groups:
-                for other_dim, entities in dual.entity_dofs.items():
-                    for other_entity, dofs in entities.items():
-                        R = group.entries.matrices[:, :, dofs]
-                        if (other_dim, other_entity) != (dim, entity) and R.any():
-                            coupling = LinearCombination(group.entries.coefficients, -R).merged()
-                            couplings[other_dim, other_entity].append((group.nodes, coupling))
+                support = {owners[j] for j in numpy.flatnonzero(group.entries.matrices.any(axis=(0, 1)))}
+                support.discard((dim, entity))
+                for other_dim, other_entity in sorted(support):
+                    R = group.entries.matrices[:, :, dual.entity_dofs[other_dim][other_entity]]
+                    coupling = LinearCombination(group.entries.coefficients, -R).merged().expand()
+                    couplings[other_dim, other_entity].append((group.nodes, coupling))
         self.dual = dual
         self.groups = dict(groups)
         #: A dict from each entity to the pairs of the nodes of another
-        #: entity and the :meth:`~LinearCombination.merged` negated block of
-        #: their rows of :math:`B_0` on the dofs of the entity.
+        #: entity and the negated block of their rows of :math:`B_0` on the
+        #: dofs of the entity, as an object array of GEM scalars.
         self.couplings = dict(couplings)
 
     def array(self):
@@ -559,9 +564,7 @@ class VandermondeMatrix:
         :math:`\chi_e = B_{ee}^{-T}(\phi_e - \sum_f B_{fe}^T\chi_f)` over the
         entities f whose closure contains e, using only the nonzero entries
         of :math:`B_0` and of the inverses of its diagonal blocks.  Then
-        :math:`\chi` is scaled by :math:`S^{-1}`.  Each block applies by
-        :meth:`LinearCombination.transpose_matvec`, which multiplies each
-        GEM scalar :math:`g_t` with a constant combination of the rows once.
+        :math:`\chi` is scaled by :math:`S^{-1}`.
 
         :arg phi: The GEM scalars :math:`\phi`, one for each reference dof.
         :returns: A list of GEM scalars, one for each reference dof.
@@ -569,7 +572,7 @@ class VandermondeMatrix:
         C = self.dual.coeffs
         if C is not None:
             # B = C B_0' C^{-1}, with B_0' on the nodes before recombination
-            phi = LinearCombination([one], C[None]).transpose_matvec(phi)
+            phi = sparse_vecmat(phi, LinearCombination([one], C[None]).expand())
 
         entity_dofs = self.dual.entity_dofs
         chi = [None] * len(phi)
@@ -577,12 +580,12 @@ class VandermondeMatrix:
             for entity, dofs in entity_dofs[dim].items():
                 rhs = [phi[j] for j in dofs]
                 for nodes, coupling in self.couplings.get((dim, entity), []):
-                    y = coupling.transpose_matvec([chi[i] for i in nodes])
+                    y = sparse_vecmat([chi[i] for i in nodes], coupling)
                     rhs = [gem.Sum(a, b) for a, b in zip(rhs, y)]
 
                 chi_block = [zero] * len(dofs)
                 for group in self.groups.get((dim, entity), []):
-                    y = group.inverse.transpose_matvec([rhs[dofs.index(i)] for i in group.nodes])
+                    y = sparse_vecmat([rhs[dofs.index(i)] for i in group.nodes], group.inverse)
                     chi_block = [gem.Sum(a, b) for a, b in zip(chi_block, y)]
                 for j, value in zip(dofs, chi_block):
                     chi[j] = value
@@ -592,7 +595,7 @@ class VandermondeMatrix:
                 for i, scale in zip(group.nodes, group.scales):
                     chi[i] = chi[i] / scale
         if C is not None:
-            chi = LinearCombination([one], numpy.linalg.inv(C)[None]).transpose_matvec(chi)
+            chi = sparse_vecmat(chi, LinearCombination([one], numpy.linalg.inv(C)[None]).expand())
         return chi
 
 
@@ -777,8 +780,22 @@ def sparse_matmul(A, B):
     for i, k in numpy.ndindex(A.shape):
         if not isinstance(A[i, k], gem.Zero):
             for j in columns[k]:
-                C[i, j] = C[i, j] + A[i, k] * B[k, j]
+                C[i, j] = gem.Sum(C[i, j], gem.Product(A[i, k], B[k, j]))
     return C
+
+
+def sparse_vecmat(x, A):
+    """The product :math:`x^TA` of a vector and a matrix of GEM scalars, which skips the zero entries.
+
+    :returns: A list of GEM scalars, one for each column of A.
+    """
+    y = [zero] * A.shape[1]
+    for xi, row in zip(x, A):
+        if not isinstance(xi, gem.Zero):
+            for j, entry in enumerate(row):
+                if not isinstance(entry, gem.Zero):
+                    y[j] = gem.Sum(y[j], gem.Product(entry, xi))
+    return y
 
 
 class LinearCombination:
@@ -864,23 +881,6 @@ class LinearCombination:
         coefficients = [g for g, _ in merged.values()]
         matrices = [C for _, C in merged.values()]
         return LinearCombination(coefficients, numpy.reshape(matrices, (len(matrices), *self.matrices.shape[1:])))
-
-    def transpose_matvec(self, x):
-        r"""The GEM scalars :math:`y=G^Tx=\sum_t g_t C_t^Tx`.
-
-        Each :math:`g_t` multiplies the constant combination :math:`C_t^Tx`
-        once, so the terms should be :meth:`merged` first.
-
-        :arg x: The GEM scalars :math:`x_i`, one for each row.
-        :returns: A list of GEM scalars, one for each column.
-        """
-        rows = [i for i, xi in enumerate(x) if not isinstance(xi, gem.Zero)]
-        y = [zero] * self.matrices.shape[2]
-        for g, C in zip(self.coefficients, self.matrices[:, rows]):
-            for j in numpy.flatnonzero(C.any(axis=0)):
-                combination = gem.Sum(*(gem.Product(gem.Literal(C[k, j]), x[rows[k]]) for k in numpy.flatnonzero(C[:, j])))
-                y[j] = gem.Sum(y[j], gem.Product(g, combination))
-        return y
 
 
 def round_to_int(x, tol):
