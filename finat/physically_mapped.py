@@ -475,7 +475,7 @@ class VandermondeMatrix:
     geometry, and constant matrices :math:`R_t` from the reference cell, see
     :class:`RowGroup`.  The blocks of the back-substitution in
     :meth:`transpose_solve` are expanded one time from the
-    :meth:`~LinearCombination.merged` terms, in :attr:`couplings` and in the
+    :meth:`~LinearCombination.collect_terms`, in :attr:`couplings` and in the
     inverses of the :class:`RowGroup` objects.  Their entries do not depend
     on the points of a tabulation, so the back-substitution multiplies each
     entry with a tabulated value.
@@ -520,7 +520,7 @@ class VandermondeMatrix:
                                           f"needs dofs {outside} outside its closure, so it is not local to the entity.")
 
             block = dual.entity_ids[dim][entity]
-            inverse = dual.to_riesz(nodes, pullback.inverse, tabulation, block).merged().expand()
+            inverse = dual.to_riesz(nodes, pullback.inverse, tabulation, block).collect_terms().expand()
             scales = [dual.functionals[i].scaling(J, h) for i in nodes]
             groups[dim, entity].append(RowGroup(nodes, entries, inverse, scales))
 
@@ -535,7 +535,7 @@ class VandermondeMatrix:
                 support.discard((dim, entity))
                 for other_dim, other_entity in sorted(support):
                     R = group.entries.matrices[:, :, dual.entity_ids[other_dim][other_entity]]
-                    coupling = LinearCombination(group.entries.coefficients, -R).merged().expand()
+                    coupling = LinearCombination(group.entries.coefficients, -R).collect_terms().expand()
                     couplings[other_dim, other_entity].append((group.nodes, coupling))
         self.dual = dual
         #: A dict from each entity to its :class:`RowGroup` objects.
@@ -874,14 +874,15 @@ class LinearCombination:
         C = literal_array(self.matrices.reshape(len(self.matrices), -1))
         return sparse_matmul(self.coefficients[None, :], C).reshape(self.matrices.shape[1:])
 
-    def merged(self):
-        r"""Drop the terms with :math:`C_t=0` and merge the terms with proportional :math:`C_t`.
+    def collect_terms(self):
+        r"""Collect the terms with proportional :math:`C_t` into one term, and drop the terms with :math:`C_t=0`.
 
-        The terms :math:`g_sC_s+g_tC_t` with :math:`C_t=\lambda C_s` merge into
-        :math:`(g_s+\lambda g_t)C_s`.  Each merged :math:`C_s` is scaled to
-        have its first nonzero entry equal to 1.
+        The terms :math:`g_sC_s+g_tC_t` with :math:`C_t=\lambda C_s` collect
+        into :math:`(g_s+\lambda g_t)C_s`, as in
+        :func:`gem.refactorise.collect_monomials`.  Each collected
+        :math:`C_s` is scaled to have its first nonzero entry equal to 1.
         """
-        merged = {}
+        terms = {}
         for g, C in zip(self.coefficients, self.matrices):
             nonzero = numpy.flatnonzero(C)
             if len(nonzero) == 0:
@@ -889,12 +890,12 @@ class LinearCombination:
             pivot = C.flat[nonzero[0]]
             C = C / pivot
             key = tuple(numpy.round(C.ravel(), 12))
-            if key in merged:
-                merged[key] = (gem.Sum(merged[key][0], gem.Literal(pivot) * g), C)
+            if key in terms:
+                terms[key] = (gem.Sum(terms[key][0], gem.Literal(pivot) * g), C)
             else:
-                merged[key] = (gem.Literal(pivot) * g, C)
-        coefficients = [g for g, _ in merged.values()]
-        matrices = [C for _, C in merged.values()]
+                terms[key] = (gem.Literal(pivot) * g, C)
+        coefficients = [g for g, _ in terms.values()]
+        matrices = [C for _, C in terms.values()]
         return LinearCombination(coefficients, numpy.reshape(matrices, (len(matrices), *self.matrices.shape[1:])))
 
 
