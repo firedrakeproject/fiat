@@ -215,7 +215,7 @@ def emit_operations(assignments, get_indices, emit_return_accumulate=True):
     return ops
 
 
-def emit_operations_new(assignments, get_indices, emit_return_accumulate=True):
+def emit_operations_new(assignments, get_indices):
     """Makes an ordering of operations to evaluate a multi-root
     expression DAG.
 
@@ -224,9 +224,6 @@ def emit_operations_new(assignments, get_indices, emit_return_accumulate=True):
                       upon execution.
     :arg get_indices: mapping from GEM nodes to an ordering of free
                       indices
-    :arg emit_return_accumulate: emit ReturnAccumulate nodes? Set to
-                      False if the output variables are not guaranteed
-                      zero on entry to the kernel.
     :returns: list of Impero terminals correctly ordered to evaluate
               the assignments
     """
@@ -267,21 +264,6 @@ def emit_operations_new(assignments, get_indices, emit_return_accumulate=True):
             depends_on[insn].append(maybe_dep)
 
     assert ready_to_schedule, "Must have something to start with"
-
-    # TODO: not handling emit_return_accumulate any more!
-    # Stage return operations
-    # staging = []
-    # for a in assignments:  # do in reverse order so final order is closer to what we expect, avoid arbitrary movement
-    #     variable = a.assignee
-    #     expression = a.expression
-    #     if emit_return_accumulate and \
-    #             refcount[expression] == 1 and isinstance(expression, gem.IndexSum) \
-    #             and set(variable.free_indices) == set(expression.free_indices):
-    #         staging.append(impero.Assignment(variable, expression, "inc"))
-    #         refcount[expression] -= 1
-    #     else:
-    #         staging.append(impero.Assignment(variable, expression, "write"))
-    # staging = list(assignments)
 
     # Callbacks executed when a reference count hits zero, push the node (either
     # GEM or Impero) onto the stack to be executed.
