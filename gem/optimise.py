@@ -194,9 +194,9 @@ _constant_fold_zero.register(Node)(reuse_if_untouched)
 
 @_constant_fold_zero.register(Literal)
 def _constant_fold_zero_literal(node, self):
-    if numpy.array_equal(node.array, 0):
-        # All zeros, make symbolic zero
-        return Zero(node.shape)
+    if not node.array.any():
+        # A table of any shape that holds only zeros is a symbolic zero.
+        return Zero(node.shape, dtype=node.dtype)
     else:
         return node
 
