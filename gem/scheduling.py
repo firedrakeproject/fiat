@@ -26,7 +26,7 @@ class OrderedDefaultDict(collections.OrderedDict):
         return val
 
 
-class ReferenceStager(object):
+class ReferenceStager:
     """Provides staging for nodes in reference counted expression
     DAGs.  A callback function is called once the reference count is
     exhausted."""
@@ -57,7 +57,7 @@ class ReferenceStager(object):
         return not any(self.waiting.values())
 
 
-class Queue(object):
+class Queue:
     """Special queue for operation scheduling.  GEM / Impero nodes are
     inserted when they are ready to be scheduled, i.e. any operation
     which depends on the operation to be inserted must have been
@@ -105,8 +105,19 @@ class Queue(object):
             del self.queue[indices]
 
 
-def handle(ops, push, decref, node):
-    """Helper function for scheduling"""
+def handle(ops, depends_on, push, decref, node):
+    """Helper function for scheduling.
+
+    The idea is:
+
+    ``ops`` is the sequence of scheduled operations (in reverse order). When we
+    append to it we are therefore concretely scheduling something.
+
+    When we consume something we say "we have now consumed this attribute" and can
+    decref its sub-attributes so that they may then get processed. When a reference
+    count drops to zero then the object has no outstanding dependencies and can be scheduled.
+
+    """
     if isinstance(node, gem.Variable):
         # Declared in the kernel header
         pass
@@ -123,7 +134,7 @@ def handle(ops, push, decref, node):
         ops.append(impero.Noop(node))
         push(impero.Accumulate(node))
     elif isinstance(node, gem.Node):
-        ops.append(impero.Evaluate(node))
+        ops.append(impero.Evaluate(node))  # might want to materialise this as a temporary
         for child in node.children:
             decref(child)
     elif isinstance(node, impero.Initialise):
@@ -138,6 +149,12 @@ def handle(ops, push, decref, node):
     elif isinstance(node, impero.ReturnAccumulate):
         ops.append(node)
         decref(node.indexsum.children[0])
+    elif isinstance(node, impero.Assignment):
+        ops.append(node)
+        decref(node.expression)
+        # maybe we can now emit instructions that this instruction depends on
+        for op in depends_on[node]:
+            decref(op)
     else:
         raise AssertionError("no handler for node type %s" % type(node))
 
@@ -181,7 +198,7 @@ def emit_operations(assignments, get_indices, emit_return_accumulate=True):
     ops = []
 
     stager = ReferenceStager(refcount, push_node)
-    queue = Queue(functools.partial(handle, ops, push_op, stager.decref))
+    queue = Queue(functools.partial(handle, ops, "unused", push_op, stager.decref))
 
     # Enqueue return operations
     for op in staging:
@@ -214,36 +231,75 @@ def emit_operations_new(assignments, get_indices, emit_return_accumulate=True):
               the assignments
     """
     # Prepare reference counts
+    # refcount = collect_refcount([a.assignee for a in assignments]+[a.expression for a in assignments])
     refcount = collect_refcount([a.expression for a in assignments])
 
+    # some assignments depend on each other, for now assume all do
+    #
+    # consider
+    #
+    #   y <- x
+    #   a <- b
+    #   z <- y
+    #
+    # We can emit instructions for a and z immediately as they have no downstream
+    # consumers. y must be assigned to before z though, so it must have an extra reference.
+    # NOTE: What about RW access? Produces a cyclic reference
+    #
+    #   t <- dat
+    #   f(t)
+    #   dat <- t
+    #
+    # FIXME: It's a hack but do things in reverse order for now because of ordering issues
+    # with the output temporary (e.g. don't zero it after computing it)
+    import pyop3.collections
+    ready_to_schedule = pyop3.collections.OrderedSet(list(reversed(assignments)))
+    depends_on = collections.defaultdict(list)
+    for insn, maybe_dep in itertools.permutations(reversed(assignments), 2):
+        # Determine if maybe_dep is a dependency of insn by looking to see if its
+        # LHS appears in insn's RHS
+        insn_refcount = collect_refcount([insn.expression])
+        if maybe_dep.assignee.aggregate in insn_refcount:
+            # maybe_dep LHS appears in the RHS expression, don't emit an
+            # instruction until that is dealt with first.
+            refcount[maybe_dep] += 1
+            ready_to_schedule.discard(maybe_dep)
+            depends_on[insn].append(maybe_dep)
+
+    assert ready_to_schedule, "Must have something to start with"
+
+    # TODO: not handling emit_return_accumulate any more!
     # Stage return operations
-    staging = []
-    for a in assignments:
-        variable = a.assignee
-        expression = a.expression
-        if emit_return_accumulate and \
-                refcount[expression] == 1 and isinstance(expression, gem.IndexSum) \
-                and set(variable.free_indices) == set(expression.free_indices):
-            staging.append(impero.ReturnAccumulate(variable, expression))
-            refcount[expression] -= 1
+    # staging = []
+    # for a in assignments:  # do in reverse order so final order is closer to what we expect, avoid arbitrary movement
+    #     variable = a.assignee
+    #     expression = a.expression
+    #     if emit_return_accumulate and \
+    #             refcount[expression] == 1 and isinstance(expression, gem.IndexSum) \
+    #             and set(variable.free_indices) == set(expression.free_indices):
+    #         staging.append(impero.Assignment(variable, expression, "inc"))
+    #         refcount[expression] -= 1
+    #     else:
+    #         staging.append(impero.Assignment(variable, expression, "write"))
+    # staging = list(assignments)
+
+    # Callbacks executed when a reference count hits zero, push the node (either
+    # GEM or Impero) onto the stack to be executed.
+    def push(node):
+        if isinstance(node, gem.Node):
+            queue.insert(get_indices(node), node)
         else:
-            staging.append(impero.Return(variable, expression))
-
-    # Prepare data structures
-    def push_node(node):  # handle gem nodes
-        queue.insert(get_indices(node), node)
-
-    def push_op(op):  # handle impero nodes
-        queue.insert(op.loop_shape(get_indices), op)
+            assert isinstance(node, impero.Node)
+            queue.insert(node.loop_shape(get_indices), node)
 
     ops = []
 
-    stager = ReferenceStager(refcount, push_node)
-    queue = Queue(functools.partial(handle, ops, push_op, stager.decref))
+    stager = ReferenceStager(refcount, push)
+    queue = Queue(lambda node: handle(ops, depends_on, push, stager.decref, node))
 
     # Enqueue return operations
-    for op in staging:
-        push_op(op)
+    for op in ready_to_schedule:
+        push(op)
 
     # Schedule operations
     queue.process()

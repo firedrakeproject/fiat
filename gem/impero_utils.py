@@ -360,7 +360,7 @@ def place_declarations(tree, temporaries, get_indices):
                   counts for each temporary in the subtree whose root
                   is ``expr``
         """
-        return AssertionError("unsupported expression type %s" % type(expr))
+        raise AssertionError(f"unsupported expression type {type(expr).__name__}")
 
     @recurse.register(imp.Terminal)
     def recurse_terminal(expr, loop_indices):
@@ -461,6 +461,8 @@ def temp_refcount(temporaries, op):
         recurse(op.expression)
     elif isinstance(op, imp.ReturnAccumulate):
         recurse(op.indexsum.children[0])
+    elif isinstance(op, imp.Assignment):
+        recurse(op.expression)
     elif isinstance(op, imp.Noop):
         pass
     else:

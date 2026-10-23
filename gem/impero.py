@@ -26,7 +26,7 @@ class Node(NodeBase):
 
     @abstractmethod
     def _pretty_string(self, *, indent: int) -> str:
-        raise NotImplementedError(f"cant print {type(self).__name__}")
+        raise NotImplementedError(f"_pretty_string not implemented for {type(self).__name__}")
 
 
 class Terminal(Node, metaclass=ABCMeta):
@@ -195,7 +195,7 @@ class For(Node):
         return "\n".join((prefix, body, suffix))
 
 
-class Assignment(Node):
+class Assignment(Terminal):
     __slots__ = ("assignee", "expression", "mode")
 
     children = ()
@@ -205,9 +205,34 @@ class Assignment(Node):
         self.expression = as_gem(expression)
         self.mode = mode
 
+    def __eq__(self, other):
+        return type(other) == type(self) and other._key == self._key
+
+    def __hash__(self):
+        return hash(self._key)
+
+    @property
+    def _key(self):
+        return (type(self), self.assignee, self.expression, self.mode)
+
     def __repr__(self):
         return f"{type(self).__name__}({self.assignee!r}, {self.expression!r}, {self.mode!r})"
 
-    def __str__(self):
-        # TODO: handle mode
-        return f"{self.assignee} <- {self.expression}"
+    def _pretty_string(self, *, indent: int) -> str:
+        match self.mode:
+            case "write":
+                infix = "="
+            case "inc":
+                infix = "+="
+            case _:
+                raise AssertionError
+
+        return f"{' '*indent}{self.assignee} {infix} {self.expression}"
+
+    def loop_shape(self, free_indices):
+        # possibly this is fine now...
+        import pyop3.collections
+        indices = pyop3.collections.OrderedSet()
+        for obj in [self.assignee, self.expression]:
+            indices.update(free_indices(obj))
+        return tuple(indices)
