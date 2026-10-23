@@ -34,6 +34,7 @@ from FIAT.orientation_utils import (
     make_cell_orientation_reflection_map_simplex,
     make_cell_orientation_reflection_map_tensorproduct,
     make_entity_permutations_simplex,
+    make_entity_permutations_tensorproduct
 )
 
 POINT = 0
@@ -1872,3 +1873,165 @@ def max_complex(complexes):
         return max_cell
     else:
         raise ValueError("Cannot find the maximal complex")
+
+
+def make_facet_embedding_maps(ref_cell):
+    """Return the affine maps from the reference coordinates of each facet to the
+    reference coordinates of the cell.
+
+    For each local facet `lf`, the map is
+
+    X = A[lf] @ X_f + b[lf].
+
+    where ``X_f`` are the reference coordinates of a point on the facet and ``X``
+    are the reference coordinates of the same point in the cell.
+
+    Parameters
+    ----------
+    ref_cell : Cell
+        The reference cell, which must be a simplex or a hypercube.
+
+    Returns
+    -------
+    A : numpy.ndarray
+        The matrix of each map, with shape ``(num_facets, dim, dim - 1)``.
+    b : numpy.ndarray
+        The translation vector of each map, with shape ``(num_facets, dim)``.
+    A_inv : numpy.ndarray
+        The pseudo-inverse of each matrix, with shape ``(num_facets, dim - 1, dim)``.
+        ``A_inv[lf] @ (X - b[lf])`` gives the facet coordinates of a point ``X``
+        that lies on facet ``lf``.
+    """
+    facet_dim = ref_cell.get_spatial_dimension() - 1
+    num_facets = len(ref_cell.get_topology()[facet_dim])
+
+    # Each facet embedding is affine and can be derived by evaluating the entity transform at the facet origin and unit vectors
+    facet_points = numpy.vstack([numpy.zeros(facet_dim), numpy.eye(facet_dim)])
+    mapped = numpy.stack([ref_cell.get_entity_transform(facet_dim, lf)(facet_points) for lf in range(num_facets)])
+    b = mapped[:, 0]
+    A = numpy.swapaxes(mapped[:, 1:] - b[:, None], 1, 2)
+    A_inv = numpy.linalg.pinv(A)
+    return A, b, A_inv
+
+
+def make_facet_orientation_maps(ref_cell):
+    """
+    When two adjacent cells share a facet, the ordering of the facet
+    vertices (and hence facet-local reference coordinates) may differ between
+    the two cells. This difference is encoded in the local facet orientation.
+    This method constructs, for every possible facet orientation `o`, an affine
+    map acting on facet-local coordinates:
+
+    X_f_can = Q_o @ X_f_o + t_o,
+
+    where X_f_can defines the facet-local coordinates in the facet's canonical orientation and
+    X_f_o defines the facet-local coordinates of the same point when the facet is in orientation `o`.
+
+    A vertex permutation is first obtained for each possible facet permutation and is then used to construct the corresponding coordinate map.
+
+    Parameters
+    ----------
+    ref_cell : Cell
+        The reference cell, which must be a simplex or a hypercube.
+
+    Returns
+    -------
+    dict
+        Maps each facet orientation integer o to an affine map (Q_o, t_o) acting on facet-local coordinates.
+    """
+    facet_dim = ref_cell.get_spatial_dimension() - 1
+
+    # Point facet
+    if facet_dim == 0:
+        return {
+            0: (
+                numpy.empty((0, 0)),
+                numpy.empty((0,)),
+            )
+        }
+
+    ref_facet = ref_cell.construct_subelement(facet_dim)
+    facet_verts = numpy.asarray(ref_facet.get_vertices())  # FIAT's canonical facet vertices
+
+    # Build the map: orientation -> vertex permutation
+    if isinstance(ref_facet, SimplicialComplex):
+        # 2D: quads and triangles (facet is an interval)
+        # 3D: tetrahedra (facet is a triangle)
+        o_p_maps = make_entity_permutations_simplex(dim=facet_dim, npoints=2)
+    elif isinstance(ref_facet, Hypercube):
+        # 3D: hexahedra (facet is a quad)
+        factors = ref_facet.product.cells  # exact interval factors
+        factor_dims = [f.get_spatial_dimension() for f in factors]
+        # build the vertex permutations of a hypercube out of the vertex permutations of its factors
+        tp_maps = make_entity_permutations_tensorproduct(factors, factor_dims, [make_entity_permutations_simplex(d, 2) for d in factor_dims])
+        # Convert the tuple keys (e0, io_0, io_1...) into FIAT's integer orientations.
+        # pass the nested dictionary { dimension tuple : { entity number : { orientation tuple : permutation } } } to flatten_permutations
+        o_p_maps = flatten_permutations({tuple(factor_dims): {0: tp_maps}})[facet_dim][0]
+    else:
+        raise NotImplementedError(f"Facet permutation maps not yet implemented for facets of type {type(ref_facet)}.")
+
+    # Finally, convert each vertex permutation into an affine map
+    o_coord_maps = {}
+    for o, p in o_p_maps.items():
+        permuted_facet_verts = facet_verts[p]
+        if facet_verts.shape[0] == facet_dim + 1:
+            # Simplex facet: use all vertices
+            xs = facet_verts
+            ys = permuted_facet_verts
+        else:
+            # Tensor-product facet: use a fixed simplex subset
+            subset = [0, 1, 2]  # any non-collinear triple works on a non-degenerate quad
+            xs = facet_verts[subset]
+            ys = permuted_facet_verts[subset]
+
+        Q, t = make_affine_mapping(xs, ys)
+        o_coord_maps[o] = (Q, t)
+    return o_coord_maps
+
+
+def make_facet_neighbouring_cell_maps(ref_cell):
+    """Return the affine maps between the reference coordinates of two cells that share a facet.
+
+    Suppose the local facet ``lf_from``, with orientation ``o_from`` of one cell is the same mesh facet
+    as the local facet ``lf_to``, with orientation `o_to` of a neighbouring cell across that facet.
+
+    Then a point with reference coordinates ``X`` in the first cell has reference coordinates in the neighbouring cell:
+
+    X' = A[lf_from, lf_to, o_from, o_to] @ X + b[lf_from, lf_to, o_from, o_to]
+
+    Parameters
+    ----------
+    ref_cell : Cell
+        The reference cell.
+
+    Returns
+    -------
+    A : numpy.ndarray
+        The matrix of each map, with shape
+        ``(num_facets, num_facets, num_orientations, num_orientations, dim, dim)``.
+    b : numpy.ndarray
+        The translation vector of each map, with shape
+        ``(num_facets, num_facets, num_orientations, num_orientations, dim)``.
+    """
+
+    A_f, b_f, A_f_inv = make_facet_embedding_maps(ref_cell)
+    o_coord_maps = make_facet_orientation_maps(ref_cell)
+    Q = numpy.stack([o_coord_maps[o][0] for o in range(len(o_coord_maps))])
+    t = numpy.stack([o_coord_maps[o][1] for o in range(len(o_coord_maps))])
+    Q_inv = numpy.linalg.inv(Q)
+
+    # List all possible combinations of facets and orientations
+    nf, no = len(A_f), len(Q)  # number of local facets, number of facet orientations
+    lf_from, lf_to, o_from, o_to = numpy.meshgrid(numpy.arange(nf), numpy.arange(nf), numpy.arange(no), numpy.arange(no), indexing="ij")
+
+    # Changes the facet coordinates from orientation o_from to orientation o_to.
+    Q_to = Q_inv[o_to] @ Q[o_from]
+    t_to = numpy.einsum("...ij, ...j -> ...i", Q_inv[o_to], t[o_from] - t[o_to])
+
+    # Maps the cell coordinates to facet coordinates, changes the orientation,
+    # and then maps the facet coordinates into the neighbouring cell.
+    A = A_f[lf_to] @ Q_to @ A_f_inv[lf_from]
+    b = (b_f[lf_to] + numpy.einsum("...ij, ...j -> ...i", A_f[lf_to], t_to)
+         - numpy.einsum("...ij, ...j -> ...i", A, b_f[lf_from]))
+
+    return A, b
