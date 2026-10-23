@@ -66,33 +66,34 @@ class Functional:
         symmetric derivative axes, then the point axis.
         """
         sd = self.ref_el.get_spatial_dimension()
-        terms = defaultdict(lambda: defaultdict(list))
+        order_dict = defaultdict(lambda: defaultdict(list))
         for pt, wc_list in self.pt_dict.items():
-            terms[0][pt].extend((w, (0,) * sd, c) for w, c in wc_list)
+            order_dict[0][pt].extend((w, (0,) * sd, c) for w, c in wc_list)
         for pt, wac_list in self.deriv_dict.items():
             for w, alpha, c in wac_list:
-                terms[sum(alpha)][pt].append((w, alpha, c))
+                order_dict[sum(alpha)][pt].append((w, alpha, c))
 
         order_tensors = {}
-        for order, weights_by_point in sorted(terms.items()):
-            W = numpy.zeros((*self.target_shape, *(sd,) * order, len(weights_by_point)))
-            for q, wac_list in enumerate(weights_by_point.values()):
+        for order, pt_dict in sorted(order_dict.items()):
+            W = numpy.zeros((*self.target_shape, *(sd,) * order, len(pt_dict)))
+            for q, wac_list in enumerate(pt_dict.values()):
                 for w, alpha, c in wac_list:
                     c = c if isinstance(c, tuple) else (c,)
                     indices = set(permutations(sum(([k] * a for k, a in enumerate(alpha)), [])))
                     for index in indices:
                         W[(*c, *index, q)] += w / len(indices)
-            order_tensors[order] = (tuple(weights_by_point), W)
+            pts = tuple(pt_dict)
+            order_tensors[order] = (pts, W)
         return order_tensors
 
     @cached_property
     def orders(self):
-        """Derivative orders represented by this functional.
+        """Derivative orders encoded by this functional.
 
         Returns
         -------
         tuple of int
-            Derivative orders for which this functional has terms.
+            Orders present in the functional's point and derivative data.
         """
         return tuple(sorted(self._order_tensors))
 
@@ -109,8 +110,8 @@ class Functional:
         points : tuple of tuple of float
             Points at which the functional samples derivatives of ``order``.
         weights : numpy.ndarray
-            Weights for the requested derivative order. Its final axis
-            corresponds to ``points``.
+            Weights are indexed first by component, then by spatial
+            direction for each derivative, and finally by sampling point.
 
         Raises
         ------
@@ -380,7 +381,8 @@ class IntegralMoment(Functional):
             rank = len(self.target_shape)
             W = numpy.mean([W.transpose((*range(rank), *axes, W.ndim - 1))
                             for axes in permutations(range(rank, rank + order))], axis=0)
-        return {order: (tuple(self.deriv_dict or self.pt_dict), W)}
+        pts = tuple(self.deriv_dict or self.pt_dict)
+        return {order: (pts, W)}
 
     def __call__(self, fn):
         """Evaluate the functional on the function fn."""
@@ -413,6 +415,7 @@ class IntegralMomentOfDerivative(IntegralMoment):
             coefficients = numpy.zeros(shp + f_at_qpts.shape)
             coefficients[comp] = f_at_qpts
             f_at_qpts = coefficients
+
         order = f_at_qpts.ndim - len(shp) - 1
         if order < 1 or f_at_qpts.shape != shp + (sd,) * order + (len(Q.pts),):
             raise ValueError("Expected component axes, derivative axes, and quadrature points")
@@ -738,17 +741,3 @@ class IntegralMomentOfTangentialEvaluation(FrobeniusIntegralMoment):
         Q = quadrature.FacetQuadratureRule(ref_el, sd - 1, facet, Q, avg=True)
         f_at_qpts = t[:, None] * P_at_qpts
         super().__init__(ref_el, Q, f_at_qpts, "IntegralMomentOfScaledTangentialEvaluation")
-
-
-def contravariant_piola_dual(J, values):
-    r"""Map test functions so their moments commute with contravariant Piola.
-
-    The factor :math:`\operatorname{sign}(\det J)J^{-T}` cancels both
-    :math:`J/\det J` on the field and :math:`|\det J|` in quadrature.
-
-    :arg J: Square Jacobian mapping reference to physical coordinates.
-    :arg values: Reference test functions, shaped ``(nbasis, dim, npoints)``.
-    :returns: Physical test functions with the same shape.
-    """
-    transform = numpy.sign(numpy.linalg.det(J)) * numpy.linalg.inv(J).T
-    return numpy.einsum("ij,bjq->biq", transform, values)

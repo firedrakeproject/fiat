@@ -12,12 +12,12 @@
 from FIAT import finite_element, dual_set, polynomial_set
 from FIAT.reference_element import TRIANGLE
 from FIAT.quadrature_schemes import create_quadrature
+from FIAT.nedelec import contravariant_piola_dual
 from FIAT.functional import (ComponentPointEvaluation,
                              TensorBidirectionalIntegralMoment,
                              IntegralMomentOfTensorDivergence,
                              IntegralLegendreNormalNormalMoment,
-                             IntegralLegendreNormalTangentialMoment,
-                             contravariant_piola_dual)
+                             IntegralLegendreNormalTangentialMoment)
 
 import numpy
 

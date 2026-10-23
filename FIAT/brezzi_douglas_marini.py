@@ -60,8 +60,8 @@ class BDMDualSet(dual_set.DualSet):
             Nedel = nedelec.Nedelec(cell, degree - 1, variant)
             Ned_at_qpts = Nedel.tabulate(0, Q_ref.get_points())[(0,) * sd]
             for entity in top[sd]:
-                Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref)
-                phis = functional.contravariant_piola_dual(Q.jacobian(), Ned_at_qpts)
+                Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref, avg=True)
+                phis = nedelec.contravariant_piola_dual(Q.jacobian(), Ned_at_qpts, avg=True)
                 cur = len(nodes)
                 nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi) for phi in phis)
                 entity_ids[sd][entity] = list(range(cur, len(nodes)))

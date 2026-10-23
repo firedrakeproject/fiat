@@ -93,7 +93,7 @@ class PhysicallyMappedFunctional:
     the entity :attr:`frame` otherwise.
 
     :arg node: The FIAT node.
-    :arg ref_el: The reference cell.
+    :arg cell: The reference cell.
     :arg dim: The dimension of the entity that supports the node.
     :arg entity: The entity that supports the node.
     :arg mapping: The FIAT mapping of the node.
@@ -103,9 +103,9 @@ class PhysicallyMappedFunctional:
         below which entries of the Riesz representation are dropped.
     """
 
-    def __init__(self, node, ref_el, dim, entity, mapping, avg, tol):
+    def __init__(self, node, cell, dim, entity, mapping, avg, tol):
         self.node = node
-        self.ref_el = ref_el
+        self.cell = cell
         self.dim = dim
         self.entity = entity
         self.mapping = mapping
@@ -148,15 +148,15 @@ class PhysicallyMappedFunctional:
         tangent :math:`t` and the normals to :math:`t` within the two facets
         that contain the edge.  Otherwise it is None.
         """
-        ref_el = self.ref_el
-        sd = ref_el.get_spatial_dimension()
+        cell = self.cell
+        sd = cell.get_spatial_dimension()
         node = self.node
         moment = isinstance(node, IntegralMoment)
         if self.dim == sd - 1 and (moment or node.max_deriv_order > 0 or len(node.target_shape) > 1):
             return (self.dim, self.entity)
         if moment and 0 < self.dim < sd - 1:
             covectors = [k for k, mapping in enumerate(self.axis_mappings) if mapping == "covariant piola"]
-            Q = tangential_projector(ref_el.compute_tangents(self.dim, self.entity))
+            Q = tangential_projector(cell.compute_tangents(self.dim, self.entity))
             if not all(in_range_of(self.weights, Q, (k,), self.tol) for k in covectors):
                 return (self.dim, self.entity)
         return None
@@ -166,7 +166,7 @@ class PhysicallyMappedFunctional:
         """A dict from each group of axes of :attr:`weights` that map together to its mapping."""
         # pullback takes the Kronecker product of the weight transformations in
         # the order of this dict.
-        sd = self.ref_el.get_spatial_dimension()
+        sd = self.cell.get_spatial_dimension()
         W = self.weights
         axis_mappings = self.axis_mappings
         # Interior moments map every axis as affine.
@@ -194,7 +194,7 @@ class PhysicallyMappedFunctional:
             if any(k in axes for axes in groups):
                 continue
             if on_edge and mapping == "covariant piola":
-                Q = tangential_projector(self.ref_el.compute_tangents(self.dim, self.entity))
+                Q = tangential_projector(self.cell.compute_tangents(self.dim, self.entity))
                 if not in_range_of(W, Q, (k,), self.tol):
                     raise NotImplementedError(f"Cannot map derivatives normal to an edge of {type(self.node).__name__}.")
                 mapping = "affine"
@@ -209,7 +209,7 @@ class PhysicallyMappedFunctional:
         :attr:`avg` is False, an integral moment with a :attr:`frame` is a
         plain integral over its entity, which contributes :math:`-dim`.
         """
-        sd = self.ref_el.get_spatial_dimension()
+        sd = self.cell.get_spatial_dimension()
         if self.frame is None:
             exponents = {"covariant piola": 1, "contravariant piola": sd - 1, "L2 piola": sd}
             return sum(exponents.get(mapping, 0) for mapping in self.pullback_mappings.values())
@@ -218,7 +218,7 @@ class PhysicallyMappedFunctional:
             if mapping == "covariant piola":
                 exponent += 1
             elif mapping == "contravariant piola" and not in_range_of(
-                    self.weights, facet_normal_projector(self.ref_el, self.entity), axes, self.tol):
+                    self.weights, facet_normal_projector(self.cell, self.entity), axes, self.tol):
                 # Tangential components of a contravariant axis
                 exponent += 2 - sd
         if isinstance(self.node, IntegralMoment) and not self.avg:
@@ -243,7 +243,7 @@ class PhysicallyMappedFunctional:
         if self.frame is None:
             pullbacks = cartesian_pullbacks(J, adjJ, detJ)
         else:
-            pullbacks = frame_pullbacks(self.ref_el, self.frame, metric, adj_metric, detJ)
+            pullbacks = frame_pullbacks(self.cell, self.frame, metric, adj_metric, detJ)
         mappings = self.pullback_mappings.values()
         unit = LinearCombination([one], [numpy.eye(1)])
         forward = reduce(LinearCombination.kron, (pullbacks[mapping].forward for mapping in mappings), unit)
@@ -285,15 +285,15 @@ class PhysicallyMappedFunctional:
         measure = one
         if self.frame is not None and isinstance(self.node, IntegralMoment) and not self.avg:
             # The physical measure of the support, from the Gram determinant of its tangents
-            T = self.ref_el.compute_tangents(self.dim, self.entity)
+            T = self.cell.compute_tangents(self.dim, self.entity)
             JT = J @ T.T
-            volume = self.ref_el.volume_of_subcomplex(self.dim, self.entity)
+            volume = self.cell.volume_of_subcomplex(self.dim, self.entity)
             measure = volume * (determinant(JT.T @ JT) / determinant(T @ T.T))**0.5
 
         dilation = one
         p = self.scaling_exponent
         if p:
-            vertices = self.ref_el.get_topology()[self.dim][self.entity]
+            vertices = self.cell.get_topology()[self.dim][self.entity]
             havg = sum(h[v] for v in vertices) / len(vertices)
             dilation = havg**p
         return measure * dilation
@@ -781,7 +781,7 @@ def cartesian_pullbacks(J, adjJ, detJ):
             "L2 piola": Pullback(pairing, pairing_inverse)}
 
 
-def frame_pullbacks(ref_el, frame, metric, adj_metric, detJ):
+def frame_pullbacks(cell, frame, metric, adj_metric, detJ):
     """The :class:`Pullback` of each mapping in the frame of an entity.
 
     :arg frame: The entity ``(dim, entity)``, a facet or an edge of a tetrahedron.
@@ -790,24 +790,24 @@ def frame_pullbacks(ref_el, frame, metric, adj_metric, detJ):
     :arg detJ: The determinant of the Jacobian.
     """
     dim, entity = frame
-    sd = ref_el.get_spatial_dimension()
+    sd = cell.get_spatial_dimension()
     if dim == sd - 1:
-        pullbacks = facet_pullbacks(ref_el, entity, metric, adj_metric, detJ)
+        pullbacks = facet_pullbacks(cell, entity, metric, adj_metric, detJ)
     else:
-        pullbacks = edge_pullbacks(ref_el, entity, metric)
+        pullbacks = edge_pullbacks(cell, entity, metric)
     affine = LinearCombination([one], [numpy.eye(sd)])
     return {"affine": Pullback(affine, affine), **pullbacks}
 
 
-def facet_pullbacks(ref_el, facet, metric, adj_metric, detJ):
+def facet_pullbacks(cell, facet, metric, adj_metric, detJ):
     r"""The :class:`Pullback` of each Piola mapping in the frame of a facet.
 
     The frame consists of the tangents of the facet and its scaled normal
     :math:`\nu`.  The metric is :math:`G=J^TJ`.
     """
-    sd = ref_el.get_spatial_dimension()
-    tangents = ref_el.compute_tangents(sd - 1, facet)
-    nu = ref_el.compute_scaled_normal(facet)
+    sd = cell.get_spatial_dimension()
+    tangents = cell.compute_tangents(sd - 1, facet)
+    nu = cell.compute_scaled_normal(facet)
     # The physical normal is the cofactor normal x = adj(J)^T nu = J w, with
     # w = adj(G) nu / detJ and |x|^2 = nu^T adj(G) nu.
     z = adj_metric @ nu
@@ -819,7 +819,7 @@ def facet_pullbacks(ref_el, facet, metric, adj_metric, detJ):
     nn = nu @ nu
     zt = [z @ tau for tau in tangents]
     dual_tangents = numpy.linalg.solve(tangents @ tangents.T, tangents)
-    matrices = [facet_normal_projector(ref_el, facet), tangential_projector(tangents),
+    matrices = [facet_normal_projector(cell, facet), tangential_projector(tangents),
                 *(numpy.outer(nu, s) for s in dual_tangents)]
     contravariant = LinearCombination([one, xx / (detJ * nn), *(-c / (detJ * nn) for c in zt)], matrices)
     contravariant_inverse = LinearCombination([one, detJ * nn / xx, *(c / xx for c in zt)], matrices)
@@ -827,16 +827,16 @@ def facet_pullbacks(ref_el, facet, metric, adj_metric, detJ):
             "contravariant piola": Pullback(contravariant, contravariant_inverse)}
 
 
-def edge_pullbacks(ref_el, edge, metric):
+def edge_pullbacks(cell, edge, metric):
     r"""The :class:`Pullback` of the covariant mapping in the frame of an edge of a tetrahedron.
 
     The frame consists of the edge tangent :math:`t` and the normals
     :math:`t \times \nu_i` to :math:`t` within the two facets that contain
     the edge, with scaled normals :math:`\nu_i`.  The metric is :math:`G=J^TJ`.
     """
-    sd = ref_el.get_spatial_dimension()
-    t = ref_el.compute_edge_tangent(edge)
-    nus = [ref_el.compute_scaled_normal(f) for f in ref_el.get_connectivity()[(1, sd - 1)][edge]]
+    sd = cell.get_spatial_dimension()
+    t = cell.compute_edge_tangent(edge)
+    nus = [cell.compute_scaled_normal(f) for f in cell.get_connectivity()[(1, sd - 1)][edge]]
     # The physical normal to the edge within facet i is J w_i, where w_i lies
     # in the plane of the facet and J w_i is orthogonal to J t.
     Gt = metric @ t
@@ -885,9 +885,9 @@ def covariant_frame_pullback(metric, tangents, normals, w, norms):
     return Pullback(forward, inverse)
 
 
-def facet_normal_projector(ref_el, facet):
+def facet_normal_projector(cell, facet):
     """The projector onto the normal of a facet."""
-    nu = ref_el.compute_scaled_normal(facet)
+    nu = cell.compute_scaled_normal(facet)
     return numpy.outer(nu, nu) / (nu @ nu)
 
 
