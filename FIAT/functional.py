@@ -12,14 +12,15 @@
 # - a reference element domain
 # - type information
 
-from itertools import chain
+from itertools import chain, permutations, repeat
 from collections import defaultdict
+from functools import cached_property
 import numpy
 
 from FIAT import polynomial_set, jacobi, quadrature, quadrature_schemes
 
 
-class Functional(object):
+class Functional:
     r"""Abstract class representing a linear functional.
     All FIAT functionals are discrete in the sense that
     they are written as a weighted sum of (derivatives of components of) their
@@ -54,6 +55,70 @@ class Functional(object):
             self.max_deriv_order = max(sum(wac[1]) for wac in chain(*deriv_dict.values()))
         else:
             self.max_deriv_order = 0
+
+    @cached_property
+    def _order_tensors(self):
+        r"""Represent the functional using points and weights for each order.
+
+        For derivative order :math:`k`, the weights :math:`W^k` satisfy
+        :math:`\ell(f) = \sum_k \sum_q W^k_q : D^k f(x_q)`. The axes of
+        :math:`W^k` are the value axes of ``target_shape``, then :math:`k`
+        symmetric derivative axes, then the point axis.
+        """
+        sd = self.ref_el.get_spatial_dimension()
+        order_dict = defaultdict(lambda: defaultdict(list))
+        for pt, wc_list in self.pt_dict.items():
+            order_dict[0][pt].extend((w, (0,) * sd, c) for w, c in wc_list)
+        for pt, wac_list in self.deriv_dict.items():
+            for w, alpha, c in wac_list:
+                order_dict[sum(alpha)][pt].append((w, alpha, c))
+
+        order_tensors = {}
+        for order, pt_dict in sorted(order_dict.items()):
+            W = numpy.zeros((*self.target_shape, *(sd,) * order, len(pt_dict)))
+            for q, wac_list in enumerate(pt_dict.values()):
+                for w, alpha, c in wac_list:
+                    c = c if isinstance(c, tuple) else (c,)
+                    indices = set(permutations(sum(([k] * a for k, a in enumerate(alpha)), [])))
+                    for index in indices:
+                        W[(*c, *index, q)] += w / len(indices)
+            pts = tuple(pt_dict)
+            order_tensors[order] = (pts, W)
+        return order_tensors
+
+    @cached_property
+    def orders(self):
+        """Derivative orders encoded by this functional.
+
+        Returns
+        -------
+        tuple of int
+            Orders present in the functional's point and derivative data.
+        """
+        return tuple(sorted(self._order_tensors))
+
+    def get_order_tensors(self, order):
+        """Return the points and weights for one derivative order.
+
+        Parameters
+        ----------
+        order : int
+            Derivative order of the requested tensors.
+
+        Returns
+        -------
+        points : tuple of tuple of float
+            Points at which the functional samples derivatives of ``order``.
+        weights : numpy.ndarray
+            Weights are indexed first by component, then by spatial
+            direction for each derivative, and finally by sampling point.
+
+        Raises
+        ------
+        KeyError
+            If this functional has no terms of the requested order.
+        """
+        return self._order_tensors[order]
 
     def evaluate(self, f):
         """Obsolete and broken functional evaluation.
@@ -127,7 +192,8 @@ class Functional(object):
             # loop over expansion functions
             for i in range(nexp):
                 for (w, c) in wc_list:
-                    result[c][i] += w * bfs[i, j]
+                    c = c if isinstance(c, tuple) else (c,)
+                    result[(*c, i)] += w * bfs[i, j][c]
 
         if self.deriv_dict:
             dpt_dict = self.deriv_dict
@@ -288,71 +354,115 @@ class IntegralMoment(Functional):
 
     :arg ref_el: a :class:`Cell`.
     :arg Q: a :class:`QuadratureRule`.
-    :arg f_at_qpts: an array tabulating the function f at the quadrature
-         points.
+    :arg f_at_qpts: values of the coefficient at the quadrature points. A
+         one-dimensional array gives a scalar coefficient; higher-dimensional
+         arrays use their leading axes as the value shape and are paired with
+         all components of the input.
     :arg comp: Optional argument indicating that only a particular
          component of the input function should be integrated against f
     :arg shp: Optional argument giving the value shape of input functions.
     """
 
-    def __init__(self, ref_el, Q, f_at_qpts, comp=tuple(), shp=tuple()):
-        self.Q = Q
+    def __init__(self, ref_el, Q, f_at_qpts, comp=(), shp=(), nm=""):
+        f_at_qpts = numpy.asarray(f_at_qpts)
+        points = Q.get_points()
+        if f_at_qpts.ndim == 0 or f_at_qpts.shape[-1] != len(points):
+            raise ValueError("Mismatch in number of quadrature points and values")
+
+        coefficient_shape = tuple(f_at_qpts.shape[:-1])
+        target_shape = tuple(shp) or coefficient_shape
+        if coefficient_shape and coefficient_shape != target_shape:
+            raise ValueError("Coefficient shape does not match the input value shape")
+
+        if coefficient_shape or comp == ():
+            comp = (slice(None),) * len(target_shape)
+        weights = numpy.moveaxis(numpy.multiply(f_at_qpts, Q.get_weights()), -1, 0)
+        pt_dict = {tuple(pt): [(wt, comp)] for pt, wt in zip(points, weights)}
+
         self.f_at_qpts = f_at_qpts
         self.comp = comp
-        points = Q.get_points()
-        weights = numpy.multiply(f_at_qpts, Q.get_weights())
-        pt_dict = {tuple(pt): [(wt, comp)] for pt, wt in zip(points, weights)}
-        super().__init__(ref_el, shp, pt_dict, {}, "IntegralMoment")
+        self.Q = Q
+        super().__init__(ref_el, target_shape, pt_dict, {}, nm or "IntegralMoment")
+
+    @cached_property
+    def _order_tensors(self):
+        """Represent this moment using points and weights for each order."""
+        sd = self.ref_el.get_spatial_dimension()
+        order = self.max_deriv_order
+        W = numpy.zeros((*self.target_shape, *(sd,) * order, len(self.Q.pts)))
+        W[self.comp] = numpy.multiply(self.f_at_qpts, self.Q.get_weights())
+        if order > 1:
+            # Only the symmetric part pairs with D^k f.
+            rank = len(self.target_shape)
+            W = numpy.mean([W.transpose((*range(rank), *axes, W.ndim - 1))
+                            for axes in permutations(range(rank, rank + order))], axis=0)
+        pts = tuple(self.deriv_dict or self.pt_dict)
+        return {order: (pts, W)}
 
     def __call__(self, fn):
         """Evaluate the functional on the function fn."""
-        pts = list(self.pt_dict.keys())
-        wts = numpy.array([foo[0][0] for foo in list(self.pt_dict.values())])
-        result = numpy.dot([fn(p) for p in pts], wts)
+        if self.deriv_dict:
+            return Functional.__call__(self, fn)
+        points = tuple(self.pt_dict)
+        values = numpy.asarray([fn(pt) for pt in points])[self.comp]
+        weights = numpy.multiply(self.f_at_qpts, self.Q.get_weights())
+        ndim = weights.ndim
+        return numpy.tensordot(weights, values, axes=(range(ndim), (*range(1, ndim), 0)))
 
-        if self.comp:
-            result = result[self.comp]
-        return result
 
-
-class IntegralMomentOfDerivative(Functional):
-    """Functional giving multi-directional derivative integrated against some function.
+class IntegralMomentOfDerivative(IntegralMoment):
+    """Functional integrating derivatives against component-shaped coefficients.
 
     :arg ref_el: a :class:`Cell`.
     :arg Q: a :class:`QuadratureRule`.
-    :arg f_at_qpts: an array tabulating the function f at the quadrature
-         points.
-    :arg *directions: a list of vectors of directions of differentiation.
+    :arg f_at_qpts: Values of f at the quadrature points. Without directions,
+         component axes precede derivative axes; with directions, the values
+         are treated as scalar coefficients.
+    :arg *directions: Optional vectors of directions of differentiation.
     :arg comp: Optional argument indicating that only a particular
          component of the input function should be integrated against f
     :arg shp: Optional argument giving the value shape of input functions.
     """
 
     def __init__(self, ref_el, Q, f_at_qpts, *directions, comp=(), shp=(), nm=""):
+        sd = ref_el.get_spatial_dimension()
+        f_at_qpts = numpy.asarray(f_at_qpts)
+        for direction in reversed(directions):
+            f_at_qpts = numpy.multiply.outer(direction, f_at_qpts)
+        coefficient_shape = () if directions else shp
+
+        if comp == ():
+            comp = (slice(None),) * len(shp)
+        elif not isinstance(comp, tuple):
+            comp = (comp,)
+
+        order = f_at_qpts.ndim - len(coefficient_shape) - 1
+        expected_shape = coefficient_shape + (sd,) * order + (len(Q.pts),)
+        if order < 1 or f_at_qpts.shape != expected_shape:
+            raise ValueError("Expected component axes, derivative axes, and quadrature points")
+
+        alphas = polynomial_set.mis(sd, order)
+        alpha_rows = {alpha: row for row, alpha in enumerate(alphas)}
+        sym_tensor = numpy.zeros((len(alphas), sd**order))
+        for column, index in enumerate(numpy.ndindex((sd,) * order)):
+            alpha = tuple(map(index.count, range(sd)))
+            sym_tensor[alpha_rows[alpha], column] = 1
+
+        weights = numpy.multiply(f_at_qpts, Q.get_weights())
+        weights = weights.reshape((*coefficient_shape, -1, len(Q.pts)))
+        weights = numpy.tensordot(sym_tensor, weights, axes=(1, len(coefficient_shape)))
+        if coefficient_shape and comp != (slice(None),) * len(coefficient_shape):
+            weights = weights[(slice(None),) + comp + (slice(None),)]
+        self.weights = weights
+        dpt_dict = {
+            tuple(pt): list(zip(wt, alphas, repeat(comp)))
+            for pt, wt in zip(Q.get_points(), numpy.moveaxis(self.weights, -1, 0))
+        }
+
         self.Q = Q
         self.f_at_qpts = f_at_qpts
         self.comp = comp
-
-        S = directions[0]
-        for dj in directions[1:]:
-            S = numpy.outer(S, dj)
-
-        sd = ref_el.get_spatial_dimension()
-        tau = defaultdict(float)
-        for index in numpy.ndindex(S.shape):
-            alpha = [0] * sd
-            for i in index:
-                alpha[i] += 1
-            tau[tuple(alpha)] += S[index]
-
-        points = Q.get_points()
-        weights = numpy.multiply(f_at_qpts, Q.get_weights())
-        self.weights = {alpha: weights*tau[alpha] for alpha in tau}
-
-        dpt_dict = {tuple(pt): [(wt*tau[alpha], alpha, comp) for alpha in tau]
-                    for pt, wt in zip(points, weights)}
-
-        super().__init__(ref_el, shp, {}, dpt_dict, nm or "IntegralMomentOfDerivative")
+        Functional.__init__(self, ref_el, shp, {}, dpt_dict, nm or "IntegralMomentOfDerivative")
 
 
 class IntegralMomentOfNormalDerivative(IntegralMomentOfDerivative):
@@ -369,20 +479,9 @@ class IntegralMomentOfNormalDerivative(IntegralMomentOfDerivative):
 class FrobeniusIntegralMoment(IntegralMoment):
 
     def __init__(self, ref_el, Q, f_at_qpts, nm=None):
-        # f_at_qpts is (some shape) x num_qpts
         shp = tuple(f_at_qpts.shape[:-1])
-        if len(Q.pts) != f_at_qpts.shape[-1]:
-            raise Exception("Mismatch in number of quadrature points and values")
-
-        self.Q = Q
-        self.comp = slice(None, None)
-        self.f_at_qpts = f_at_qpts
-        qpts, qwts = Q.get_points(), Q.get_weights()
-        weights = numpy.transpose(numpy.multiply(f_at_qpts, qwts), (-1,) + tuple(range(len(shp))))
-        alphas = list(numpy.ndindex(shp))
-
-        pt_dict = {tuple(pt): [(wt[alpha], alpha) for alpha in alphas] for pt, wt in zip(qpts, weights)}
-        Functional.__init__(self, ref_el, shp, pt_dict, {}, nm or "FrobeniusIntegralMoment")
+        super().__init__(ref_el, Q, f_at_qpts, comp=(slice(None),) * len(shp),
+                         shp=shp, nm=nm or "FrobeniusIntegralMoment")
 
 
 class IntegralLegendreDirectionalMoment(FrobeniusIntegralMoment):
@@ -451,49 +550,22 @@ class IntegralLegendreTangentialTangentialMoment(IntegralLegendreBidirectionalMo
                          "IntegralTangentialTangentialLegendreMoment")
 
 
-class IntegralMomentOfDivergence(Functional):
+class IntegralMomentOfDivergence(IntegralMomentOfDerivative):
     """Functional representing integral of the divergence of the input
     against some tabulated function f."""
     def __init__(self, ref_el, Q, f_at_qpts):
-        self.f_at_qpts = f_at_qpts
-        self.Q = Q
-
         sd = ref_el.get_spatial_dimension()
-        shp = f_at_qpts.shape[1:-1] + (sd,)
-
-        points = Q.get_points()
-        self.dpts = points
-        weights = numpy.multiply(f_at_qpts, Q.get_weights())
-
-        alphas = tuple(map(tuple, numpy.eye(sd, dtype=int)))
-        dpt_dict = {tuple(pt): [(wt, alphas[i], (i,)) for i in range(sd)]
-                    for pt, wt in zip(points, weights)}
-
-        super().__init__(ref_el, shp, {}, dpt_dict,
-                         "IntegralMomentOfDivergence")
+        coefficients = numpy.eye(sd)[..., None] * f_at_qpts
+        super().__init__(ref_el, Q, coefficients, shp=(sd,), nm="IntegralMomentOfDivergence")
 
 
-class IntegralMomentOfTensorDivergence(Functional):
+class IntegralMomentOfTensorDivergence(IntegralMomentOfDerivative):
     """Like IntegralMomentOfDivergence, but on symmetric tensors."""
 
     def __init__(self, ref_el, Q, f_at_qpts):
-        self.f_at_qpts = f_at_qpts
-        self.Q = Q
-        points = Q.get_points()
-        self.dpts = points
         sd = ref_el.get_spatial_dimension()
-        shp = (sd, sd)
-
-        assert len(f_at_qpts.shape) == 2
-        assert f_at_qpts.shape[0] == sd
-        assert f_at_qpts.shape[1] == len(points)
-        weights = numpy.multiply(f_at_qpts, Q.get_weights()).T
-
-        alphas = tuple(map(tuple, numpy.eye(sd, dtype=int)))
-        dpt_dict = {tuple(pt): [(wt[i], alphas[j], (i, j)) for i, j in numpy.ndindex(shp)]
-                    for pt, wt in zip(points, weights)}
-
-        super().__init__(ref_el, tuple(), {}, dpt_dict, "IntegralMomentOfDivergence")
+        coefficients = numpy.einsum("iq,jk->ijkq", f_at_qpts, numpy.eye(sd))
+        super().__init__(ref_el, Q, coefficients, shp=(sd, sd), nm="IntegralMomentOfTensorDivergence")
 
 
 class PointNormalEvaluation(Functional):
@@ -524,7 +596,7 @@ class PointEdgeTangentEvaluation(Functional):
         return "(u.t)(%s)" % (','.join(x),)
 
 
-class IntegralMomentOfEdgeTangentEvaluation(Functional):
+class IntegralMomentOfEdgeTangentEvaluation(FrobeniusIntegralMoment):
     r"""
     \int_e v\cdot t p ds
 
@@ -537,14 +609,9 @@ class IntegralMomentOfEdgeTangentEvaluation(Functional):
     """
     def __init__(self, ref_el, Q, P_at_qpts, edge):
         t = ref_el.compute_edge_tangent(edge)
-        sd = ref_el.get_spatial_dimension()
-        transform = ref_el.get_entity_transform(1, edge)
-        points = transform(Q.get_points())
-        weights = numpy.multiply(P_at_qpts, Q.get_weights())
-        pt_dict = {tuple(pt): [(wt*t[i], (i,)) for i in range(sd)]
-                   for pt, wt in zip(points, weights)}
-        super().__init__(ref_el, (sd, ), pt_dict, {},
-                         "IntegralMomentOfEdgeTangentEvaluation")
+        Q = quadrature.FacetQuadratureRule(ref_el, 1, edge, Q, avg=True)
+        f_at_qpts = t[:, None] * P_at_qpts
+        super().__init__(ref_el, Q, f_at_qpts, "IntegralMomentOfEdgeTangentEvaluation")
 
 
 class PointFaceTangentEvaluation(Functional):
@@ -565,7 +632,7 @@ class PointFaceTangentEvaluation(Functional):
         return "(u.t%d)(%s)" % (self.tno, ','.join(x),)
 
 
-class IntegralMomentOfFaceTangentEvaluation(Functional):
+class IntegralMomentOfFaceTangentEvaluation(FrobeniusIntegralMoment):
     r"""
     \int_F v \times n \cdot p ds
 
@@ -577,23 +644,11 @@ class IntegralMomentOfFaceTangentEvaluation(Functional):
     :arg facet: which facet.
     """
     def __init__(self, ref_el, Q, P_at_qpts, facet):
-        P_at_qpts = [[P_at_qpts[0][i], P_at_qpts[1][i], P_at_qpts[2][i]]
-                     for i in range(P_at_qpts.shape[1])]
         n = ref_el.compute_scaled_normal(facet)
         sd = ref_el.get_spatial_dimension()
-        transform = ref_el.get_entity_transform(sd-1, facet)
-        pts = tuple(map(tuple, transform(Q.get_points())))
-        weights = Q.get_weights()
-        pt_dict = {}
-        for pt, wgt, phi in zip(pts, weights, P_at_qpts):
-            phixn = [phi[1]*n[2] - phi[2]*n[1],
-                     phi[2]*n[0] - phi[0]*n[2],
-                     phi[0]*n[1] - phi[1]*n[0]]
-            pt_dict[pt] = [(wgt*(-n[2]*phixn[1]+n[1]*phixn[2]), (0, )),
-                           (wgt*(n[2]*phixn[0]-n[0]*phixn[2]), (1, )),
-                           (wgt*(-n[1]*phixn[0]+n[0]*phixn[1]), (2, ))]
-        super().__init__(ref_el, (sd, ), pt_dict, {},
-                         "IntegralMomentOfFaceTangentEvaluation")
+        Q = quadrature.FacetQuadratureRule(ref_el, sd - 1, facet, Q, avg=True)
+        f_at_qpts = numpy.cross(n, numpy.cross(P_at_qpts.T, n)).T
+        super().__init__(ref_el, Q, f_at_qpts, "IntegralMomentOfFaceTangentEvaluation")
 
 
 class PointScaledNormalEvaluation(Functional):
@@ -614,7 +669,7 @@ class PointScaledNormalEvaluation(Functional):
         return "(u.n)(%s)" % (','.join(x),)
 
 
-class IntegralMomentOfScaledNormalEvaluation(Functional):
+class IntegralMomentOfScaledNormalEvaluation(FrobeniusIntegralMoment):
     r"""
     \int_F v\cdot n p ds
 
@@ -628,12 +683,9 @@ class IntegralMomentOfScaledNormalEvaluation(Functional):
     def __init__(self, ref_el, Q, P_at_qpts, facet):
         n = ref_el.compute_scaled_normal(facet)
         sd = ref_el.get_spatial_dimension()
-        transform = ref_el.get_entity_transform(sd - 1, facet)
-        pts = transform(Q.get_points())
-        weights = Q.get_weights() * P_at_qpts
-        pt_dict = {tuple(pt): [(wt*n[i], (i, )) for i in range(sd)]
-                   for pt, wt in zip(pts, weights)}
-        super().__init__(ref_el, (sd, ), pt_dict, {}, "IntegralMomentOfScaledNormalEvaluation")
+        Q = quadrature.FacetQuadratureRule(ref_el, sd - 1, facet, Q, avg=True)
+        f_at_qpts = n[:, None] * P_at_qpts
+        super().__init__(ref_el, Q, f_at_qpts, "IntegralMomentOfScaledNormalEvaluation")
 
 
 class PointwiseInnerProductEvaluation(Functional):
@@ -672,7 +724,7 @@ class TensorBidirectionalIntegralMoment(FrobeniusIntegralMoment):
         super().__init__(ref_el, Q, F_at_qpts, "TensorBidirectionalMomentInnerProductEvaluation")
 
 
-class IntegralMomentOfNormalEvaluation(Functional):
+class IntegralMomentOfNormalEvaluation(FrobeniusIntegralMoment):
     r"""
     \int_F v\cdot n p ds
     p \in Polynomials
@@ -682,19 +734,14 @@ class IntegralMomentOfNormalEvaluation(Functional):
     :arg facet: which facet.
     """
     def __init__(self, ref_el, Q, P_at_qpts, facet):
-        # scaling on the normal is ok because edge length then weights
-        # the reference element quadrature appropriately
         n = ref_el.compute_scaled_normal(facet)
         sd = ref_el.get_spatial_dimension()
-        transform = ref_el.get_entity_transform(sd - 1, facet)
-        pts = transform(Q.get_points())
-        weights = numpy.multiply(P_at_qpts, Q.get_weights())
-        pt_dict = {tuple(pt): [(wt*n[i], (i, )) for i in range(sd)]
-                   for pt, wt in zip(pts, weights)}
-        super().__init__(ref_el, (sd, ), pt_dict, {}, "IntegralMomentOfNormalEvaluation")
+        Q = quadrature.FacetQuadratureRule(ref_el, sd - 1, facet, Q, avg=True)
+        f_at_qpts = n[:, None] * P_at_qpts
+        super().__init__(ref_el, Q, f_at_qpts, "IntegralMomentOfNormalEvaluation")
 
 
-class IntegralMomentOfTangentialEvaluation(Functional):
+class IntegralMomentOfTangentialEvaluation(FrobeniusIntegralMoment):
     r"""
     \int_F v\cdot n p ds
     p \in Polynomials
@@ -704,14 +751,9 @@ class IntegralMomentOfTangentialEvaluation(Functional):
     :arg facet: which facet.
     """
     def __init__(self, ref_el, Q, P_at_qpts, facet):
-        # scaling on the tangent is ok because edge length then weights
-        # the reference element quadrature appropriately
         sd = ref_el.get_spatial_dimension()
         assert sd == 2
         t = ref_el.compute_edge_tangent(facet)
-        transform = ref_el.get_entity_transform(sd - 1, facet)
-        points = transform(Q.get_points())
-        weights = numpy.multiply(P_at_qpts, Q.get_weights())
-        pt_dict = {tuple(pt): [(wt*t[i], (i, )) for i in range(sd)]
-                   for pt, wt in zip(points, weights)}
-        super().__init__(ref_el, (sd, ), pt_dict, {}, "IntegralMomentOfScaledTangentialEvaluation")
+        Q = quadrature.FacetQuadratureRule(ref_el, sd - 1, facet, Q, avg=True)
+        f_at_qpts = t[:, None] * P_at_qpts
+        super().__init__(ref_el, Q, f_at_qpts, "IntegralMomentOfScaledTangentialEvaluation")
