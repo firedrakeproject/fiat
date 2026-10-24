@@ -226,20 +226,25 @@ class FiatElement(FiniteElementBase):
         # Columns (k) are unique points to evaluate.
         # Higher indices (*cmp) are tensor indices of the weights when weights
         # are tensor valued.
-        Q = {}
+        Q = []
         for i, dual in enumerate(nodes):
             point_dict = dual.get_point_dict()
             pts = tuple(sorted(point_dict.keys()))
             kstart, kend = seen[pts]
             for p, k in zip(pts, unique_indices[kstart:kend]):
                 for weight, cmp in point_dict[p]:
-                    Q[(i, k, *cmp)] = weight
-        identity_weights = all(
-            len(set(key)) == 1 and np.isclose(weight, 1) and len(key) == 2
-            for key, weight in Q.items())
+                    cmp = cmp if isinstance(cmp, tuple) else (cmp,)
+                    Q.append(((i, k, *cmp), weight))
+        identity_weights = not self.value_shape and all(
+            len(index) == 2 and index[0] == index[1]
+            and np.ndim(weight) == 0 and np.isclose(weight, 1)
+            for index, weight in Q)
         if dual_coeffs is None and identity_weights:
             # Identity matrix Q can be expressed symbolically
-            extents = tuple(map(max, zip(*Q.keys())))
+            extents = tuple(
+                max(index[axis] for index, weight in Q)
+                for axis in range(2)
+            )
             js = tuple(gem.Index(extent=e+1) for e in extents)
             assert len(js) == 2
             Q = gem.ComponentTensor(gem.Delta(*js), js)
@@ -250,12 +255,9 @@ class FiatElement(FiniteElementBase):
             # significantly by building Q in a COO format rather than DOK (i.e.
             # storing coords and associated data in (nonzeros, entries) shaped
             # numpy arrays) to take advantage of numpy multiindexing
-            if len(Q) == 1:
-                Qshape = tuple(s + 1 for s in tuple(Q)[0])
-            else:
-                Qshape = tuple(s + 1 for s in map(max, *Q))
+            Qshape = (len(nodes), len(allpts), *self.value_shape)
             Qdense = np.zeros(Qshape, dtype=np.float64)
-            for idx, value in Q.items():
+            for idx, value in Q:
                 Qdense[idx] = value
             if dual_coeffs is not None:
                 Qdense = np.tensordot(dual_coeffs, Qdense, axes=(1, 0))
