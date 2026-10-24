@@ -193,7 +193,7 @@ class Functional:
             for i in range(nexp):
                 for (w, c) in wc_list:
                     c = c if isinstance(c, tuple) else (c,)
-                    result[(*c, i)] += w * bfs[i, j][c]
+                    result[(*c, i)] += w * bfs[i, j]
 
         if self.deriv_dict:
             dpt_dict = self.deriv_dict
@@ -354,10 +354,8 @@ class IntegralMoment(Functional):
 
     :arg ref_el: a :class:`Cell`.
     :arg Q: a :class:`QuadratureRule`.
-    :arg f_at_qpts: values of the coefficient at the quadrature points. A
-         one-dimensional array gives a scalar coefficient; higher-dimensional
-         arrays use their leading axes as the value shape and are paired with
-         all components of the input.
+    :arg f_at_qpts: an array tabulating the function f at the quadrature
+         points.
     :arg comp: Optional argument indicating that only a particular
          component of the input function should be integrated against f
     :arg shp: Optional argument giving the value shape of input functions.
@@ -369,13 +367,14 @@ class IntegralMoment(Functional):
         if f_at_qpts.ndim == 0 or f_at_qpts.shape[-1] != len(points):
             raise ValueError("Mismatch in number of quadrature points and values")
 
-        coefficient_shape = tuple(f_at_qpts.shape[:-1])
-        target_shape = tuple(shp) or coefficient_shape
-        if coefficient_shape and coefficient_shape != target_shape:
-            raise ValueError("Coefficient shape does not match the input value shape")
-
-        if coefficient_shape or comp == ():
+        target_shape = tuple(shp) or f_at_qpts.shape[:-1]
+        if comp == ():
             comp = (slice(None),) * len(target_shape)
+        elif not isinstance(comp, tuple):
+            comp = (comp,)
+        # f is integrated against the components of the input selected by comp
+        if f_at_qpts.shape[:-1] != numpy.zeros(target_shape)[comp].shape:
+            raise ValueError("Coefficient shape does not match the selected components")
         weights = numpy.moveaxis(numpy.multiply(f_at_qpts, Q.get_weights()), -1, 0)
         pt_dict = {tuple(pt): [(wt, comp)] for pt, wt in zip(points, weights)}
 
@@ -402,12 +401,10 @@ class IntegralMoment(Functional):
     def __call__(self, fn):
         """Evaluate the functional on the function fn."""
         if self.deriv_dict:
-            return Functional.__call__(self, fn)
-        points = tuple(self.pt_dict)
-        values = numpy.asarray([fn(pt) for pt in points])[self.comp]
-        weights = numpy.multiply(self.f_at_qpts, self.Q.get_weights())
-        ndim = weights.ndim
-        return numpy.tensordot(weights, values, axes=(range(ndim), (*range(1, ndim), 0)))
+            raise NotImplementedError("Evaluation is not yet implemented for %s" % type(self))
+        pts, W = self.get_order_tensors(0)
+        values = numpy.asarray([fn(pt) for pt in pts])
+        return numpy.tensordot(W, values, axes=(range(W.ndim), (*range(1, W.ndim), 0)))
 
 
 class IntegralMomentOfDerivative(IntegralMoment):
@@ -417,26 +414,33 @@ class IntegralMomentOfDerivative(IntegralMoment):
     :arg Q: a :class:`QuadratureRule`.
     :arg f_at_qpts: an array tabulating the function f at the quadrature
          points.
-    :arg *directions: Optional vectors of directions of differentiation.
+    :arg *directions: Optional directions of differentiation. The last axis
+         of each direction is a derivative axis, and any leading axes index
+         components of the input.
     :arg comp: Optional argument indicating that only a particular
-         component of the input function should be integrated against f
+         component of the input function should be integrated against f.
+         Without it, the leading axes of f index all components of the input.
     :arg shp: Optional argument giving the value shape of input functions.
     """
 
     def __init__(self, ref_el, Q, f_at_qpts, *directions, comp=(), shp=(), nm=""):
         sd = ref_el.get_spatial_dimension()
         f_at_qpts = numpy.asarray(f_at_qpts)
-        for direction in reversed(directions):
-            f_at_qpts = numpy.multiply.outer(direction, f_at_qpts)
-        coefficient_shape = () if directions else shp
+        S = numpy.ones(())
+        for direction in directions:
+            S = numpy.multiply.outer(S, direction)
+        # Components of f, then the directions, then the points
+        shape = (*f_at_qpts.shape[:-1], *(1,) * S.ndim, f_at_qpts.shape[-1])
+        f_at_qpts = f_at_qpts.reshape(shape) * S[..., None]
 
         if comp == ():
             comp = (slice(None),) * len(shp)
         elif not isinstance(comp, tuple):
             comp = (comp,)
-
-        order = f_at_qpts.ndim - len(coefficient_shape) - 1
-        expected_shape = coefficient_shape + (sd,) * order + (len(Q.pts),)
+        # f is integrated against the components of the input selected by comp
+        comp_shape = numpy.zeros(shp)[comp].shape
+        order = f_at_qpts.ndim - len(comp_shape) - 1
+        expected_shape = comp_shape + (sd,) * order + (len(Q.pts),)
         if order < 1 or f_at_qpts.shape != expected_shape:
             raise ValueError("Expected component axes, derivative axes, and quadrature points")
 
@@ -448,14 +452,11 @@ class IntegralMomentOfDerivative(IntegralMoment):
             sym_tensor[alpha_rows[alpha], column] = 1
 
         weights = numpy.multiply(f_at_qpts, Q.get_weights())
-        weights = weights.reshape((*coefficient_shape, -1, len(Q.pts)))
-        weights = numpy.tensordot(sym_tensor, weights, axes=(1, len(coefficient_shape)))
-        if coefficient_shape and any(c != slice(None) for c in comp):
-            weights = weights[(slice(None), *comp, slice(None))]
-        self.weights = weights
+        weights = weights.reshape((*comp_shape, -1, len(Q.pts)))
+        weights = numpy.tensordot(sym_tensor, weights, axes=(1, len(comp_shape)))
         dpt_dict = {
             tuple(pt): list(zip(wt, alphas, repeat(comp)))
-            for pt, wt in zip(Q.get_points(), numpy.moveaxis(self.weights, -1, 0))
+            for pt, wt in zip(Q.get_points(), numpy.moveaxis(weights, -1, 0))
         }
 
         self.Q = Q
@@ -478,9 +479,7 @@ class IntegralMomentOfNormalDerivative(IntegralMomentOfDerivative):
 class FrobeniusIntegralMoment(IntegralMoment):
 
     def __init__(self, ref_el, Q, f_at_qpts, nm=None):
-        shp = tuple(f_at_qpts.shape[:-1])
-        super().__init__(ref_el, Q, f_at_qpts, comp=(slice(None),) * len(shp),
-                         shp=shp, nm=nm or "FrobeniusIntegralMoment")
+        super().__init__(ref_el, Q, f_at_qpts, nm=nm or "FrobeniusIntegralMoment")
 
 
 class IntegralLegendreDirectionalMoment(FrobeniusIntegralMoment):
@@ -554,8 +553,7 @@ class IntegralMomentOfDivergence(IntegralMomentOfDerivative):
     against some tabulated function f."""
     def __init__(self, ref_el, Q, f_at_qpts):
         sd = ref_el.get_spatial_dimension()
-        coefficients = numpy.eye(sd)[..., None] * f_at_qpts
-        super().__init__(ref_el, Q, coefficients, shp=(sd,), nm="IntegralMomentOfDivergence")
+        super().__init__(ref_el, Q, f_at_qpts, numpy.eye(sd), shp=(sd,), nm="IntegralMomentOfDivergence")
 
 
 class IntegralMomentOfTensorDivergence(IntegralMomentOfDerivative):
@@ -563,8 +561,7 @@ class IntegralMomentOfTensorDivergence(IntegralMomentOfDerivative):
 
     def __init__(self, ref_el, Q, f_at_qpts):
         sd = ref_el.get_spatial_dimension()
-        coefficients = numpy.einsum("iq,jk->ijkq", f_at_qpts, numpy.eye(sd))
-        super().__init__(ref_el, Q, coefficients, shp=(sd, sd), nm="IntegralMomentOfTensorDivergence")
+        super().__init__(ref_el, Q, f_at_qpts, numpy.eye(sd), shp=(sd, sd), nm="IntegralMomentOfTensorDivergence")
 
 
 class PointNormalEvaluation(Functional):
