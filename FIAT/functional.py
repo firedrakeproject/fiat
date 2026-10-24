@@ -415,9 +415,8 @@ class IntegralMomentOfDerivative(IntegralMoment):
 
     :arg ref_el: a :class:`Cell`.
     :arg Q: a :class:`QuadratureRule`.
-    :arg f_at_qpts: Values of f at the quadrature points. Without directions,
-         component axes precede derivative axes; with directions, the values
-         are treated as scalar coefficients.
+    :arg f_at_qpts: an array tabulating the function f at the quadrature
+         points.
     :arg *directions: Optional vectors of directions of differentiation.
     :arg comp: Optional argument indicating that only a particular
          component of the input function should be integrated against f
@@ -451,8 +450,8 @@ class IntegralMomentOfDerivative(IntegralMoment):
         weights = numpy.multiply(f_at_qpts, Q.get_weights())
         weights = weights.reshape((*coefficient_shape, -1, len(Q.pts)))
         weights = numpy.tensordot(sym_tensor, weights, axes=(1, len(coefficient_shape)))
-        if coefficient_shape and comp != (slice(None),) * len(coefficient_shape):
-            weights = weights[(slice(None),) + comp + (slice(None),)]
+        if coefficient_shape and any(c != slice(None) for c in comp):
+            weights = weights[(slice(None), *comp, slice(None))]
         self.weights = weights
         dpt_dict = {
             tuple(pt): list(zip(wt, alphas, repeat(comp)))
