@@ -10,9 +10,11 @@ from finat.point_set import PointSet, PointSingleton
 class FiatElement(FiniteElementBase):
     """Base class for finite elements whose tabulation is provided by FIAT.
 
-    Subclasses may override ``space_dimension`` to report a smaller dimension
-    when trailing FIAT functionals represent constraints rather than
-    degrees of freedom.
+    Subclasses may override ``space_dimension()`` to report a smaller dimension
+    when FIAT nodes encode constraints. In that case, the first
+    ``space_dimension()`` FIAT nodes must correspond to finite-element degrees
+    of freedom, with any constraint nodes following them. Constraint nodes
+    must not be interleaved with finite-element nodes.
     """
     def __init__(self, fiat_element):
         super().__init__()
