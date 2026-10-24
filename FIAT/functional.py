@@ -12,7 +12,7 @@
 # - a reference element domain
 # - type information
 
-from itertools import chain, permutations
+from itertools import chain, permutations, repeat
 from collections import defaultdict
 from functools import cached_property
 import numpy
@@ -192,7 +192,8 @@ class Functional:
             # loop over expansion functions
             for i in range(nexp):
                 for (w, c) in wc_list:
-                    result[c][i] += w * bfs[i, j]
+                    c = c if isinstance(c, tuple) else (c,)
+                    result[(*c, i)] += w * bfs[i, j][c]
 
         if self.deriv_dict:
             dpt_dict = self.deriv_dict
@@ -353,21 +354,35 @@ class IntegralMoment(Functional):
 
     :arg ref_el: a :class:`Cell`.
     :arg Q: a :class:`QuadratureRule`.
-    :arg f_at_qpts: an array tabulating the function f at the quadrature
-         points.
+    :arg f_at_qpts: values of the coefficient at the quadrature points. A
+         one-dimensional array gives a scalar coefficient; higher-dimensional
+         arrays use their leading axes as the value shape and are paired with
+         all components of the input.
     :arg comp: Optional argument indicating that only a particular
          component of the input function should be integrated against f
     :arg shp: Optional argument giving the value shape of input functions.
     """
 
-    def __init__(self, ref_el, Q, f_at_qpts, comp=tuple(), shp=tuple()):
-        self.Q = Q
+    def __init__(self, ref_el, Q, f_at_qpts, comp=(), shp=(), nm=""):
+        f_at_qpts = numpy.asarray(f_at_qpts)
+        points = Q.get_points()
+        if f_at_qpts.ndim == 0 or f_at_qpts.shape[-1] != len(points):
+            raise ValueError("Mismatch in number of quadrature points and values")
+
+        coefficient_shape = tuple(f_at_qpts.shape[:-1])
+        target_shape = tuple(shp) or coefficient_shape
+        if coefficient_shape and coefficient_shape != target_shape:
+            raise ValueError("Coefficient shape does not match the input value shape")
+
+        if coefficient_shape or comp == ():
+            comp = (slice(None),) * len(target_shape)
+        weights = numpy.moveaxis(numpy.multiply(f_at_qpts, Q.get_weights()), -1, 0)
+        pt_dict = {tuple(pt): [(wt, comp)] for pt, wt in zip(points, weights)}
+
         self.f_at_qpts = f_at_qpts
         self.comp = comp
-        points = Q.get_points()
-        weights = numpy.multiply(f_at_qpts, Q.get_weights())
-        pt_dict = {tuple(pt): [(wt, comp)] for pt, wt in zip(points, weights)}
-        super().__init__(ref_el, shp, pt_dict, {}, "IntegralMoment")
+        self.Q = Q
+        super().__init__(ref_el, target_shape, pt_dict, {}, nm or "IntegralMoment")
 
     @cached_property
     def _order_tensors(self):
@@ -388,18 +403,21 @@ class IntegralMoment(Functional):
         """Evaluate the functional on the function fn."""
         if self.deriv_dict:
             return Functional.__call__(self, fn)
-        return sum(w * numpy.asarray(fn(pt))[comp]
-                   for pt, weights in self.pt_dict.items() for w, comp in weights)
+        points = tuple(self.pt_dict)
+        values = numpy.asarray([fn(pt) for pt in points])[self.comp]
+        weights = numpy.multiply(self.f_at_qpts, self.Q.get_weights())
+        ndim = weights.ndim
+        return numpy.tensordot(weights, values, axes=(range(ndim), (*range(1, ndim), 0)))
 
 
 class IntegralMomentOfDerivative(IntegralMoment):
-    """Functional giving multi-directional derivative integrated against some function.
+    """Functional integrating derivatives against component-shaped coefficients.
 
     :arg ref_el: a :class:`Cell`.
     :arg Q: a :class:`QuadratureRule`.
-    :arg f_at_qpts: Values of f at the quadrature points. If directions are
-         omitted, component axes precede derivative axes, with the quadrature
-         point axis last.
+    :arg f_at_qpts: Values of f at the quadrature points. Without directions,
+         component axes precede derivative axes; with directions, the values
+         are treated as scalar coefficients.
     :arg *directions: Optional vectors of directions of differentiation.
     :arg comp: Optional argument indicating that only a particular
          component of the input function should be integrated against f
@@ -409,32 +427,41 @@ class IntegralMomentOfDerivative(IntegralMoment):
     def __init__(self, ref_el, Q, f_at_qpts, *directions, comp=(), shp=(), nm=""):
         sd = ref_el.get_spatial_dimension()
         f_at_qpts = numpy.asarray(f_at_qpts)
-        if directions:
-            for direction in reversed(directions):
-                f_at_qpts = numpy.multiply.outer(direction, f_at_qpts)
-            coefficients = numpy.zeros(shp + f_at_qpts.shape)
-            coefficients[comp] = f_at_qpts
-            f_at_qpts = coefficients
+        for direction in reversed(directions):
+            f_at_qpts = numpy.multiply.outer(direction, f_at_qpts)
+        coefficient_shape = () if directions else shp
 
-        order = f_at_qpts.ndim - len(shp) - 1
-        if order < 1 or f_at_qpts.shape != shp + (sd,) * order + (len(Q.pts),):
+        if comp == ():
+            comp = (slice(None),) * len(shp)
+        elif not isinstance(comp, tuple):
+            comp = (comp,)
+
+        order = f_at_qpts.ndim - len(coefficient_shape) - 1
+        expected_shape = coefficient_shape + (sd,) * order + (len(Q.pts),)
+        if order < 1 or f_at_qpts.shape != expected_shape:
             raise ValueError("Expected component axes, derivative axes, and quadrature points")
+
+        alphas = polynomial_set.mis(sd, order)
+        alpha_rows = {alpha: row for row, alpha in enumerate(alphas)}
+        sym_tensor = numpy.zeros((len(alphas), sd**order))
+        for column, index in enumerate(numpy.ndindex((sd,) * order)):
+            alpha = tuple(map(index.count, range(sd)))
+            sym_tensor[alpha_rows[alpha], column] = 1
+
+        weights = numpy.multiply(f_at_qpts, Q.get_weights())
+        weights = weights.reshape((*coefficient_shape, -1, len(Q.pts)))
+        weights = numpy.tensordot(sym_tensor, weights, axes=(1, len(coefficient_shape)))
+        if coefficient_shape and comp != (slice(None),) * len(coefficient_shape):
+            weights = weights[(slice(None),) + comp + (slice(None),)]
+        self.weights = weights
+        dpt_dict = {
+            tuple(pt): list(zip(wt, alphas, repeat(comp)))
+            for pt, wt in zip(Q.get_points(), numpy.moveaxis(self.weights, -1, 0))
+        }
 
         self.Q = Q
         self.f_at_qpts = f_at_qpts
-        self.comp = slice(None)
-        self.weights = {}
-        weights = numpy.multiply(f_at_qpts, Q.get_weights())
-        for index in numpy.ndindex((sd,) * order):
-            alpha = tuple(numpy.bincount(index, minlength=sd))
-            if alpha not in self.weights:
-                self.weights[alpha] = numpy.zeros(shp + (len(Q.pts),))
-            self.weights[alpha] += weights[..., *index, :]
-
-        components = list(numpy.ndindex(shp))
-        dpt_dict = {tuple(pt): [(values[component + (q,)], alpha, component)
-                                for alpha, values in self.weights.items() for component in components]
-                    for q, pt in enumerate(Q.get_points())}
+        self.comp = comp
         Functional.__init__(self, ref_el, shp, {}, dpt_dict, nm or "IntegralMomentOfDerivative")
 
 
@@ -452,20 +479,9 @@ class IntegralMomentOfNormalDerivative(IntegralMomentOfDerivative):
 class FrobeniusIntegralMoment(IntegralMoment):
 
     def __init__(self, ref_el, Q, f_at_qpts, nm=None):
-        # f_at_qpts is (some shape) x num_qpts
         shp = tuple(f_at_qpts.shape[:-1])
-        if len(Q.pts) != f_at_qpts.shape[-1]:
-            raise Exception("Mismatch in number of quadrature points and values")
-
-        self.Q = Q
-        self.comp = slice(None, None)
-        self.f_at_qpts = f_at_qpts
-        qpts, qwts = Q.get_points(), Q.get_weights()
-        weights = numpy.transpose(numpy.multiply(f_at_qpts, qwts), (-1,) + tuple(range(len(shp))))
-        alphas = list(numpy.ndindex(shp))
-
-        pt_dict = {tuple(pt): [(wt[alpha], alpha) for alpha in alphas] for pt, wt in zip(qpts, weights)}
-        Functional.__init__(self, ref_el, shp, pt_dict, {}, nm or "FrobeniusIntegralMoment")
+        super().__init__(ref_el, Q, f_at_qpts, comp=(slice(None),) * len(shp),
+                         shp=shp, nm=nm or "FrobeniusIntegralMoment")
 
 
 class IntegralLegendreDirectionalMoment(FrobeniusIntegralMoment):
