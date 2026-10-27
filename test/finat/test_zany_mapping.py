@@ -242,7 +242,9 @@ def check_zany_mapping(element, ref_to_phys, *args, **kwargs):
     if isinstance(finat_element, PhysicallyMappedElement):
         Mgem = finat_element.basis_transformation(ref_to_phys)
         M = evaluate([Mgem])[0].arr
-        ref_vals_zany = np.tensordot(M, ref_vals_piola, (-1, 0))
+        key = (0,) * sd
+        mapped = finat_element.map_tabulation({key: gem.Literal(ref_vals_piola)}, ref_to_phys)
+        ref_vals_zany = evaluate([mapped[key]])[0].arr
     else:
         M = np.eye(num_dofs, num_bfs)
         ref_vals_zany = ref_vals_piola
@@ -456,8 +458,8 @@ class SymbolicMapping:
 
 
 def transformations(element, sd):
-    mapping = SymbolicMapping(sd)
-    return element._physical_vandermonde(mapping), element._inverse_physical_vandermonde(mapping)
+    B = element._vandermonde_matrix(SymbolicMapping(sd))
+    return (B.array(), B.inverse_array())
 
 
 def nonzeros(row):
