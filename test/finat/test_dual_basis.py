@@ -1,5 +1,6 @@
 from itertools import chain
 
+import FIAT
 import pytest
 import numpy
 import finat
@@ -9,6 +10,9 @@ import ufl
 import finat.ufl
 from finat.element_factory import create_element
 from finat.enriched import as_enriched
+from finat.fiat_elements import FiatElement
+from finat.physically_mapped import (PhysicallyMappedElement, cartesian_pullbacks, frame_pullbacks,
+                                     in_range_of, adjugate_and_determinant, metric_and_adjugate)
 from finat.point_set import PointSet, UnionPointSet
 from finat.quadrature import QuadratureRule
 from finat.quadrature_element import QuadratureElement
@@ -365,3 +369,117 @@ def test_mixed_subelement_dual_evaluation():
                                             basis_indices)])
 
     assert numpy.allclose(result.arr, cell.vertices)
+
+
+class MappedElement(PhysicallyMappedElement, FiatElement):
+    pass
+
+
+def test_pairing_respects_tolerance():
+    """Near-divergence weights are not paired using NumPy's default tolerance."""
+    ref_el = FIAT.ufc_simplex(2)
+    node = FIAT.functional.Functional(
+        ref_el, (2,), {},
+        {(0.0, 0.0): [(1.0, (1, 0), (0,)),
+                      (1.0 + 1.0e-6, (0, 1), (1,))]},
+        "NearDivergence")
+    assert node.orders == (1,)
+    _, W = node.get_order_tensors(1)
+    delta = numpy.eye(2).ravel()
+    P = numpy.outer(delta, delta) / 2
+    assert in_range_of(numpy.eye(2)[..., None], P, (0, 1), 1.0e-12)
+    assert not in_range_of(W, P, (0, 1), 1.0e-12)
+
+
+def transformation_matrix(G):
+    coefficients, = evaluate([gem.ListTensor(G.coefficients)])
+    return numpy.tensordot(coefficients.arr, G.matrices, axes=1)
+
+
+@pytest.mark.parametrize("sd", [2, 3])
+def test_pairing_transformation(sd):
+    """The Kronecker product of a contravariant axis and a covariant axis maps the identity as the pair."""
+    J = numpy.eye(sd) + numpy.random.default_rng(0).random((sd, sd))
+    adjJ, detJ = adjugate_and_determinant(numpy.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object))
+    J = numpy.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object)
+    pullbacks = cartesian_pullbacks(J, adjJ, detJ)
+    contravariant = transformation_matrix(pullbacks["contravariant piola"].forward)
+    covariant = transformation_matrix(pullbacks["covariant piola"].forward)
+    pair = transformation_matrix(pullbacks["L2 piola"].forward)
+    J, = evaluate([gem.ListTensor(J)])
+    J = J.arr
+    assert numpy.allclose(contravariant, J.T / numpy.linalg.det(J))
+    assert numpy.allclose(covariant, numpy.linalg.inv(J))
+    delta = numpy.eye(sd).reshape(-1, 1)
+    assert numpy.allclose(pair @ delta, numpy.kron(contravariant, covariant) @ delta)
+    assert numpy.allclose(pair, numpy.eye(sd * sd) / numpy.linalg.det(J))
+
+
+@pytest.mark.parametrize("sd,frame", [(2, (1, 0)), (3, (2, 0)), (3, (1, 1))])
+def test_transformation_inverse(sd, frame):
+    """The inverse of each weight transformation is the inverse of the matrix."""
+    ref_el = FIAT.ufc_simplex(sd)
+    J = numpy.eye(sd) + numpy.random.default_rng(0).random((sd, sd))
+    J = numpy.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object)
+    adjJ, detJ = adjugate_and_determinant(J)
+    cartesian = cartesian_pullbacks(J, adjJ, detJ)
+    framed = frame_pullbacks(ref_el, frame, *metric_and_adjugate(J), detJ)
+    for pullbacks in (cartesian, framed):
+        for mapping in pullbacks:
+            G = transformation_matrix(pullbacks[mapping].forward)
+            inverse = transformation_matrix(pullbacks[mapping].inverse)
+            assert numpy.allclose(inverse @ G, numpy.eye(len(G)))
+
+
+@pytest.mark.parametrize("scaled", [False, True])
+def test_recombined_physical_dual(ref_to_phys, scaled_ref_to_phys, scaled):
+    element = FIAT.Hermite(FIAT.ufc_simplex(2), 3)
+    C = numpy.eye(element.space_dimension())
+    for dofs in element.entity_dofs()[0].values():
+        C[numpy.ix_(dofs, dofs)] = [[2, 1, 0], [1, 3, 1], [0, 1, 2]]
+    basis = element.get_nodal_basis().recombine(numpy.linalg.inv(C).T)
+    recombined = FIAT.finite_element.CiarletElement(
+        basis, element.get_dual_set(), 3, recombine_dual=True)
+    assert numpy.allclose(recombined.get_dual_set().get_coeffs(), C)
+    original = MappedElement(element)
+    transformed = MappedElement(recombined)
+    mapping = scaled_ref_to_phys[2][1] if scaled else ref_to_phys[2]
+    Q = gem.Literal(numpy.eye(len(C)))
+    B, BC, M = [result.arr for result in evaluate([
+        original.dual_transformation(Q, mapping), transformed.dual_transformation(Q, mapping),
+        transformed.basis_transformation(mapping)])]
+    assert numpy.allclose(BC, C @ B @ numpy.linalg.inv(C))
+    assert numpy.allclose(BC @ M.T, numpy.eye(len(C)))
+
+
+@pytest.mark.parametrize("avg", [False, True])
+def test_single_point_moment(ref_to_phys, avg):
+    """A normal derivative moment at a single point is still an integral moment."""
+    element = MappedElement(FIAT.Morley(FIAT.ufc_simplex(2)))
+    element.avg = avg
+    dual = element.fiat_equivalent.get_dual_set()
+    nodes = dual.get_nodes()
+    edge_dofs = list(chain.from_iterable(dual.get_entity_ids()[1].values()))
+    for i in edge_dofs:
+        points, _ = nodes[i].get_order_tensors(1)
+        assert len(points) == 1
+        assert isinstance(nodes[i], FIAT.functional.IntegralMoment)
+
+    # The plain integral of the physical normal derivative is its average times the edge length.
+    averaged = MappedElement(element.fiat_equivalent)
+    Q = gem.Literal(numpy.eye(element.space_dimension()))
+    B, Bavg = [result.arr for result in evaluate([
+        element.dual_transformation(Q, ref_to_phys[2]), averaged.dual_transformation(Q, ref_to_phys[2])])]
+    lengths = [1.0 if avg else ref_to_phys[2].phys_cell.volume_of_subcomplex(1, e) for e in range(3)]
+    assert numpy.allclose(B[edge_dofs], numpy.multiply(lengths, Bavg[edge_dofs].T).T)
+
+
+def test_plain_integral_facet_moments(ref_to_phys):
+    element = FIAT.CrouzeixRaviart(FIAT.ufc_simplex(2), 1, variant="integral")
+    mapped = MappedElement(element)
+    mapped.avg = False
+    B, M = [result.arr for result in evaluate([
+        mapped.dual_transformation(gem.Literal(numpy.eye(3)), ref_to_phys[2]), mapped.basis_transformation(ref_to_phys[2])])]
+    lengths = [ref_to_phys[2].phys_cell.volume_of_subcomplex(1, e) for e in range(3)]
+    assert numpy.allclose(B, numpy.diag(lengths))
+    assert numpy.allclose(B @ M.T, numpy.eye(3))

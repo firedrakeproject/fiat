@@ -1,15 +1,16 @@
 r"""Physically mapped elements and the automatic basis transformation.
 
-The physical basis functions are :math:`M F^*(\hat\Psi)`, with
-:math:`M = V^T`, :math:`V = B^{-1}`, and :math:`B_{ij} = n_i(\hat\psi_j
-\circ F^{-1})` the Vandermonde matrix of the physical nodes :math:`n_i`
-on the pulled-back reference nodal basis :math:`\hat\psi_j` (Kirby 2017,
-Brubeck & Kirby 2025).
+Let :math:`\mathcal{P}` map reference functions to the physical cell,
+including any Piola map.  The physical basis is :math:`M\mathcal{P}\hat\Psi`,
+where :math:`B_{ij} = n_i(\mathcal{P}\hat\psi_j)` and :math:`M = B^{-T}`
+(Kirby 2017, Brubeck & Kirby 2025).
 """
 
 from abc import ABCMeta, abstractmethod
-from collections.abc import Iterable, Mapping
+from collections import defaultdict, namedtuple
+from collections.abc import Mapping
 from functools import cached_property, reduce
+from itertools import chain, product
 from numbers import Number
 from operator import add
 
@@ -17,8 +18,18 @@ import gem
 import numpy
 from gem.optimise import factorise_scalar_sums
 
+from FIAT.functional import IntegralMoment
 from finat.citations import cite
-from finat.functional import DERIVATIVE, DIVERGENCE, Functional, one, zero
+
+zero = gem.Zero()
+one = gem.Literal(1.0)
+
+#: A weight transformation and its inverse.
+Pullback = namedtuple("Pullback", ["forward", "inverse"])
+
+#: The row of :math:`B_0` of a node, the row of the inverse of the diagonal
+#: block of :math:`B_0`, and the scaling of the row of :math:`B=SB_0`.
+VandermondeRow = namedtuple("VandermondeRow", ["entries", "inverse", "scale"])
 
 
 class NeedsCoordinateMappingElement(metaclass=ABCMeta):
@@ -40,21 +51,15 @@ class MappedTabulation(Mapping):
 
     :arg M: a gem.ListTensor with the basis transformation matrix.
     :arg ref_tabulation: a dict of tabulations on the reference cell.
-    :kwarg indices: an optional list of restriction indices on the basis functions.
     """
 
-    def __init__(
-            self, M: gem.ListTensor, ref_tabulation: Mapping,
-            indices: Iterable[int] | None = None) -> None:
+    def __init__(self, M: gem.ListTensor, ref_tabulation: Mapping) -> None:
         self.ref_tabulation = ref_tabulation
-        if indices is None:
-            indices = range(M.shape[0])
-        self.indices = tuple(indices)
-        self._space_dim = len(self.indices)
+        self._space_dim = M.shape[0]
         self._value_dim = M.shape[1]
 
         nonzero_rows = []
-        for source_row in self.indices:
+        for source_row in range(self._space_dim):
             row = []
             for column in range(M.shape[1]):
                 value = M.array[source_row, column]
@@ -63,7 +68,7 @@ class MappedTabulation(Mapping):
                     row.append((column, value))
             nonzero_rows.append(row)
         width = max((len(row) for row in nonzero_rows), default=0)
-        nrows = len(self.indices)
+        nrows = self._space_dim
         columns = numpy.zeros((nrows, width), dtype=gem.uint_type)
         data = numpy.full((nrows, width), zero, dtype=object)
         for index, row in enumerate(nonzero_rows):
@@ -136,45 +141,250 @@ class MappedTabulation(Mapping):
         return len(self.ref_tabulation)
 
 
-class PhysicallyMappedElement(NeedsCoordinateMappingElement):
-    """A mixin that applies a "physical" transformation to tabulated
-    basis functions.
+class PhysicallyMappedFunctional:
+    r"""A FIAT node and the data that maps it to the physical cell.
 
-    :meth:`basis_transformation` derives the transformation from the
-    FIAT dual basis by the duality formulation of the module docstring.
-    Elements override :attr:`avg` and :meth:`dof_scale` to record the
-    normalization conventions of their physical nodes.
+    :attr:`pullback_mappings` assigns a mapping to each group of axes of
+    :attr:`weights`: ``affine``, ``covariant piola``, ``contravariant
+    piola``, or ``L2 piola`` for a contravariant axis paired with a
+    covariant axis through the identity.  These mappings act on Cartesian
+    components if :attr:`frame` is None, and on components in the frame of
+    the entity :attr:`frame` otherwise.
+
+    :arg node: The FIAT node.
+    :arg cell: The reference cell.
+    :arg dim: The dimension of the entity that supports the node.
+    :arg entity: The entity that supports the node.
+    :arg mapping: The FIAT mapping of the node.
+    :arg avg: If False, an integral moment with a :attr:`frame` is a plain
+        integral over its entity instead of an average.
+    :arg tol: Relative tolerance for the range tests on the weights, and
+        below which entries of the Riesz representation are dropped.
     """
 
-    #: Relative tolerance below which entries of the numeric reference
-    #: tabulations are dropped from the symbolic rows.
+    def __init__(self, node, cell, dim, entity, mapping, avg, tol):
+        self.node = node
+        self.cell = cell
+        self.dim = dim
+        self.entity = entity
+        self.mapping = mapping
+        self.avg = avg
+        self.tol = tol
+
+    @cached_property
+    def weights(self):
+        """The weights of the node, see :meth:`FIAT.functional.Functional.get_order_tensors`."""
+        node = self.node
+        if len(node.orders) != 1:
+            raise NotImplementedError(f"{type(node).__name__} mixes derivative orders.")
+        _, W = node.get_order_tensors(node.orders[0])
+        return W
+
+    @cached_property
+    def axis_mappings(self):
+        """The mapping of each value and derivative axis of the weights."""
+        rank = len(self.node.target_shape)
+        words = self.mapping.split()
+        if words == ["affine"]:
+            value_mappings = (self.mapping,) * rank
+        elif words[0] == "double":
+            value_mappings = (f"{words[1]} piola",) * 2
+        else:
+            value_mappings = tuple(f"{word} piola" for word in words[:-1])
+        if len(value_mappings) != rank:
+            raise ValueError(f"A {self.mapping} functional must have rank {len(value_mappings)}, not {rank}.")
+        return value_mappings + ("covariant piola",) * self.node.max_deriv_order
+
+    @cached_property
+    def frame(self):
+        r"""The entity ``(dim, entity)`` in whose frame :attr:`pullback_mappings` act, or None for Cartesian components.
+
+        For integral moments on a facet, and for nodes on a facet with
+        derivatives or matrix values, this is the facet, with the frame of
+        its tangents and normal.  For an integral moment on an edge of a
+        tetrahedron with derivatives normal to the edge, this is the edge,
+        with the frame :math:`(t, t \times n_1, t \times n_2)` of the edge
+        tangent :math:`t` and the normals to :math:`t` within the two facets
+        that contain the edge.  Otherwise it is None.
+        """
+        cell = self.cell
+        sd = cell.get_spatial_dimension()
+        node = self.node
+        moment = isinstance(node, IntegralMoment)
+        if self.dim == sd - 1 and (moment or node.max_deriv_order > 0 or len(node.target_shape) > 1):
+            return (self.dim, self.entity)
+        if moment and 0 < self.dim < sd - 1:
+            covectors = [k for k, mapping in enumerate(self.axis_mappings) if mapping == "covariant piola"]
+            Q = tangential_projector(cell.compute_tangents(self.dim, self.entity))
+            if not all(in_range_of(self.weights, Q, (k,), self.tol) for k in covectors):
+                return (self.dim, self.entity)
+        return None
+
+    @cached_property
+    def pullback_mappings(self):
+        """A dict from each group of axes of :attr:`weights` that map together to its mapping."""
+        # pullback takes the Kronecker product of the weight transformations in
+        # the order of this dict.
+        sd = self.cell.get_spatial_dimension()
+        W = self.weights
+        axis_mappings = self.axis_mappings
+        # Interior moments map every axis as affine.
+        if self.dim == sd and isinstance(self.node, IntegralMoment):
+            return {(k,): "affine" for k in range(len(axis_mappings))}
+        # In a frame, each axis keeps its own mapping.
+        if self.frame is not None:
+            return {(k,): mapping for k, mapping in enumerate(axis_mappings)}
+
+        # A contravariant axis contracted with a covariant axis through the
+        # identity is a trace, and the pair maps as L2 piola.
+        delta = numpy.eye(sd).ravel()
+        trace = numpy.outer(delta, delta) / sd
+        groups = {}
+        for k, vector in enumerate(axis_mappings):
+            for l, covector in enumerate(axis_mappings):
+                if (vector == "contravariant piola" and covector == "covariant piola"
+                        and not any(k in axes or l in axes for axes in groups)
+                        and in_range_of(W, trace, (k, l), self.tol)):
+                    groups[k, l] = "L2 piola"
+        # A derivative along the edge maps as affine.
+        # Every other axis keeps its own mapping.
+        on_edge = 0 < self.dim < sd - 1
+        for k, mapping in enumerate(axis_mappings):
+            if any(k in axes for axes in groups):
+                continue
+            if on_edge and mapping == "covariant piola":
+                Q = tangential_projector(self.cell.compute_tangents(self.dim, self.entity))
+                if not in_range_of(W, Q, (k,), self.tol):
+                    raise NotImplementedError(f"Cannot map derivatives normal to an edge of {type(self.node).__name__}.")
+                mapping = "affine"
+            groups[k,] = mapping
+        return groups
+
+    @cached_property
+    def scaling_exponent(self):
+        """The exponent :math:`p` such that the physical node dilates as :math:`h^{-p}`.
+
+        Each group in :attr:`pullback_mappings` contributes its scaling.  If
+        :attr:`avg` is False, an integral moment with a :attr:`frame` is a
+        plain integral over its entity, which contributes :math:`-dim`.
+        """
+        sd = self.cell.get_spatial_dimension()
+        if self.frame is None:
+            exponents = {"covariant piola": 1, "contravariant piola": sd - 1, "L2 piola": sd}
+            return sum(exponents.get(mapping, 0) for mapping in self.pullback_mappings.values())
+        exponent = 0
+        for axes, mapping in self.pullback_mappings.items():
+            if mapping == "covariant piola":
+                exponent += 1
+            elif mapping == "contravariant piola" and not in_range_of(
+                    self.weights, facet_normal_projector(self.cell, self.entity), axes, self.tol):
+                # Tangential components of a contravariant axis
+                exponent += 2 - sd
+        if isinstance(self.node, IntegralMoment) and not self.avg:
+            exponent -= self.dim
+        return exponent
+
+    @cached_property
+    def pullback_key(self):
+        """The :attr:`frame` and the :attr:`pullback_mappings`."""
+        return (self.frame, tuple(self.pullback_mappings.values()))
+
+    def pullback(self, J, adjJ, detJ, metric, adj_metric):
+        """The Kronecker product of the weight transformations of :attr:`pullback_mappings`.
+
+        :arg J: The Jacobian as an object array of GEM scalars.
+        :arg adjJ: The adjugate of the Jacobian.
+        :arg detJ: The determinant of the Jacobian.
+        :arg metric: The metric :math:`J^TJ`.
+        :arg adj_metric: The adjugate of the metric.
+        :returns: A :class:`Pullback`.
+        """
+        if self.frame is None:
+            pullbacks = cartesian_pullbacks(J, adjJ, detJ)
+        else:
+            pullbacks = frame_pullbacks(self.cell, self.frame, metric, adj_metric, detJ)
+        mappings = self.pullback_mappings.values()
+        unit = LinearCombination([one], [numpy.eye(1)])
+        forward = reduce(LinearCombination.kron, (pullbacks[mapping].forward for mapping in mappings), unit)
+        inverse = reduce(LinearCombination.kron, (pullbacks[mapping].inverse for mapping in mappings), unit)
+        return Pullback(forward, inverse)
+
+    def to_riesz(self, G, D):
+        r"""The Riesz representation :math:`(GW):D_j` of the node on a basis, where :math:`W` are the :attr:`weights`.
+
+        For the :meth:`pullback` G and the reference basis, this is the row of
+        :math:`B_0`, and for its inverse and the basis of the entity of the
+        node, the row of the inverse of the diagonal block.
+
+        :arg G: The pullback of the weights, a :class:`LinearCombination` on their axes.
+        :arg D: The derivatives of the basis at the points of the node, with
+            the basis followed by the axes of the weights.
+        :returns: An object array of GEM scalars, one for each basis function.
+        """
+        # Contract the weights with the derivatives at the points, and order
+        # the axes of the groups as in the Kronecker product
+        axes = list(chain.from_iterable(self.pullback_mappings))
+        rank = len(axes)
+        A = numpy.tensordot(self.weights, D, axes=(-1, -1))
+        A = A.transpose(*(rank + 1 + k for k in axes), *axes, rank)
+        n = self.weights.size // self.weights.shape[-1]
+        return G.contract(A.reshape(n, n, -1), self.tol)
+
+    def scaling(self, J, h):
+        r"""The factor :math:`h^p\,|e|` of the row of the physical Vandermonde matrix :math:`B=SB_0`.
+
+        Here :math:`p` is :attr:`scaling_exponent`, and :math:`|e|` is the
+        physical measure of the entity if :attr:`avg` is False and there is
+        a :attr:`frame`, and 1 otherwise.
+
+        :arg J: The Jacobian as an object array of GEM scalars.
+        :arg h: The cell size at each vertex.
+        :returns: A GEM scalar.
+        """
+        measure = one
+        if self.frame is not None and isinstance(self.node, IntegralMoment) and not self.avg:
+            # The physical measure of the support, from the Gram determinant of its tangents
+            T = self.cell.compute_tangents(self.dim, self.entity)
+            JT = J @ T.T
+            volume = self.cell.volume_of_subcomplex(self.dim, self.entity)
+            measure = volume * (determinant(JT.T @ JT) / determinant(T @ T.T))**0.5
+
+        dilation = one
+        p = self.scaling_exponent
+        if p:
+            vertices = self.cell.get_topology()[self.dim][self.entity]
+            havg = sum(h[v] for v in vertices) / len(vertices)
+            dilation = havg**p
+        return measure * dilation
+
+
+class PhysicallyMappedElement(NeedsCoordinateMappingElement):
+    """A mixin that applies a "physical" transformation to tabulated
+    basis functions."""
+
+    #: Relative tolerance for the range tests on the weights of each node,
+    #: and below which entries of the Riesz representation are dropped.
     tol = 1e-10
 
-    #: If False, physical scalar facet moments are plain integrals rather
-    #: than the measure-intrinsic integral averages of the reference nodes.
+    #: If False, an integral moment with a frame is a plain
+    #: integral over its entity instead of an average.
     avg = True
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         cite("Kirby2018zany")
         cite("Kirby2019zany")
-        self.restriction_indices = None
 
     def basis_transformation(self, coordinate_mapping):
         r"""Transformation matrix for the basis functions.
 
         :arg coordinate_mapping: Object providing the physical geometry
             as GEM expressions.
-        :returns: A ``gem.ListTensor`` of shape ``(space_dimension(),
-            nbf)``, with the trailing constraint columns of an extended
-            element truncated.
+        :returns: A ``gem.ListTensor`` with exposed physical dofs as rows
+            and the complete reference basis as columns.
         """
-        V = self.physical_vandermonde(coordinate_mapping).inverse()
-        for i, scale in enumerate(self.dof_scales(coordinate_mapping)):
-            if scale is not None:
-                V[:, i] = V[:, i] * scale
-        ndof = self.space_dimension()
-        return gem.ListTensor(V[:, :ndof].T)
+        V = self._inverse_physical_vandermonde(coordinate_mapping)
+        return gem.ListTensor(V[:, self._physical_indices].T)
 
     def dual_transformation(self, Q, coordinate_mapping=None):
         r"""Transforms reference dual evaluation into physical dual evaluation.
@@ -190,13 +400,8 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
             as GEM expressions.
         :returns: The physical dual evaluation gem weight tensor.
         """
-        B = self.physical_vandermonde(coordinate_mapping).matrix()
-        for i, scale in enumerate(self.dof_scales(coordinate_mapping)):
-            if scale is not None:
-                B[i] = B[i] / scale
-        indices = self.restriction_indices
-        if indices is None:
-            indices = list(range(self.space_dimension()))
+        B = self._physical_vandermonde(coordinate_mapping)
+        indices = self._physical_indices
         B = gem.ListTensor(B[numpy.ix_(indices, indices)])
 
         key = None
@@ -205,140 +410,175 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
     def map_tabulation(self, ref_tabulation, coordinate_mapping):
         assert coordinate_mapping is not None
         M = self.basis_transformation(coordinate_mapping)
-        return MappedTabulation(M, ref_tabulation, indices=self.restriction_indices)
+        return MappedTabulation(M, ref_tabulation)
 
     def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
         result = super().basis_evaluation(order, ps, entity=entity)
         return self.map_tabulation(result, coordinate_mapping)
 
-    def physical_vandermonde(self, coordinate_mapping):
-        """The physical Vandermonde matrix of the element.
+    @cached_property
+    def _physical_indices(self):
+        """The reference dofs exposed as physical dofs, in local order.
+
+        These are the dofs of :meth:`entity_dofs`, which omits the
+        constraint nodes that only complete the transformation.
+        """
+        return sorted(i for entities in self.entity_dofs().values()
+                      for dofs in entities.values() for i in dofs)
+
+    @cached_property
+    def _physical_functionals(self):
+        """The physical counterpart of each node of the FIAT dual set."""
+        dual = self._element.get_dual_set()
+        mappings = self._element.mapping()
+        functionals = [None] * len(dual.nodes)
+        for dim, entities in dual.get_entity_ids().items():
+            for entity, dofs in entities.items():
+                for i in dofs:
+                    functionals[i] = PhysicallyMappedFunctional(dual.nodes[i], self.cell, dim, entity,
+                                                                mappings[i], self.avg, self.tol)
+        return tuple(functionals)
+
+    @cached_property
+    def _reference_tabulation(self):
+        r"""The tabulation of the source nodal basis at the points of the nodes.
+
+        A dict from each derivative order k to a tuple of a dict from each
+        point :math:`x_q` to its index q, and the tensor
+        :math:`D_{jb\gamma q}=(\partial^\gamma\psi^0_j)_b(x_q)` with k
+        derivative axes :math:`\gamma`, where :math:`\psi^0` is the nodal
+        basis of the nodes before recombination.  The basis is tabulated one
+        time for each order.
+        """
+        sd = self.cell.get_spatial_dimension()
+        num_members = self._element.space_dimension()
+        tshape = self._element.value_shape()
+        dual = self._element.get_dual_set()
+        points = defaultdict(set)
+        for node in dual.nodes:
+            order = node.max_deriv_order
+            node_points, _ = node.get_order_tensors(order)
+            points[order].update(node_points)
+
+        C = dual.get_coeffs()
+        derivatives = {}
+        for order in points:
+            pts = sorted(points[order])
+            tabulation = self._element.tabulate(order, pts)
+            dshape = (sd,) * order
+            D = numpy.zeros((num_members, *tshape, *dshape, len(pts)))
+            for index in numpy.ndindex(dshape):
+                D[..., *index, :] = tabulation[tuple(map(index.count, range(sd)))]
+            if C is not None:
+                # n = C n_0, so the basis dual to n_0 is psi^0 = C^T psi.
+                D = numpy.tensordot(C, D, axes=(0, 0))
+            point_index = {pt: q for q, pt in enumerate(pts)}
+            derivatives[order] = (point_index, D)
+        return derivatives
+
+    def _vandermonde_rows(self, coordinate_mapping):
+        r"""The rows of the physical Vandermonde matrix :math:`B=SB_0` that differ from the identity.
 
         :arg coordinate_mapping: Object providing the physical geometry
             as GEM expressions.
-        :returns: The :class:`PhysicalVandermondeMatrix`.
+        :returns: A dict from each node number to its :class:`VandermondeRow`.
+        :raises NotImplementedError: If a row couples to a dof outside the
+            closure of the entity of the node.
         """
-        ref_el = self._element.get_reference_element()
-        sd = ref_el.get_spatial_dimension()
-        bary, = ref_el.make_points(sd, 0, sd + 1)
+        sd = self.cell.get_spatial_dimension()
+        bary, = self.cell.make_points(sd, 0, sd + 1)
         if sd == 1:
-            # The tangent derivative on a one-dimensional manifold carries
-            # the orientation in the signed Jacobian determinant.
+            # The signed determinant carries the orientation of the tangent.
             J = gem.ListTensor([[coordinate_mapping.detJ_at(bary)]])
         else:
             J = coordinate_mapping.jacobian_at(bary)
-        jacobian = Jacobian(J)
-        return PhysicalVandermondeMatrix(self._element, self.functionals(), jacobian, self.tol, avg=self.avg)
-
-    def functionals(self):
-        """The degrees of freedom as coefficient tensors.
-
-        Constraint functionals of an extended element that cannot be
-        parsed are not exposed as physical dofs: their physical
-        counterparts are the push-forwards of the reference ones (Kirby
-        2017, section 5), with identity rows.
-
-        :returns: A list with a :class:`~finat.functional.Functional` per
-            dof, or None for a dof keeping an identity row.
-        """
-        fiat_element = self._element
-        fiat_nodes = fiat_element.dual_basis()
-        mappings = fiat_element.mapping()
-        ndof = self.space_dimension()
-        functionals = [None] * len(fiat_nodes)
-        for dim, entities in fiat_element.entity_dofs().items():
-            for entity, dofs in entities.items():
-                for i in dofs:
-                    try:
-                        functionals[i] = Functional(fiat_nodes[i], (dim, entity), mappings[i])
-                    except NotImplementedError:
-                        if i < ndof:
-                            raise
-        return functionals
-
-    def dof_scales(self, coordinate_mapping):
-        r"""The rescaling of the physical degrees of freedom by powers of the cell size.
-
-        Each dof is rescaled by :meth:`dof_scale` evaluated with the cell
-        size averaged over the vertices of the dof's entity.  This is
-        the FInAT convention keeping the mass matrix well-conditioned; it
-        is consistent across cells because the scaling only depends on
-        shared entities.  The columns of :math:`V` are multiplied by the
-        scaling, and the rows of :math:`B` are divided by it.
-
-        :arg coordinate_mapping: Object providing the physical geometry as
-            GEM expressions.
-        :returns: A list with the GEM scaling factor of each dof of the
-            FIAT element, or ``None`` for no rescaling.
-        """
-        # cell_size may be a GEM expression or a numpy array of numbers
+        J = numpy.array([[J[i, k] for k in range(J.shape[1])] for i in range(J.shape[0])], dtype=object)
+        adjJ, detJ = adjugate_and_determinant(J)
+        metric, adj_metric = metric_and_adjugate(J)
         h = coordinate_mapping.cell_size()
-        fiat_element = self._element
-        top = fiat_element.get_reference_element().get_topology()
-        functionals = self.functionals()
-        entity_ids = fiat_element.entity_dofs()
-        scales = [None] * len(functionals)
-        for dim in entity_ids:
-            for entity in entity_ids[dim]:
-                verts = top[dim][entity]
-                havg = reduce(add, (h[v] for v in verts)) / len(verts)
-                for i in entity_ids[dim][entity]:
-                    if functionals[i] is not None:
-                        scales[i] = self.dof_scale(functionals[i], havg)
-        return scales
 
-    def dof_scale(self, functional: Functional, havg):
-        r"""Return the conditioning rescaling factor of one physical dof.
+        closure_dofs = self._element.entity_closure_dofs()
+        entity_dofs = self._element.entity_dofs()
+        tabulation = self._reference_tabulation
+        pullbacks = {}
+        rows = {}
+        for i, functional in enumerate(self._physical_functionals):
+            # Assemble each row by applying the pulled-back functional to the reference basis
+            key = functional.pullback_key
+            if key not in pullbacks:
+                pullbacks[key] = functional.pullback(J, adjJ, detJ, metric, adj_metric)
+            pullback = pullbacks[key]
 
-        The physical node of a pulled back reference basis function
-        dilates as :math:`h^{-p}`, and the dof is rescaled by :math:`h^{-p}`
-        to make it dimensionless.  The exponent :math:`p` is inferred from
-        the axes of the node:
+            order = functional.node.max_deriv_order
+            points, _ = functional.node.get_order_tensors(order)
+            point_index, D = tabulation[order]
+            D = D[..., [point_index[x] for x in points]]
 
-        * a derivative axis carries :math:`J^{-T}`, of exponent :math:`1`;
-        * a covariant component axis carries :math:`J^{-T}`, of exponent
-          :math:`1`, a contravariant component axis carries
-          :math:`J/\det J`, of exponent :math:`d-1`, and a divergence axis
-          carries :math:`1/\det J`, of exponent :math:`d`, where :math:`d`
-          is the spatial dimension.  These Piola weights only affect nodes
-          that are Cartesian components;
-        * a node in the physical frame of a facet absorbs the Piola
-          weights of its components, since its normals and tangents are
-          the images of the reference ones, except that the tangential
-          components of a contravariant axis have exponent :math:`2-d`;
-        * a node that is the push-forward of a reference node has exponent
-          zero.
+            # Get the row and the row scale
+            row = functional.to_riesz(pullback.forward, D)
+            scale = functional.scaling(J, h)
 
-        Unless :attr:`avg` is set, a node that integrates over its entity
-        of dimension :math:`k` is a plain integral rather than an average,
-        which contributes the entity measure :math:`h^k`.
+            nonzeros = [j for j, entry in enumerate(row) if not isinstance(entry, gem.Zero)]
+            if nonzeros == [i] and row[i] == one and scale == one:
+                # Skip identity row
+                continue
 
-        :arg functional: The :class:`~finat.functional.Functional` of the dof.
-        :arg havg: GEM scalar for the cell size averaged over the vertices
-            of the dof's entity.
-        :returns: The GEM scaling factor, or ``None`` for no rescaling.
+            # The row may only couple to the dofs in the closure of its entity
+            closure = closure_dofs[functional.dim][functional.entity]
+            outside = [j for j in nonzeros if j not in closure]
+            if outside:
+                raise NotImplementedError(f"The pullback of dof {i} on entity {(functional.dim, functional.entity)} "
+                                          f"needs dofs {outside} outside its closure, so it is not local to the entity.")
+
+            # Get the row of the inverse of the diagonal block
+            block = entity_dofs[functional.dim][functional.entity]
+            inverse = functional.to_riesz(pullback.inverse, D[block])
+            rows[i] = VandermondeRow(row, inverse, scale)
+        return rows
+
+    def _recombine(self, A):
+        r"""For :math:`n=Cn_0`, a matrix over the nodes transforms as :math:`CAC^{-1}`."""
+        C = self._element.get_dual_set().get_coeffs()
+        if C is None:
+            return A
+        return C @ A @ numpy.linalg.inv(C)
+
+    def _physical_vandermonde(self, coordinate_mapping):
+        """The physical Vandermonde matrix :math:`B` over all reference dofs."""
+        B = identity(self._element.space_dimension())
+        for i, row in self._vandermonde_rows(coordinate_mapping).items():
+            B[i] = row.entries * row.scale
+        return self._recombine(B)
+
+    def _inverse_physical_vandermonde(self, coordinate_mapping):
+        r""":math:`B^{-1}=B_0^{-1}S^{-1}` over all reference dofs.
+
+        Back-substitute the entity blocks of :math:`B_0` in closure order,
+        retaining completion functions.  The rows of each block e are
+        :math:`B_{ee}^{-1}(I_e - B_{ec}V_c)` over the rest c of its closure.
         """
-        sd = functional.ref_el.get_spatial_dimension()
-        weights = {DERIVATIVE: 1}
-        if functional.transformation == "cartesian":
-            weights.update({"covariant piola": 1, "contravariant piola": sd - 1, DIVERGENCE: sd})
-        elif functional.transformation == "invariant":
-            weights = {}
-        exponent = sum(weights.get(mapping, 0) for mapping in functional.mappings)
-        if functional.transformation == "frame":
-            # The normal component of a contravariant axis is invariant, and
-            # the tangential components pull back with degree sd - 2.
-            nu = functional.ref_el.compute_scaled_normal(functional.entity[1])
-            normal = numpy.outer(nu, nu) / (nu @ nu)
-            W = functional.coefficients
-            for k, mapping in enumerate(functional.mappings):
-                if mapping == "contravariant piola":
-                    R = numpy.tensordot(W, numpy.eye(sd) - normal, axes=(1 + k, 1))
-                    if numpy.abs(R).max() > self.tol * numpy.abs(W).max():
-                        exponent += 2 - sd
-            if not self.avg and len(functional.points) > 1:
-                exponent -= functional.entity[0]
-        return havg**-exponent if exponent else None
+        rows = self._vandermonde_rows(coordinate_mapping)
+        closure_dofs = self._element.entity_closure_dofs()
+        entity_dofs = self._element.entity_dofs()
+        I = identity(self._element.space_dimension())
+        V = identity(self._element.space_dimension())
+        for dim, entities in sorted(closure_dofs.items()):
+            for entity in entities:
+                block = entity_dofs[dim][entity]
+                if not any(i in rows for i in block):
+                    continue
+                closure = [j for j in closure_dofs[dim][entity] if j not in block]
+                inverse = identity(len(block))
+                offdiag = numpy.full((len(block), len(closure)), zero, dtype=object)
+                for k, i in enumerate(block):
+                    if i in rows:
+                        inverse[k] = rows[i].inverse
+                        offdiag[k] = rows[i].entries[closure]
+                rhs = I[block] - sparse_matmul(offdiag, V[closure])
+                V[block] = sparse_matmul(inverse, rhs)
+        for i, row in rows.items():
+            V[:, i] = V[:, i] / row.scale
+        return self._recombine(V)
 
 
 class DirectlyDefinedElement(NeedsCoordinateMappingElement):
@@ -473,225 +713,255 @@ def adjugate(A):
     return C
 
 
-def connected_components(A):
-    """Returns the connected components of the sparsity pattern of A.
+def adjugate_and_determinant(J):
+    r"""Return the determinant-scaled inverse and volume factor of a Jacobian.
 
-    :arg A: A square object array of GEM scalars.
-    :returns: A list of sorted lists of indices.
+    Square matrices use the signed determinant and adjugate.  For a
+    rectangular matrix the volume factor is :math:`\sqrt{\det(J^T J)}`
+    and the scaled inverse is :math:`\det J\,J^+`.
+
+    :arg J: Full-column-rank Jacobian as an object array of GEM scalars.
+    :returns: The scaled inverse (numerator) and volume factor (denominator).
+        The transpose of the scaled inverse is the cofactor matrix.
     """
-    m, n = A.shape
-    if m != n:
-        raise ValueError("A must be square.")
-    components = []
-    candidates = set(range(m))
-    while len(candidates) > 0:
-        seed = {min(candidates)}
-        while True:
-            ids = set(seed)
-            for i in seed:
-                ids.update(j for j in candidates if not isinstance(A[j, i], gem.Zero))
-                ids.update(j for j in candidates if not isinstance(A[i, j], gem.Zero))
-            if len(ids) == len(seed):
-                break
-            seed = ids
-        candidates -= ids
-        components.append(sorted(ids))
-    return components
+    gdim, tdim = J.shape
+    if gdim == tdim:
+        return (adjugate(J), determinant(J))
+    JTJ = J.T @ J
+    detJ = determinant(JTJ)**0.5
+    return (adjugate(JTJ) @ J.T / detJ, detJ)
 
 
-def solve(A, B, cache=None):
-    """Solves A X = B for a matrix A of GEM scalars.
+def metric_and_adjugate(J):
+    r"""Return the metric :math:`G=J^TJ` and its adjugate, which equals :math:`\operatorname{adj}(J)\operatorname{adj}(J)^T`.
 
-    Each connected component of A is solved through its adjugate and
-    determinant, which are cached so that identical blocks (e.g. the
-    vertex jets of every vertex) are only inverted once.
-
-    :arg A: A square object array of GEM scalars.
-    :arg B: An object array with the right-hand sides as columns.
-    :arg cache: An optional dict of adjugate and determinant pairs.
-    :returns: X as an object array.
+    :arg J: Full-column-rank Jacobian as an object array of GEM scalars.
+    :returns: The symmetric matrices :math:`G` and :math:`\operatorname{adj}(G)`.
     """
-    if cache is None:
-        cache = {}
-    X = numpy.full(B.shape, zero, dtype=object)
-    for ids in connected_components(A):
-        Aii = A[numpy.ix_(ids, ids)]
-        if len(ids) == 1:
-            d = Aii[0, 0]
-            X[ids] = B[ids] if d == one else B[ids] / d
-            continue
-        key = gem.ListTensor(Aii)
-        try:
-            adj, det = cache[key]
-        except KeyError:
-            adj, det = cache.setdefault(key, (adjugate(Aii), determinant(Aii)))
-        X[ids] = (adj @ B[ids]) / det
-    return X
+    G = symmetric(J.T @ J)
+    return G, symmetric(adjugate(G))
 
 
-def pseudoinverse(A):
-    """Returns the Moore-Penrose pseudoinverse of a full-rank matrix.
+def symmetric(A):
+    """The symmetric matrix with the upper triangle of A."""
+    A = A.copy()
+    i, j = numpy.tril_indices(len(A), -1)
+    A[i, j] = A[j, i]
+    return A
 
-    :arg A: An object array of GEM scalars with at least as many rows as
-        columns.
-    :returns: The Moore-Penrose pseudoinverse, formed as
-        ``solve(A.T @ A, A.T)``.
+
+def sparse_matmul(A, B):
+    """The product of matrices of GEM scalars, which skips the zero entries."""
+    columns = [[j for j, b in enumerate(row) if not isinstance(b, gem.Zero)] for row in B]
+    C = numpy.full((A.shape[0], B.shape[1]), zero, dtype=object)
+    for i, k in numpy.ndindex(A.shape):
+        if not isinstance(A[i, k], gem.Zero):
+            for j in columns[k]:
+                C[i, j] = C[i, j] + A[i, k] * B[k, j]
+    return C
+
+
+class LinearCombination:
+    r"""A matrix :math:`G=\sum_t g_t C_t` of GEM scalars :math:`g_t` and constant matrices :math:`C_t`.
+
+    :arg coefficients: The coefficients :math:`g_t`.
+    :arg matrices: The matrices :math:`C_t`.
     """
-    m, n = A.shape
-    if m < n:
-        raise ValueError("A must have at least as many rows as columns.")
-    return solve(A.T @ A, A.T)
 
+    def __init__(self, coefficients, matrices):
+        self.coefficients = numpy.asarray(coefficients, dtype=object)
+        self.matrices = numpy.asarray(matrices, dtype=float)
 
-class Jacobian:
-    r"""The cell Jacobian and its derived matrices, as object arrays of GEM scalars.
+    @classmethod
+    def from_matrix(cls, A):
+        """The linear combination of the entries of a matrix of GEM scalars."""
+        n = len(A)
+        units = numpy.eye(n * n).reshape(n, n, n, n)
+        entries = [(A[a, b], units[a, b]) for a, b in numpy.ndindex(A.shape) if not isinstance(A[a, b], gem.Zero)]
+        return cls(*zip(*entries))
 
-    Following FInAT, :math:`J = \partial x/\partial\hat{x}` maps
-    reference to physical coordinates.
+    @classmethod
+    def outer(cls, u, v):
+        """The outer product of a vector u of GEM scalars and a constant vector v."""
+        return cls(u, [numpy.outer(e, v) for e in numpy.eye(len(u))])
 
-    For a rectangular Jacobian, :attr:`detJ` is the positive metric volume
-    factor :math:`\sqrt{\det(J^T J)}`.  The :func:`pseudoinverse` handles
-    full-rank rectangular Jacobians.
+    @property
+    def T(self):
+        """The transpose."""
+        return LinearCombination(self.coefficients, self.matrices.transpose(0, 2, 1))
 
-    :arg J: A GEM expression for the Jacobian, shape ``(gdim, tdim)``.
-    """
-    def __init__(self, J):
-        if len(J.shape) != 2:
-            raise ValueError(f"The Jacobian must be a matrix, got shape {J.shape}.")
-        gdim, tdim = J.shape
-        self.J = numpy.array([[J[i, k] for k in range(tdim)] for i in range(gdim)], dtype=object)
-        if gdim == tdim:
-            self.detJ = determinant(self.J)
-            self.adjJ = adjugate(self.J)
-        else:
-            JTJ = self.J.T @ self.J
-            self.detJ = determinant(JTJ)**0.5
-            self.adjJ = self.detJ * pseudoinverse(self.J)
-        #: the cofactor matrix, which maps normals to normals
-        self.K = self.adjJ.T
+    def __add__(self, other):
+        return LinearCombination([*self.coefficients, *other.coefficients], [*self.matrices, *other.matrices])
 
+    def kron(self, other):
+        """The Kronecker product."""
+        return LinearCombination(numpy.multiply.outer(self.coefficients, other.coefficients).ravel(),
+                                 [numpy.kron(C, D) for C, D in product(self.matrices, other.matrices)])
 
-class PhysicalVandermondeMatrix:
-    r"""The generalized Vandermonde matrix of the physical nodes.
+    def contract(self, A, tol):
+        r"""The contraction :math:`G:A=g^TR` with a constant tensor, where :math:`R_t=C_t:A`.
 
-    :math:`B_{ij} = n_i(\hat\psi_j\circ F^{-1})` pairs the physical
-    nodes with the pulled-back reference nodal basis.  Every row is
-    supported on the dofs of the node's own entity and of the entities
-    in its closure, since the trace of a basis function on an entity is
-    determined by the dofs on the closure of that entity (which is what
-    makes the element conforming), so :math:`B` is block lower
-    triangular in the entity order.
-
-    :arg fiat_element: The FIAT element.
-    :arg functionals: A :class:`~finat.functional.Functional` per dof, or
-        None for a dof whose physical node is the push-forward of the
-        reference one.
-    :arg jacobian: The :class:`Jacobian`.
-    :arg tol: Relative tolerance below which numeric couplings are dropped.
-    :arg avg: Whether physical facet moments are integral averages, as
-        the reference nodes are; if not, they carry the physical facet
-        measure.
-    """
-    def __init__(self, fiat_element, functionals, jacobian, tol, avg=True):
-        self.fiat_element = fiat_element
-        self.functionals = functionals
-        self.jacobian = jacobian
-        self.tol = tol
-        self.avg = avg
-
-    def rows(self):
-        r"""Assembles the rows of :math:`B` that are not rows of the identity.
-
-        Each row is kept in numerator/denominator form, and is checked
-        to be supported on the closure of its entity.
-
-        :returns: A dict mapping the dof to its ``(numerator, denominator)``
-            pair of an object array of GEM scalars and a GEM scalar.
+        :arg A: A constant tensor whose first two axes match :math:`G`.
+        :arg tol: Tolerance relative to A and each :math:`C_t` below which
+            entries of :math:`R` are dropped.
+        :returns: An object array of GEM scalars with the remaining axes of A.
         """
-        fiat_element = self.fiat_element
-        nbf = fiat_element.space_dimension()
-        nodes = {i: node for i, node in enumerate(self.functionals)
-                 if node is not None and not node.is_invariant(self.jacobian, self.tol)}
-        if not nodes:
-            return {}
-        # tabulate once at the points of all the nodes, as DualSet.to_riesz does
-        points = sorted({pt for node in nodes.values() for pt in node.points})
-        order = max(node.order for node in nodes.values())
-        tabulation = fiat_element.tabulate(order, points)
-        columns = {pt: q for q, pt in enumerate(points)}
+        R = numpy.tensordot(self.matrices, A, axes=2)
+        R = R.reshape(len(R), -1)
+        cutoffs = tol * numpy.abs(A).max() * numpy.abs(self.matrices).max(axis=(1, 2))[:, None]
+        R = round_to_int(R, cutoffs)
+        nonzero = numpy.abs(R) > cutoffs
+        R_gem = numpy.full(R.shape, zero, dtype=object)
+        R_gem[nonzero] = [gem.Literal(r) for r in R[nonzero]]
+        return sparse_matmul(self.coefficients[None, :], R_gem).reshape(A.shape[2:])
 
-        closure_dofs = fiat_element.entity_closure_dofs()
-        rows = {}
-        for dim, entities in fiat_element.entity_dofs().items():
-            for entity, dofs in entities.items():
-                allowed = set(closure_dofs[dim][entity])
-                for i in dofs:
-                    if i not in nodes:
-                        continue
-                    T = nodes[i].arrange_tabulation(tabulation, columns)
-                    numerator, denominator = nodes[i].action(T, self.jacobian, self.tol, avg=self.avg)
-                    outside = [j for j in range(nbf) if j not in allowed
-                               and not isinstance(numerator[j], gem.Zero)]
-                    if outside:
-                        raise NotImplementedError(
-                            f"Dof {i} on entity {(dim, entity)} couples to dofs "
-                            f"{outside} outside the closure of its entity.")
-                    rows[i] = (numerator, denominator)
-        return rows
 
-    def matrix(self):
-        r"""Computes :math:`B`.
+def round_to_int(x, tol):
+    """Round the entries of x that lie within tol of an integer."""
+    rounded = numpy.round(x)
+    return numpy.where(numpy.abs(x - rounded) <= tol, rounded, x)
 
-        :returns: :math:`B` as an object array of GEM scalars.
-        """
-        B = identity(self.fiat_element.space_dimension())
-        for i, (numerator, denominator) in self.rows().items():
-            B[i] = numerator / denominator
-        return B
 
-    def inverse(self):
-        r"""Computes :math:`V = B^{-1}` by block back-substitution over the entities.
+def cartesian_pullbacks(J, adjJ, detJ):
+    """The :class:`Pullback` of each mapping in Cartesian components."""
+    sd = J.shape[1]
+    affine = LinearCombination([one], [numpy.eye(sd)])
+    contravariant = LinearCombination.from_matrix(J.T / detJ)
+    contravariant_inverse = LinearCombination.from_matrix(adjJ.T)
+    covariant = LinearCombination.from_matrix(adjJ / detJ)
+    covariant_inverse = LinearCombination.from_matrix(J)
+    # The identity on a contravariant axis and a covariant axis pulls back
+    # as (J^T/detJ) K^T = I/detJ, so the pair scales its weights by 1/detJ.
+    pairing = LinearCombination([one / detJ], [numpy.eye(sd * sd)])
+    pairing_inverse = LinearCombination([detJ], [numpy.eye(sd * sd)])
+    return {"affine": Pullback(affine, affine),
+            "contravariant piola": Pullback(contravariant, contravariant_inverse),
+            "covariant piola": Pullback(covariant, covariant_inverse),
+            "L2 piola": Pullback(pairing, pairing_inverse)}
 
-        Entities are visited in order of increasing dimension, and for
-        each entity :math:`e` with closure dofs :math:`c`
 
-        .. math:: V_e = B_{ee}^{-1}(I_e - B_{ec} V_c).
+def frame_pullbacks(cell, frame, metric, adj_metric, detJ):
+    """The :class:`Pullback` of each mapping in the frame of an entity.
 
-        Starting from the identity, only the rows of entities carrying
-        transformed nodes are replaced, and the rows of :math:`B` are
-        kept in numerator/denominator form so that only polynomial
-        blocks are inverted.
+    :arg frame: The entity ``(dim, entity)``, a facet or an edge of a tetrahedron.
+    :arg metric: The metric :math:`J^TJ`.
+    :arg adj_metric: The adjugate of the metric.
+    :arg detJ: The determinant of the Jacobian.
+    """
+    dim, entity = frame
+    sd = cell.get_spatial_dimension()
+    if dim == sd - 1:
+        pullbacks = facet_pullbacks(cell, entity, metric, adj_metric, detJ)
+    else:
+        pullbacks = edge_pullbacks(cell, entity, metric)
+    affine = LinearCombination([one], [numpy.eye(sd)])
+    return {"affine": Pullback(affine, affine), **pullbacks}
 
-        :returns: :math:`V` as an object array of GEM scalars.
-        """
-        fiat_element = self.fiat_element
-        nbf = fiat_element.space_dimension()
-        entity_dofs = fiat_element.entity_dofs()
-        closure_dofs = fiat_element.entity_closure_dofs()
-        rows = self.rows()
-        V = identity(nbf)
-        cache = {}
-        for dim in sorted(entity_dofs):
-            for entity, block in entity_dofs[dim].items():
-                if not any(i in rows for i in block):
-                    continue
-                closure = [j for j in closure_dofs[dim][entity] if j not in block]
-                # B_ee V_e = D_e - B_ec V_c, with B = diag(1/D) numerators
-                n = len(block)
-                Bee = numpy.full((n, n), zero, dtype=object)
-                rhs = numpy.full((n, nbf), zero, dtype=object)
-                for k, i in enumerate(block):
-                    if i not in rows:
-                        Bee[k, k] = one
-                        rhs[k, i] = one
-                        continue
-                    numerator, denominator = rows[i]
-                    Bee[k] = numerator[block]
-                    rhs[k, i] = denominator
-                    for j in closure:
-                        if not isinstance(numerator[j], gem.Zero):
-                            # keep the object array on the left, lest GEM
-                            # broadcast the scalar into a vector node
-                            rhs[k] = rhs[k] - V[j] * numerator[j]
-                V[block] = solve(Bee, rhs, cache)
-        return V
+
+def facet_pullbacks(cell, facet, metric, adj_metric, detJ):
+    r"""The :class:`Pullback` of each Piola mapping in the frame of a facet.
+
+    The frame consists of the tangents of the facet and its scaled normal
+    :math:`\nu`.  The metric is :math:`G=J^TJ`.
+    """
+    sd = cell.get_spatial_dimension()
+    tangents = cell.compute_tangents(sd - 1, facet)
+    nu = cell.compute_scaled_normal(facet)
+    # The physical normal is the cofactor normal x = adj(J)^T nu = J w, with
+    # w = adj(G) nu / detJ and |x|^2 = nu^T adj(G) nu.
+    z = adj_metric @ nu
+    xx = z @ nu
+    covariant = covariant_frame_pullback(metric, tangents, [nu], [z / detJ], [xx**0.5])
+
+    # Contravariant weights keep their normal component, and their
+    # tangential components map through the dual tangents of the facet.
+    nn = nu @ nu
+    zt = [z @ tau for tau in tangents]
+    dual_tangents = numpy.linalg.solve(tangents @ tangents.T, tangents)
+    matrices = [facet_normal_projector(cell, facet), tangential_projector(tangents),
+                *(numpy.outer(nu, s) for s in dual_tangents)]
+    contravariant = LinearCombination([one, xx / (detJ * nn), *(-c / (detJ * nn) for c in zt)], matrices)
+    contravariant_inverse = LinearCombination([one, detJ * nn / xx, *(c / xx for c in zt)], matrices)
+    return {"covariant piola": covariant,
+            "contravariant piola": Pullback(contravariant, contravariant_inverse)}
+
+
+def edge_pullbacks(cell, edge, metric):
+    r"""The :class:`Pullback` of the covariant mapping in the frame of an edge of a tetrahedron.
+
+    The frame consists of the edge tangent :math:`t` and the normals
+    :math:`t \times \nu_i` to :math:`t` within the two facets that contain
+    the edge, with scaled normals :math:`\nu_i`.  The metric is :math:`G=J^TJ`.
+    """
+    sd = cell.get_spatial_dimension()
+    t = cell.compute_edge_tangent(edge)
+    nus = [cell.compute_scaled_normal(f) for f in cell.get_connectivity()[(1, sd - 1)][edge]]
+    # The physical normal to the edge within facet i is J w_i, where w_i lies
+    # in the plane of the facet and J w_i is orthogonal to J t.
+    Gt = metric @ t
+    w = [numpy.cross(Gt, nu) for nu in nus]
+    norms = [(wi @ metric @ wi)**0.5 for wi in w]
+    covariant = covariant_frame_pullback(metric, t[None], [numpy.cross(t, nu) for nu in nus], w, norms)
+    return {"covariant piola": covariant}
+
+
+def covariant_frame_pullback(metric, tangents, normals, w, norms):
+    r"""The :class:`Pullback` of the covariant mapping in the frame of an entity.
+
+    The frame :math:`F` consists of the tangents of the entity and its
+    normals :math:`n_i`.  Its pullback :math:`A` from the physical cell
+    consists of the same tangents and the pullbacks :math:`w_i|n_i|/|Jw_i|`
+    of the unit physical normals, scaled by :math:`|n_i|`.  Covariant
+    weights map by :math:`AF^{-1}`, and back by :math:`FA^{-1}`.
+
+    :arg metric: The metric :math:`G=J^TJ`.
+    :arg tangents: The tangents as rows.
+    :arg normals: The normals :math:`n_i`.
+    :arg w: The pullbacks :math:`w_i` of the physical normals, with
+        :math:`\tau^TGw_i = 0` for each tangent :math:`\tau`.
+    :arg norms: The lengths :math:`|Jw_i|` of the physical normals.
+    """
+    normals = numpy.asarray(normals)
+    lengths = numpy.linalg.norm(normals, axis=1)
+    # The columns of A for the normals
+    A = [wi * (length / norm) for wi, norm, length in zip(w, norms, lengths)]
+    # The dual basis of the frame, as rows
+    dual = numpy.linalg.inv(numpy.concatenate([tangents, normals]).T)
+    tangents_dual, normals_dual = dual[:len(tangents)], dual[len(tangents):]
+    forward = reduce(add, (LinearCombination.outer(a, n_dual) for a, n_dual in zip(A, normals_dual)),
+                     LinearCombination([one], [tangents.T @ tangents_dual]))
+
+    # The rows of A^{-1} for the tangents are (T G T^T)^{-1} T G, which vanish
+    # on the w_i.  The rows for the normals vanish on the tangents, so they
+    # combine the dual normals through the inverse of N_ij = n_i^* . A_j.
+    GT = metric @ tangents.T
+    g = symmetric(GT.T @ tangents.T)
+    components = adjugate(g) @ GT.T / determinant(g)
+    N = numpy.array([[n_dual @ a for a in A] for n_dual in normals_dual])
+    inverse = reduce(add, (LinearCombination.outer(row, tau).T for tau, row in zip(tangents, components)),
+                     LinearCombination((adjugate(N) / determinant(N)).ravel(),
+                                       [numpy.outer(n, n_dual) for n in normals for n_dual in normals_dual]))
+    return Pullback(forward, inverse)
+
+
+def facet_normal_projector(cell, facet):
+    """The projector onto the normal of a facet."""
+    nu = cell.compute_scaled_normal(facet)
+    return numpy.outer(nu, nu) / (nu @ nu)
+
+
+def tangential_projector(tangents):
+    r"""The projector :math:`t^T\operatorname{adj}(g)\,t/\det g` onto the span of the tangents t.
+
+    :arg tangents: The tangents as rows, with the Gram matrix :math:`g=tt^T`.
+    """
+    g = tangents @ tangents.T
+    return tangents.T @ adjugate(g) @ tangents / determinant(g)
+
+
+def in_range_of(weights, projector, axes, tol):
+    """Whether the weights lie in the range of the projector acting on the given axes."""
+    shape = tuple(weights.shape[k] for k in axes)
+    complement = numpy.eye(projector.shape[0]) - projector
+    residual = numpy.tensordot(complement.reshape(shape + shape), weights, axes=(range(len(axes), 2 * len(axes)), axes))
+    return numpy.abs(residual).max() <= tol * numpy.abs(weights).max()

@@ -285,7 +285,7 @@ class StokesDual(dual_set.DualSet):
                         nfe = numpy.cross(ref_el.compute_edge_tangent(e), nface)
                         nfe /= numpy.linalg.norm(nfe)
                         Q, phis = map_duals(ref_el, dim-1, e, Q_edge, phis_edge[:degree-5+1])
-                        nodes.extend(IntegralMomentOfDerivative(ref_el, Q, phi, nfe, comp=comp, shp=shp)
+                        nodes.extend(IntegralMomentOfDerivative(ref_el, Q, phi, numpy.outer(comp, nfe), shp=shp)
                                      for phi in phis for comp in entity_comps)
 
                 # Rest of the facet moments

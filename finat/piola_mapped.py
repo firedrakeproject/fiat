@@ -1,6 +1,5 @@
 from finat.fiat_elements import FiatElement
 from finat.physically_mapped import PhysicallyMappedElement
-from copy import deepcopy
 
 
 class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
@@ -14,18 +13,9 @@ class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
         # On each facet we expect the normal dof followed by the tangential ones
         # The tangential dofs should be numbered last, and are constrained to be zero
         sd = self.cell.get_spatial_dimension()
-        reduced_dofs = deepcopy(self._element.entity_dofs())
-        reduced_dim = 0
-        cur = reduced_dofs[sd-1][0][0]
-        for entity in sorted(reduced_dofs[sd-1]):
-            reduced_dim += len(reduced_dofs[sd-1][entity][1:])
-            reduced_dofs[sd-1][entity] = [cur]
-            cur += 1
-        self._entity_dofs = reduced_dofs
+        facet_dofs = self._element.entity_dofs()[sd-1]
+        reduced_dim = sum(len(dofs) - 1 for dofs in facet_dofs.values())
         self._space_dimension = fiat_element.space_dimension() - reduced_dim
-
-    def entity_dofs(self):
-        return self._entity_dofs
 
     def space_dimension(self):
         return self._space_dimension

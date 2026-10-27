@@ -25,6 +25,10 @@ from gem.interpreter import evaluate
     (2, finat.AlfeldC2, 5, None),
     (3, finat.Walkington, 5, None),
     (3, finat.MardalTaiWinther, 2, None),
+    (2, finat.GuzmanNeilanFirstKindH1, 1, None),
+    (3, finat.GuzmanNeilanFirstKindH1, 1, None),
+    (2, finat.JohnsonMercier, 1, None),
+    (3, finat.JohnsonMercier, 1, None),
 ])
 def test_mass_scaling(scaled_ref_to_phys, sd, element, degree, variant):
     kwargs = {} if variant is None else dict(variant=variant)
