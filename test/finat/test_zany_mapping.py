@@ -17,19 +17,17 @@ from gem.node import traversal
 from gem.driver import contraction
 from finat.physically_mapped import MappedTabulation
 
-
-def test_numeric_zero_mapped_tabulation_is_sparse() -> None:
-    """Discard numeric zeros when constructing mapped rows."""
-    matrix = gem.Literal(np.eye(3))
-    mapped = MappedTabulation(matrix, {None: gem.Literal(np.eye(3))})
-
-    assert mapped._width == 1
-    assert np.array_equal(mapped._columns.array[:, 0], np.arange(3))
-    assert mapped._values.shape == (1,)
+from .conftest import MyMapping
 
 
-def test_sparse_mapped_tabulation():
-    """Check the values and arithmetic work of a padded sparse basis map."""
+def test_numeric_zero_mapped_tabulation_is_sparse():
+    """Discard numeric zeros when constructing mapped blocks."""
+    mapped = MappedTabulation(gem.Literal(np.eye(3)), {}, {0: {0: [0, 1, 2]}})
+    assert sum(np.prod(coefficients.shape) for coefficients, _, _ in mapped._blocks) == 3
+
+
+def test_entity_mapped_tabulation():
+    """Check a rectangular entity map and its coefficient contraction."""
     coefficient = gem.Variable("coefficient", ())
     matrix = gem.ListTensor(np.asarray([
         [gem.Literal(1.0), gem.Zero(), coefficient],
@@ -38,21 +36,11 @@ def test_sparse_mapped_tabulation():
     table_values = np.arange(1.0, 7.0).reshape(3, 2)
     table = gem.Literal(table_values)
 
-    mapped_tabulation = MappedTabulation(matrix, {None: table})
-    # Equal symbolic entries share one coefficient slot, so the sparse map
-    # indexes a vector rather than materialising a symbolic matrix.
-    assert mapped_tabulation._values.shape == (3,)
-
+    mapped_tabulation = MappedTabulation(matrix, {None: table}, {0: {0: [0, 1], 1: [2]}})
     i, j = gem.indices(2)
     mapped = contraction(gem.Indexed(mapped_tabulation[None], (i, j)))
-
-    products = [node for node in traversal((mapped,))
-                if isinstance(node, gem.Product)]
-    assert sum(map(operation_count, products)) == 8
-    output = gem.Indexed(gem.Variable("output", (2, 2)), (i, j))
-    assert count_flops(compile_gem([(output, mapped)], (i, j))) == 16
-    assert not any(isinstance(node, gem.Conditional)
-                   for node in traversal((mapped,)))
+    products = [node for node in traversal((mapped,)) if isinstance(node, gem.Product)]
+    assert sum(map(operation_count, products)) <= 4
 
     actual, = evaluate(
         [gem.ComponentTensor(mapped, (i, j))],
@@ -61,6 +49,101 @@ def test_sparse_mapped_tabulation():
     expected = np.asarray([[1.0, 0.0, 2.0], [0.0, 1.0, 0.0]]) \
         @ table_values
     assert np.array_equal(actual.arr, expected)
+
+    weights = gem.Variable("weights", (2,))
+    value = contraction(gem.IndexSum(
+        gem.Product(gem.Indexed(weights, (i,)),
+                    gem.Indexed(mapped_tabulation[None], (i, j))), (i,)))
+    output = gem.Indexed(gem.Variable("output", (2,)), (j,))
+    # Transform the coefficient weights before looping over components.
+    assert count_flops(compile_gem([(output, value)], (j,))) <= 13
+    assert not any(isinstance(node, gem.Conditional) for node in traversal((value,)))
+
+    actual, = evaluate(
+        [gem.ComponentTensor(value, (j,))],
+        {coefficient: np.asarray(2.0), weights: np.asarray([1.0, 10.0])},
+    )
+    assert np.array_equal(actual.arr, np.asarray([1.0, 10.0]) @ expected)
+
+
+@pytest.mark.parametrize("shape", [(), (2,), (2, 2)])
+@pytest.mark.parametrize("restriction_indices", [None, [4, 1, 0]])
+def test_entity_mapped_tabulation_restriction(shape, restriction_indices):
+    """Entity couplings retain basis order, tensor components and point indices."""
+    matrix_values = np.asarray([
+        [1, 2, 0, 0, 3, 0, 0],
+        [0, 4, 5, 0, 0, 6, 0],
+        [0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 7, 0, 0, 8],
+        [0, 0, 0, 0, 9, 0, 10],
+    ], dtype=float)
+    scale = gem.Variable("scale", ())
+    matrix = gem.ListTensor([[scale * value if value else gem.Zero()
+                              for value in row] for row in matrix_values])
+    retained = list(range(5)) if restriction_indices is None else restriction_indices
+    reference_entities = {0: {0: [0, 1], 1: [2]}, 1: {0: [3, 4, 5, 6]}}
+    q = gem.Index(extent=3)
+    values = np.random.default_rng(42).normal(size=(3, 7, *shape))
+    table = gem.partial_indexed(gem.Literal(values), (q,))
+    mapped = MappedTabulation(matrix, {None: table}, reference_entities,
+                              restriction_indices=restriction_indices)
+    result, = evaluate([mapped[None]], {scale: np.asarray(1.5)})
+    expected = np.einsum("ij,qj...->qi...", 1.5*matrix_values[retained], values)
+    assert result.fids == (q,)
+    assert np.allclose(result.arr, expected)
+    weights = gem.Variable("weights", (len(retained),))
+    i, *tail = gem.indices(1 + len(shape))
+    value = contraction(gem.IndexSum(gem.Product(
+        gem.Indexed(weights, (i,)), gem.Indexed(mapped[None], (i, *tail))), (i,)))
+    coefficients = np.random.default_rng(19).normal(size=len(retained))
+    actual, = evaluate([gem.ComponentTensor(value, tuple(tail))],
+                       {scale: np.asarray(1.5), weights: coefficients})
+    assert actual.fids == (q,)
+    assert np.allclose(actual.arr, np.einsum("i,qi...->q...", coefficients, expected))
+    assert mapped[None] is mapped[None]
+    assert list(mapped) == [None]
+    assert len(mapped) == 1
+    with pytest.raises(KeyError):
+        mapped["missing"]
+
+
+@pytest.mark.parametrize("element", [finat.Argyris, finat.Bell, finat.HsiehCloughTocher])
+def test_entity_mapped_tabulation_triangular(ref_to_phys, element):
+    """Keep all couplings from vertex jets into facet functionals."""
+    mapping = ref_to_phys[2]
+    element = element(mapping.ref_cell)
+    table = gem.Variable("reference", (element._element.space_dimension(),))
+    result = element.map_tabulation({None: table}, mapping)[None]
+    reference = np.random.default_rng(11).normal(size=table.shape)
+    matrix, = evaluate([element.basis_transformation(mapping)])
+    actual, = evaluate([result], {table: reference})
+    assert np.allclose(actual.arr, matrix.arr @ reference)
+    physical_dims = {dof: dim for dim, entities in element.entity_dofs().items()
+                     for dofs in entities.values() for dof in dofs}
+    reference_dims = {dof: dim for dim, entities in element._element.entity_dofs().items()
+                      for dofs in entities.values() for dof in dofs}
+    assert all(physical_dims[row] <= reference_dims[column]
+               for row, column in zip(*np.nonzero(matrix.arr)))
+
+
+class TranslatedMapping(MyMapping):
+    """Translate the Jacobian afresh on every call, as a form compiler does."""
+
+    def jacobian_at(self, point):
+        i, j, k = gem.indices(3)
+        product = gem.Product(gem.Indexed(gem.Literal(self.A), (i, k)),
+                              gem.Indexed(gem.Literal(np.eye(len(self.A))), (k, j)))
+        return gem.ComponentTensor(gem.IndexSum(product, (k,)), (i, j))
+
+
+def test_mapped_tabulations_share_transformations(ref_to_phys):
+    """Separately translated transformations share the same GEM expressions."""
+    mapping = TranslatedMapping(ref_to_phys[2].ref_cell, ref_to_phys[2].phys_cell)
+    element = finat.Hermite(mapping.ref_cell, 3)
+    ps = finat.point_set.PointSet([[0.25, 0.25]])
+    values = element.basis_evaluation(0, ps, coordinate_mapping=mapping)
+    gradients = element.basis_evaluation(1, ps, coordinate_mapping=mapping)
+    assert values[(0, 0)] == gradients[(0, 0)]
 
 
 def test_rectangular_adjugate_and_determinant():

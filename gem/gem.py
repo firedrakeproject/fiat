@@ -312,13 +312,10 @@ class Literal(Constant):
             return False
         if self.shape != other.shape:
             return False
-        if self.dtype != other.dtype:
-            return False
         return numpy.array_equal(self.array, other.array)
 
     def get_hash(self):
-        return hash((type(self), self.shape, self.dtype,
-                     tuple(self.array.flat)))
+        return hash((type(self), self.shape, tuple(self.array.flat)))
 
     @property
     def value(self):
@@ -760,6 +757,14 @@ def _index_free_indices(index):
     return ()
 
 
+def _index_ordering(index):
+    """Return the running indices of an index expression in indexing order."""
+    if isinstance(index, VariableIndex) and isinstance(
+            index.expression, (Indexed, FlexiblyIndexed)):
+        return index.expression.index_ordering()
+    return _index_free_indices(index)
+
+
 class Indexed(Scalar):
     __slots__ = ('children', 'multiindex', 'indirect_children')
     __back__ = ('multiindex',)
@@ -797,16 +802,11 @@ class Indexed(Scalar):
                 C, = B.children
                 kk = B.multiindex
                 ff = C.free_indices
-                # An index reached only through a VariableIndex is not a key
-                # of kk, so the rewrite below would drop its replacement and
-                # leave the old index behind, bound by nothing.  Those belong
-                # to replace_indices, which does substitute inside the lookup.
-                nested = set(chain.from_iterable(
+                # Substitution inside indirect lookups needs replace_indices.
+                hh = frozenset(chain.from_iterable(
                     k.expression.free_indices
                     for k in kk if isinstance(k, VariableIndex)))
-                safe = not set(jj).intersection(set(ff) | nested)
-                if safe:
-                    # Only replace indices that are not present in C
+                if not any((j in ff or j in hh) for j in jj):
                     rep = dict(zip(jj, ii))
                     ll = tuple(rep.get(k, k) for k in kk)
                     aggregate = C
@@ -831,7 +831,7 @@ class Indexed(Scalar):
 
     def index_ordering(self):
         """Running indices in the order of indexing in this node."""
-        return tuple(chain.from_iterable(map(_index_free_indices, self.multiindex)))
+        return tuple(chain.from_iterable(map(_index_ordering, self.multiindex)))
 
 
 class FlexiblyIndexed(Scalar):
@@ -922,7 +922,7 @@ class FlexiblyIndexed(Scalar):
                 if isinstance(index, Index):
                     free_indices.append(index)
                 elif isinstance(index, VariableIndex):
-                    free_indices.extend(index.expression.free_indices)
+                    free_indices.extend(_index_ordering(index))
                 if isinstance(stride, Node):
                     free_indices.extend(stride.free_indices)
         return tuple(free_indices)
@@ -1320,15 +1320,10 @@ class OrientationVariableIndex(VariableIndex, FIATOrientation):
 def unique(indices):
     """Sorts free indices and eliminates duplicates.
 
-    Indices are ordered by creation, not by :func:`id`.  Object addresses
-    depend on what else the process has allocated, so an address ordering
-    would make every ``free_indices`` tuple, and hence the loop order
-    chosen downstream, depend on which forms were compiled beforehand.
-
     :arg indices: iterable of indices
     :returns: sorted tuple of unique free indices
     """
-    return tuple(sorted(set(indices), key=attrgetter("count")))
+    return tuple(sorted(set(indices), key=lambda index: index.count))
 
 
 def index_sum(expression, indices):

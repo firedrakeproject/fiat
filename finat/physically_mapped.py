@@ -16,10 +16,12 @@ from operator import add
 
 import gem
 import numpy
-from gem.optimise import factorise_scalar_sums
+
+from gem.optimise import canonical_bound_indices, factorise_scalar_sums
 
 from FIAT.functional import IntegralMoment
 from finat.citations import cite
+from finat.finiteelementbase import broadcast_tensor
 
 zero = gem.Zero()
 one = gem.Literal(1.0)
@@ -41,98 +43,82 @@ class NeedsCoordinateMappingElement(metaclass=ABCMeta):
 
 
 class MappedTabulation(Mapping):
-    """A lazy tabulation dict that applies the basis transformation only
-    on the requested derivatives.
+    """Apply entity blocks of a basis transformation to reference tabulations.
 
-    Rows are padded to a common number of entries, so that a loop over the
-    basis index has an affine iteration domain.  Constant tables select the
-    reference column and one of the distinct symbolic coefficients, which
-    shares equal entries without materialising the matrix entry by entry.
+    Parameters
+    ----------
+    transformation : gem.Node
+        Matrix mapping reference basis functions to physical basis functions.
+        Its nonzero blocks couple physical and reference entity functionals.
+    ref_tabulation : Mapping
+        Reference tabulations indexed by derivative order.
+    ref_entity_dofs : Mapping
+        Reference degrees of freedom on each entity, including constraint
+        functions removed from the physical element.
+    restriction_indices : sequence of int, optional
+        Indices of the physical basis functions retained by a restriction.
+        Their order defines the ordering of the restricted basis.
 
-    :arg M: a gem.ListTensor with the basis transformation matrix.
-    :arg ref_tabulation: a dict of tabulations on the reference cell.
+    Notes
+    -----
+    Basis functions with common reference entity support form dense
+    transformation blocks. This retains diagonal jet maps and their
+    couplings to higher-dimensional entities, including constraint functions.
+    Every reduction has a fixed extent and contains only nonzero entries.
     """
 
-    def __init__(self, M: gem.ListTensor, ref_tabulation: Mapping) -> None:
+    def __init__(self, transformation, ref_tabulation, ref_entity_dofs,
+                 restriction_indices=None):
         self.ref_tabulation = ref_tabulation
-        self._space_dim = M.shape[0]
-        self._value_dim = M.shape[1]
-
-        nonzero_rows = []
-        for source_row in range(self._space_dim):
-            row = []
-            for column in range(M.shape[1]):
-                value = M.array[source_row, column]
-                if not (isinstance(value, gem.Zero)
-                        or isinstance(value, Number) and value == 0):
-                    row.append((column, value))
-            nonzero_rows.append(row)
-        width = max((len(row) for row in nonzero_rows), default=0)
-        nrows = self._space_dim
-        columns = numpy.zeros((nrows, width), dtype=gem.uint_type)
-        data = numpy.full((nrows, width), zero, dtype=object)
-        for index, row in enumerate(nonzero_rows):
-            columns[index, :len(row)] = tuple(column for column, _ in row)
-            data[index, :len(row)] = tuple(
-                factorise_scalar_sums(gem.as_gem(value)) for _, value in row)
-        self._width = width
-        self._columns = gem.Literal(columns, dtype=gem.uint_type)
-        values = []
-        value_numbers = {}
-        value_indices = numpy.empty(data.shape, dtype=gem.uint_type)
-        for multiindex, value in numpy.ndenumerate(data):
-            try:
-                number = value_numbers[value]
-            except KeyError:
-                number = len(values)
-                value_numbers[value] = number
-                values.append(value)
-            value_indices[multiindex] = number
-        self._value_indices = gem.Literal(value_indices, dtype=gem.uint_type)
-        self._values = gem.ListTensor(values)
         self._tabulation_cache = {}
-
-    @cached_property
-    def _reference_index(self) -> gem.Index:
-        """Contraction over the reference basis, shared by all tabulations."""
-        return gem.Index(extent=self._value_dim)
-
-    @cached_property
-    def _row_index(self) -> gem.Index:
-        """Contraction over a padded row, shared by all tabulations."""
-        return gem.Index(extent=self._width)
-
-    def _entry(self, r: gem.Index, a: gem.Index) -> gem.Node:
-        """Entry ``M[r, a]`` of the basis transformation.
-
-        :arg r: index over the rows retained by the element
-        :arg a: index over the reference basis
-        :returns: a sum over the padded row of an interned entry against a
-                  Delta selecting its column, so that contracting either axis
-                  of ``M`` is ordinary GEM algebra
-        """
-        k = self._row_index
-        entry = gem.Indexed(
-            self._values,
-            (gem.VariableIndex(gem.Indexed(self._value_indices, (r, k))),))
-        column = gem.VariableIndex(gem.Indexed(self._columns, (r, k)))
-        return gem.IndexSum(gem.Product(entry, gem.Delta(column, a)), (k,))
-
-    def matmul(self, table: gem.Node) -> gem.Node:
-        """Apply the basis transformation to a reference tabulation."""
-        r = gem.Index(extent=self._space_dim)
-        a = self._reference_index
-        tail = gem.indices(len(table.shape) - 1)
-        mapped = gem.IndexSum(
-            gem.Product(self._entry(r, a), gem.Indexed(table, (a, *tail))), (a,))
-        return gem.ComponentTensor(mapped, (r, *tail))
+        if restriction_indices is None:
+            restriction_indices = range(transformation.shape[0])
+        matrix = transformation.array
+        groups = defaultdict(list)
+        for dof, basis_index in enumerate(restriction_indices):
+            support = []
+            for dim, entities in ref_entity_dofs.items():
+                for entity, dofs in entities.items():
+                    columns = []
+                    for column in dofs:
+                        value = matrix[basis_index, column]
+                        if (isinstance(value, gem.Zero)
+                                or isinstance(value, Number) and value == 0):
+                            continue
+                        columns.append(column)
+                    if columns:
+                        support.append(((dim, entity), tuple(columns)))
+            if support:
+                groups[tuple(support)].append((dof, basis_index))
+        self._blocks = []
+        self._dimension = len(restriction_indices)
+        for support, entries in groups.items():
+            columns = tuple(column for _, dofs in support for column in dofs)
+            coefficients = gem.ListTensor([
+                [factorise_scalar_sums(gem.as_gem(matrix[basis_index, c])) for c in columns]
+                for _, basis_index in entries])
+            self._blocks.append((coefficients, columns, tuple(dof for dof, _ in entries)))
 
     def __getitem__(self, alpha):
-        try:
-            return self._tabulation_cache[alpha]
-        except KeyError:
-            result = self.matmul(self.ref_tabulation[alpha])
-            return self._tabulation_cache.setdefault(alpha, result)
+        if alpha not in self._tabulation_cache:
+            table = self.ref_tabulation[alpha]
+            tail = gem.indices(len(table.shape) - 1)
+            values = [zero] * self._dimension
+            for coefficients, columns, positions in self._blocks:
+                r, k = gem.indices(2)
+                columns = gem.Literal(columns, dtype=gem.uint_type)
+                reference = gem.VariableIndex(gem.Indexed(columns, (k,)))
+                mapped = gem.IndexSum(gem.Product(
+                    gem.Indexed(coefficients, (r, k)),
+                    gem.Indexed(table, (reference, *tail))), (k,))
+                block = gem.ComponentTensor(mapped, (r,))
+                for local, position in enumerate(positions):
+                    values[position] = gem.Indexed(block, (local,))
+            r = gem.Index(extent=self._dimension)
+            mapped = gem.Indexed(gem.ListTensor(values), (r,))
+            self._tabulation_cache[alpha] = canonical_bound_indices(
+                broadcast_tensor(mapped, (r, *tail)))
+        return self._tabulation_cache[alpha]
 
     def __iter__(self):
         return iter(self.ref_tabulation)
@@ -405,12 +391,12 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         B = gem.ListTensor(B[numpy.ix_(indices, indices)])
 
         key = None
-        return MappedTabulation(B, {key: Q})[key]
+        return MappedTabulation(B, {key: Q}, self.entity_dofs())[key]
 
     def map_tabulation(self, ref_tabulation, coordinate_mapping):
         assert coordinate_mapping is not None
         M = self.basis_transformation(coordinate_mapping)
-        return MappedTabulation(M, ref_tabulation)
+        return MappedTabulation(M, ref_tabulation, self._element.entity_dofs())
 
     def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
         result = super().basis_evaluation(order, ps, entity=entity)

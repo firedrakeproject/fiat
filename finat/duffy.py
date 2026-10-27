@@ -109,4 +109,5 @@ class DuffyElement:
         tabulation = {
             alpha: gem.FlattenedTensor(expr, multiindex)
             for alpha, expr in result.items()}
-        return MappedTabulation(coefficients, tabulation)
+        return MappedTabulation(
+            coefficients, tabulation, {cell_dim: {0: range(coefficients.shape[1])}})
