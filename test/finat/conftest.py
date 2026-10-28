@@ -23,7 +23,11 @@ class MyMapping(PhysicalGeometry):
         return gem.Literal(np.linalg.det(self.A))
 
     def jacobian_at(self, point):
-        return gem.Literal(self.A)
+        A = self.A
+        if self.ref_cell.get_spatial_dimension() == 1:
+            # The manifold tangent is unsigned; detJ_at carries orientation.
+            A = np.abs(A)
+        return gem.Literal(A)
 
     def normalized_reference_edge_tangents(self):
         top = self.ref_cell.get_topology()
@@ -70,28 +74,13 @@ class ScaledMapping(MyMapping):
 
     def cell_size(self):
         # Firedrake interprets this as 2x the circumradius
-        sd = self.phys_cell.get_spatial_dimension()
-        top = self.phys_cell.get_topology()
-        vol = self.phys_cell.volume()
-        edges = [self.phys_cell.volume_of_subcomplex(1, i)
-                 for i in sorted(top[1])]
-
-        if sd == 1:
-            cs = vol
-        elif sd == 2:
-            cs = np.prod(edges) / (2 * vol)
-        elif sd == 3:
-            edge_pairs = [edges[i] * edges[j] for i in top[1] for j in top[1]
-                          if len(set(top[1][i] + top[1][j])) == len(top[0])]
-            cs = 1.0 / (12 * vol)
-            for k in range(4):
-                s = [1]*len(edge_pairs)
-                if k > 0:
-                    s[k-1] = -1
-                cs *= np.dot(s, edge_pairs) ** 0.5
-        else:
-            raise NotImplementedError(f"Cell size not implemented in {sd} dimensions")
-        return np.asarray([cs for _ in sorted(top[0])])
+        verts = np.asarray(self.phys_cell.get_vertices())
+        # The circumcenter is equidistant from all vertices
+        A = 2 * (verts[1:] - verts[0])
+        b = np.sum(verts[1:]**2 - verts[0]**2, axis=1)
+        center = np.linalg.solve(A, b)
+        cs = 2 * np.linalg.norm(verts[0] - center)
+        return np.full((len(verts),), cs)
 
 
 def scaled_simplex(dim, scale):

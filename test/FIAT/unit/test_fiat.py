@@ -66,6 +66,7 @@ from FIAT.nodal_enriched import NodalEnrichedElement
 from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen    # noqa: F401
 from FIAT.histopolation import Histopolation                    # noqa: F401
 from FIAT.wuxu import WuXuH3NC, WuXuRobustH3NC                  # noqa: F401
+from FIAT.walkington import Walkington                         # noqa: F401
 
 P = Point()
 I = UFCInterval()  # noqa: E741
