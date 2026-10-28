@@ -1,7 +1,7 @@
 """A set of routines implementing various transformations on GEM
 expressions."""
 
-from collections import OrderedDict, defaultdict
+from collections import Counter, OrderedDict, defaultdict
 from functools import singledispatch, partial
 from itertools import combinations, permutations, zip_longest
 from numbers import Integral
@@ -228,12 +228,29 @@ def constant_fold_zero(exprs):
     return list(map(mapper, exprs))
 
 
-def _select_expression(expressions, index):
+def _selection_indices(multiindex, expressions):
+    """Bound indices for a selection among expressions.
+
+    Reusing the bound indices of one expression makes the selection
+    deterministic, so that equal selections share their code.  Fresh indices
+    replace them only where another expression has them free.
+
+    :arg multiindex: bound indices of one of the expressions
+    :arg expressions: the expressions to select from
+    :returns: a multiindex with the same extents
+    """
+    if all(set(e.free_indices).isdisjoint(multiindex) for e in expressions):
+        return multiindex
+    return tuple(Index(extent=index.extent) for index in multiindex)
+
+
+def _select_expression(expressions, self, index):
     """Helper function to select an expression from a list of
     expressions with an index.  This function expect sanitised input,
     one should normally call :py:func:`select_expression` instead.
 
     :arg expressions: a list of expressions
+    :arg self: memoizer sharing selections of repeated subexpressions
     :arg index: an index (free, fixed or variable)
     :returns: an expression
     """
@@ -252,16 +269,18 @@ def _select_expression(expressions, index):
                 return expression.children[0]
             elif isinstance(expression, Zero):
                 return Zero(shape)
-        return Indexed(_select_expression(list(map(child, expressions)), index), multiindex)
+        return Indexed(self(tuple(map(child, expressions)), index), multiindex)
 
     if types <= {Literal, Zero, Failure}:
         return partial_indexed(ListTensor(expressions), (index,))
 
     if types <= {ComponentTensor, Zero}:
         shape, = set(e.shape for e in expressions)
-        multiindex = tuple(Index(extent=d) for d in shape)
+        multiindex = _selection_indices(
+            next(e.multiindex for e in expressions
+                 if isinstance(e, ComponentTensor)), expressions)
         children = remove_componenttensors([Indexed(e, multiindex) for e in expressions])
-        return ComponentTensor(_select_expression(children, index), multiindex)
+        return ComponentTensor(self(tuple(children), index), multiindex)
 
     if types == {Delta}:
         if all(e.i == k and e.j == expr.j for k, e in enumerate(expressions)):
@@ -269,18 +288,29 @@ def _select_expression(expressions, index):
         elif all(e.j == k and e.i == expr.i for k, e in enumerate(expressions)):
             return expr.reconstruct(expr.i, index)
 
+    if types == {IndexSum}:
+        extents = {tuple(i.extent for i in e.multiindex) for e in expressions}
+        if len(extents) == 1:
+            multiindex = _selection_indices(expr.multiindex, expressions)
+            summands = [Indexed(ComponentTensor(e.children[0], e.multiindex),
+                                multiindex)
+                        for e in expressions]
+            return IndexSum(self(tuple(summands), index), multiindex)
+
     if len(types) == 1:
         cls, = types
-        if cls.__front__ or cls.__back__:
-            raise NotImplementedError("How to factorise {} expressions?".format(cls.__name__))
-        assert all(len(e.children) == len(expr.children) for e in expressions)
-        assert len(expr.children) > 0
+        attributes = cls.__front__ + cls.__back__
+        if (expr.children and all(
+                len(e.children) == len(expr.children)
+                and all(getattr(e, name) == getattr(expr, name)
+                        for name in attributes)
+                for e in expressions)):
+            return expr.reconstruct(*(
+                self(nth_children, index)
+                for nth_children in zip(*(e.children for e in expressions))))
 
-        return expr.reconstruct(*(_select_expression(nth_children, index)
-                                  for nth_children in zip(*(e.children
-                                                            for e in expressions))))
-
-    raise NotImplementedError("No rule for factorising expressions of this kind.")
+    # Different facet expressions can always be selected as tensor entries.
+    return partial_indexed(ListTensor(expressions), (index,))
 
 
 def select_expression(expressions, index):
@@ -300,11 +330,15 @@ def select_expression(expressions, index):
     assert all(e.shape == shape for e in expressions)
 
     # Sanitise input expressions
-    alpha = tuple(Index() for s in shape)
+    first = expressions[0]
+    if isinstance(first, ComponentTensor):
+        alpha = _selection_indices(first.multiindex, expressions)
+    else:
+        alpha = tuple(Index() for s in shape)
     exprs = remove_componenttensors([Indexed(e, alpha) for e in expressions])
 
     # Factor the expressions recursively and convert result
-    selected = _select_expression(exprs, index)
+    selected = MemoizerArg(_select_expression)(tuple(exprs), index)
     return ComponentTensor(selected, alpha)
 
 
@@ -380,6 +414,11 @@ def associate(operator, operands):
         operands.append(operator(a, b))
     result, = operands
     return result, flops
+
+
+def index_space_literal(indices):
+    """Return the cardinality of a rectangular index domain as a scalar."""
+    return Literal(float(numpy.prod([i.extent for i in indices], dtype=int)))
 
 
 def _independent_contractions(sum_indices, groups):
@@ -478,32 +517,127 @@ def _contract_greedily(sum_indices, groups):
     return _contract_in_order(ordering, groups)
 
 
+# Bound the 3**factors product-tree search. Wider products use index
+# orderings, with a greedy fallback when there are also many indices.
+_MAX_PLANNED_FACTORS = 10
+
+
+def _plan_contraction(sum_indices, groups):
+    """Choose a product tree for one connected contraction.
+
+    Every factor is a vertex and every contraction index joins the factors
+    carrying it.  A product tree is built by dynamic programming over
+    subsets of factors, and each index is reduced at the smallest subtree
+    holding every factor that carries it, which is the earliest its
+    reduction is legal.  Unlike a search over orderings of the indices,
+    this can reduce an index over part of the product and multiply the
+    rest in afterwards.
+
+    :arg sum_indices: free indices for contractions, which must not split
+                      into independent subproblems
+    :arg groups: product factors, grouped by free indices
+    :returns: optimised GEM expression and its arithmetic cost
+    """
+    def size(indices):
+        return numpy.prod([i.extent for i in indices], dtype=int)
+
+    # The factors each contraction index occurs in, as a bit mask
+    incidence = {}
+    for index in sum_indices:
+        incidence[index] = sum(1 << n for n, group in enumerate(groups)
+                               if index in group.free_indices)
+
+    full = (1 << len(groups)) - 1
+    # Indices reducible once a subset of the factors has been multiplied
+    reducible = {}
+    for subset in range(1, full + 1):
+        reducible[subset] = frozenset(index for index in sum_indices
+                                      if not incidence[index] & ~subset)
+
+    def order(indices):
+        """Sum out the widest index first, breaking ties reproducibly."""
+        return tuple(sorted(indices, key=lambda i: (-i.extent, i.count)))
+
+    def reduce_indices(free, indices):
+        """Sum out indices, largest extent first, costing each reduction."""
+        flops = 0
+        indices = order(indices)
+        for index in indices:
+            flops += size(free)
+            free = free - {index}
+        return free, flops, indices
+
+    # plans[subset] = (flops, factor or split, free indices, reduction indices)
+    plans = {}
+    for n, group in enumerate(groups):
+        subset = 1 << n
+        free = frozenset(group.free_indices)
+        free, flops, indices = reduce_indices(free, reducible[subset])
+        plans[subset] = (flops, group, free, indices)
+
+    for subset in range(1, full + 1):
+        if subset in plans:
+            continue
+        best = None
+        # Split the subset in two, taking each unordered split once
+        lowest = subset & -subset
+        part = (subset - 1) & subset
+        while part:
+            if part & lowest:
+                other = subset ^ part
+                left, right = plans[part], plans[other]
+                free = left[2] | right[2]
+                flops = left[0] + right[0] + size(free)
+                indices = reducible[subset] - reducible[part] - reducible[other]
+                free, extra, indices = reduce_indices(free, indices)
+                candidate = (flops + extra, (part, other), free, indices)
+                if best is None or candidate[0] < best[0]:
+                    best = candidate
+            part = (part - 1) & subset
+        plans[subset] = best
+
+    def build(subset):
+        _, tree, _, indices = plans[subset]
+        expression = Product(*(build(part) for part in tree)) \
+            if isinstance(tree, tuple) else tree
+        return IndexSum(expression, indices) if indices else expression
+
+    return build(full), plans[full][0]
+
+
 def _sum_factorise_connected(sum_indices, groups):
     """Sum factorise a single connected contraction.
 
-    Contraction orderings are searched exhaustively while that is
-    affordable, and chosen greedily when it is not.
+    Plan small products as trees, retaining the supplied axis order on equal
+    arithmetic. Wider products use an index-order search.
 
     :arg sum_indices: free indices for contractions, which must not split
                       into independent subproblems
     :arg groups: product factors, grouped by free indices
     :returns: optimised GEM expression
     """
+    if not groups:
+        return index_space_literal(sum_indices)
+
+    if len(groups) <= _MAX_PLANNED_FACTORS:
+        planned, planned_flops = _plan_contraction(sum_indices, groups)
+        ordered, ordered_flops = _contract_in_order(sum_indices, groups)
+        # Equal-work trees retain the supplied axes for streaming loops.
+        return ordered if ordered_flops <= planned_flops else planned
+
     if len(sum_indices) > 6:
-        # Exhaustive search costs a factorial in the number of indices.
         expression, _ = _contract_greedily(sum_indices, groups)
         return expression
 
+    # Prefer the index-order search on equal arithmetic. Its first ordering
+    # follows the supplied axes and preserves streaming tensor-product loops.
     expression = None
     best_flops = numpy.inf
-
-    # Consider all orderings of contraction indices
     for ordering in permutations(sum_indices):
         expr, flops = _contract_in_order(ordering, groups)
         if flops < best_flops:
             expression = expr
             best_flops = flops
-
     return expression
 
 
@@ -593,6 +727,26 @@ def make_renamer(rename_map):
     return partial(_renamer, rename_map, set())
 
 
+def _product_descent(expr):
+    """The subexpressions a product-tree walk breaks into further factors.
+
+    A contraction and a product are broken up, and so is the dividend of a
+    division, but never its divisor.  This is the one rule shared by
+    `traverse_product` and `repeated_contractions`.
+
+    :arg expr: a GEM expression
+    :returns: the subexpressions to descend into, empty when ``expr`` is
+              itself a factor
+    """
+    if isinstance(expr, (IndexSum, Product)):
+        return expr.children
+    if isinstance(expr, Division):
+        dividend, _ = expr.children
+        # A reciprocal is a factor in its own right.
+        return () if dividend == one else (dividend,)
+    return ()
+
+
 def traverse_product(expression, stop_at=None, renamer=None, index_replacer=None):
     """Traverses a product tree and collects factors, also descending into
     tensor contractions (IndexSum).  The numerators of divisions are
@@ -624,24 +778,20 @@ def traverse_product(expression, stop_at=None, renamer=None, index_replacer=None
     stack = [expression]
     while stack:
         expr = stack.pop()
-        if stop_at is not None and stop_at(expr):
+        children = () if stop_at is not None and stop_at(expr) \
+            else _product_descent(expr)
+        if not children:
             terms.append(expr)
         elif isinstance(expr, IndexSum):
             indices, applier = renamer(expr.multiindex)
             sum_indices.extend(indices)
-            stack.extend(index_replacer(applier(c), ()) for c in expr.children)
-        elif isinstance(expr, Product):
-            stack.extend(reversed(expr.children))
+            stack.extend(index_replacer(applier(c), ()) for c in children)
         elif isinstance(expr, Division):
-            # Break up products in the dividend, but not in divisor.
-            dividend, divisor = expr.children
-            if dividend == one:
-                terms.append(expr)
-            else:
-                stack.append(Division(one, divisor))
-                stack.append(dividend)
+            # The divisor is not broken up, but becomes a factor of its own.
+            stack.append(Division(one, expr.children[1]))
+            stack.extend(children)
         else:
-            terms.append(expr)
+            stack.extend(reversed(children))
 
     return sum_indices, terms
 
@@ -669,6 +819,31 @@ def traverse_sum(expression, stop_at=None):
     return result
 
 
+def repeated_contractions(expression):
+    """Find the contractions that occur more than once in a product tree.
+
+    Flattening a contraction renames its indices apart, so a contraction
+    used more than once becomes that many independent contractions and is
+    evaluated once per use.  Keeping it whole preserves the sharing.
+
+    :arg expression: a GEM expression
+    :returns: the :class:`~.IndexSum` nodes occurring more than once as a
+              factor of ``expression``
+    """
+    counts = Counter()
+    stack = [expression]
+    while stack:
+        expr = stack.pop()
+        # Only distinguish one use from several. Each node's children are
+        # visited at most twice, even when shared products nest deeply.
+        if counts[expr] == 2:
+            continue
+        counts[expr] += 1
+        stack.extend(_product_descent(expr))
+    return frozenset(expr for expr, count in counts.items()
+                     if count > 1 and isinstance(expr, IndexSum))
+
+
 def contraction(expression):
     """Optimise the contractions of the tensor product at the root of
     the expression, including:
@@ -688,7 +863,13 @@ def contraction(expression):
 
     # Flatten product tree, eliminate deltas, sum factorise
     def rebuild(expression):
-        sum_indices, factors = traverse_product(expression, index_replacer=index_replacer)
+        root = expression
+        # The contraction at the root is always broken up, as that is the
+        # one being optimised
+        keep = repeated_contractions(expression)
+        sum_indices, factors = traverse_product(
+            expression, index_replacer=index_replacer,
+            stop_at=lambda e: e is not root and e in keep)
         sum_indices, factors = delta_elimination(sum_indices, factors, index_replacer=index_replacer)
         factors = [index_replacer(f, ()) for f in factors]
         return sum_factorise(sum_indices, factors)
