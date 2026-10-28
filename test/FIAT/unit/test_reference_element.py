@@ -515,7 +515,7 @@ def test_facet_embedding_coord_maps(cell):
     facet_dim = dim - 1
     topology = cell.get_topology()[facet_dim]
     facet_vertices = np.asarray(cell.construct_subelement(facet_dim).get_vertices(), dtype=float)
-    A, b, A_inv = cell.facet_coord_embedding_maps
+    A, b, A_inv = cell.facet_embedding_coord_maps
     assert A.shape == (len(topology), dim, facet_dim)
     assert b.shape == (len(topology), dim)
     assert A_inv.shape == (len(topology), facet_dim, dim)
@@ -529,13 +529,13 @@ def test_facet_embedding_coord_maps(cell):
 
 
 @pytest.mark.parametrize('cell', [interval, triangle, tetrahedron, quadrilateral, hexahedron])
-def test_facet_adjacent_cell_maps_vertices(cell):
+def test_facet_neighbour_coord_maps_on_facet_vertices(cell):
     """Check that each map takes the vertices of one facet to the vertices of
     the other facet, and that the map in the opposite direction undoes it."""
     dim = cell.get_spatial_dimension()
     vertices = np.asarray(cell.get_vertices(), dtype=float)
     topology = cell.get_topology()[dim - 1]
-    A, b = cell.facet_adjacent_cell_maps
+    A, b = cell.facet_neighbour_coord_maps
     num_facets, _, num_orientations = A.shape[:3]
     combinations = itertools.product(range(num_facets), range(num_facets),
                                      range(num_orientations), range(num_orientations))
