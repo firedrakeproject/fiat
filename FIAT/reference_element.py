@@ -355,16 +355,16 @@ class Cell:
     def facet_orientation_coord_maps(self):
         """Return the affine transformation that maps, for every possible facet orientation `o`, the facet-local reference coordinates
         to the facet-local coordinates expressed in the canonical orientation.
-    
+
         For each facet orientation `o`, the map is
-        
+
             X_f_can = Q_o @ X_f_o + t_o,
-        
+
         where X_f_can defines the facet-local coordinates in the facet's canonical orientation and
         X_f_o defines the facet-local coordinates of the same point when the facet is in orientation `o`.
-        
+
         A vertex permutation is first obtained for each possible facet permutation and is then used to construct the corresponding coordinate map.
-    
+
         Returns
         -------
         dict
@@ -376,7 +376,7 @@ class Cell:
 
     @property
     def facet_embedding_coord_maps(self):
-        """Return the affine transformation that maps the reference coordinates of a point on each facet 
+        """Return the affine transformation that maps the reference coordinates of a point on each facet
         to the reference coordinates of the cell.
 
         For each local facet `lf`, the map is
@@ -413,7 +413,7 @@ class Cell:
         """Return the affine transformation that maps between the reference coordinates of two adjacent cells sharing a facet.
 
         Example:
-        Suppose a cell has local facet ``lf_from`` with orientation ``o_from`` corresponding to local facet ``lf_to``, with orientation `o_to` 
+        Suppose a cell has local facet ``lf_from`` with orientation ``o_from`` corresponding to local facet ``lf_to``, with orientation `o_to`
         in the other cell across that facet. Then a point with reference coordinates ``X`` in the first cell has reference coordinates in the neighbouring cell:
 
             X' = A[lf_from, lf_to, o_from, o_to] @ X + b[lf_from, lf_to, o_from, o_to]
@@ -445,8 +445,7 @@ class Cell:
         # Maps the cell coordinates to facet coordinates, changes the orientation,
         # and then maps the facet coordinates into the neighbouring cell.
         A = A_f[lf_to] @ Q_to @ A_f_inv[lf_from]
-        b = (b_f[lf_to] + numpy.einsum("...ij, ...j -> ...i", A_f[lf_to], t_to)
-            - numpy.einsum("...ij, ...j -> ...i", A, b_f[lf_from]))
+        b = (b_f[lf_to] + numpy.einsum("...ij, ...j -> ...i", A_f[lf_to], t_to) - numpy.einsum("...ij, ...j -> ...i", A, b_f[lf_from]))
         return A, b
 
     def is_simplex(self):
@@ -1068,6 +1067,7 @@ class Simplex(SimplicialComplex):
             Q, t = make_affine_mapping(verts, permuted_verts)
             o_coord_maps[o] = (Q, t)
         return o_coord_maps
+
 
 # Backwards compatible name
 ReferenceElement = Simplex
