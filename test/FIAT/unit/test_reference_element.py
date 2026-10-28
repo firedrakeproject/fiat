@@ -18,10 +18,13 @@
 import pytest
 import numpy as np
 import sys
+import itertools
 
 from FIAT.reference_element import UFCInterval, UFCTriangle, UFCTetrahedron
 from FIAT.reference_element import Point, TensorProductCell, UFCQuadrilateral, UFCHexahedron
 from FIAT.reference_element import is_ufc, is_hypercube, default_simplex, flatten_reference_cube, Hypercube
+from FIAT.reference_element import flatten_permutations
+from FIAT.orientation_utils import make_entity_permutations_simplex, make_entity_permutations_tensorproduct
 
 point = Point()
 interval = UFCInterval()
@@ -453,6 +456,95 @@ def test_flatten_maintains_ufc_status(cell):
     ufc_status = is_ufc(cell)
     flat_cell = flatten_reference_cube(cell)
     assert ufc_status == is_ufc(flat_cell)
+
+
+def _vertex_index(vertices, x):
+    """Return the index of vertex ``x`` in the list ``vertices``."""
+    index, = np.flatnonzero(np.all(np.isclose(vertices, x), axis=1))
+    return index
+
+
+def _vertex_permutations(cell):
+    """Return FIAT's vertex permutation for each orientation of the cell."""
+    dim = cell.get_spatial_dimension()
+    if cell.is_simplex():
+        return make_entity_permutations_simplex(dim, 2)
+    factors = cell.product.cells
+    factor_dims = [c.get_spatial_dimension() for c in factors]
+    permutations = make_entity_permutations_tensorproduct(
+        factors, factor_dims, [make_entity_permutations_simplex(d, 2) for d in factor_dims])
+    return flatten_permutations({tuple(factor_dims): {0: permutations}})[dim][0]
+
+
+@pytest.mark.parametrize(('cell', 'num_orientations'),
+                         [(point, 1), (interval, 2),
+                         (triangle, 6), (tetrahedron, 24),
+                         (quadrilateral, 8), (hexahedron, 48),])
+def test_orientation_coord_maps(cell, num_orientations):
+    """Check that each orientation map takes the vertices of the cell to a
+    permutation of its vertices."""
+    coord_maps = cell.get_orientation_coord_maps()
+    assert sorted(coord_maps) == list(range(num_orientations))
+
+    vertices = np.asarray(cell.get_vertices(), dtype=float)
+    permutations = set()
+    for o, (Q, t) in coord_maps.items():
+        mapped_verts = vertices @ Q.T + t
+        p = tuple(_vertex_index(vertices, x) for x in mapped_verts)
+        assert sorted(p) == list(range(len(vertices)))
+        permutations.add(p)
+    assert len(permutations) == num_orientations
+
+
+@pytest.mark.parametrize('cell', [point, interval, triangle, tetrahedron, quadrilateral, hexahedron])
+def test_orientation_coord_maps_follow_vertex_permutations(cell):
+    """Check that the map of orientation ``o`` takes vertex ``i`` to vertex ``p[i]``,
+    where ``p`` is FIAT's vertex permutation of orientation ``o``."""
+    vertices = np.asarray(cell.get_vertices(), dtype=float)
+    maps = cell.get_orientation_coord_maps()
+    for o, p in _vertex_permutations(cell).items():
+        Q, t = maps[o]
+        assert np.allclose(vertices @ Q.T + t, vertices[list(p)])
+
+
+@pytest.mark.parametrize('cell', [interval, triangle, tetrahedron, quadrilateral, hexahedron])
+def test_facet_embedding_coord_maps(cell):
+    """Check that each facet embedding agrees with get_entity_transform i.e., it takes
+    the facet vertices to the cell vertices of that facet."""
+    dim = cell.get_spatial_dimension()
+    facet_dim = dim - 1
+    topology = cell.get_topology()[facet_dim]
+    facet_vertices = np.asarray(cell.construct_subelement(facet_dim).get_vertices(), dtype=float)
+    A, b, A_inv = cell.facet_embedding_coord_maps
+    assert A.shape == (len(topology), dim, facet_dim)
+    assert b.shape == (len(topology), dim)
+    assert A_inv.shape == (len(topology), facet_dim, dim)
+
+    X_f = np.random.default_rng(0).random((5, facet_dim))
+    for lf, facet in topology.items():
+        transform = cell.get_entity_transform(facet_dim, lf)
+        assert np.allclose(X_f @ A[lf].T + b[lf], transform(X_f))
+        assert np.allclose(facet_vertices @ A[lf].T + b[lf], cell.get_vertices_of_subcomplex(facet))
+        assert np.allclose(A_inv[lf] @ A[lf], np.eye(facet_dim))
+
+
+@pytest.mark.parametrize('cell', [interval, triangle, tetrahedron, quadrilateral, hexahedron])
+def test_facet_neighbour_coord_maps_on_facet_vertices(cell):
+    """Check that each map takes the vertices of one facet to the vertices of
+    the other facet, and that the map in the opposite direction undoes it."""
+    dim = cell.get_spatial_dimension()
+    vertices = np.asarray(cell.get_vertices(), dtype=float)
+    topology = cell.get_topology()[dim - 1]
+    A, b = cell.facet_neighbour_coord_maps
+    num_facets, _, num_orientations = A.shape[:3]
+    combinations = itertools.product(range(num_facets), range(num_facets),
+                                     range(num_orientations), range(num_orientations))
+    for lf_from, lf_to, o_from, o_to in combinations:
+        X = vertices[list(topology[lf_from])]
+        X_to = X @ A[lf_from, lf_to, o_from, o_to].T + b[lf_from, lf_to, o_from, o_to]
+        assert {_vertex_index(vertices, x) for x in X_to} == set(topology[lf_to])
+        X_back = X_to @ A[lf_to, lf_from, o_to, o_from].T + b[lf_to, lf_from, o_to, o_from]
+        assert np.allclose(X_back, X)
 
 
 if __name__ == '__main__':
