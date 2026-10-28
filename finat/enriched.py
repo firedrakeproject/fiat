@@ -26,7 +26,7 @@ class EnrichedElement(FiniteElementBase):
         if len(elements) == 1:
             return elements[0]
         else:
-            self = super().__new__(cls)
+            self = super().__new__(cls, elements, is_nodal_enriched)
             self.elements = elements
 
             if is_nodal_enriched is None:
