@@ -8,6 +8,7 @@ from numbers import Integral
 
 import numpy
 
+from gem.cost import index_space_literal, iteration_count
 from gem.utils import groupby
 from gem.node import (Memoizer, MemoizerArg, reuse_if_untouched,
                       reuse_if_untouched_arg, traversal)
@@ -416,11 +417,6 @@ def associate(operator, operands):
     return result, flops
 
 
-def index_space_literal(indices):
-    """Return the cardinality of a rectangular index domain as a scalar."""
-    return Literal(float(numpy.prod([i.extent for i in indices], dtype=int)))
-
-
 def _independent_contractions(sum_indices, groups):
     """Split a contraction into independent subproblems.
 
@@ -538,9 +534,6 @@ def _plan_contraction(sum_indices, groups):
     :arg groups: product factors, grouped by free indices
     :returns: optimised GEM expression and its arithmetic cost
     """
-    def size(indices):
-        return numpy.prod([i.extent for i in indices], dtype=int)
-
     # The factors each contraction index occurs in, as a bit mask
     incidence = {}
     for index in sum_indices:
@@ -563,7 +556,7 @@ def _plan_contraction(sum_indices, groups):
         flops = 0
         indices = order(indices)
         for index in indices:
-            flops += size(free)
+            flops += iteration_count(free)
             free = free - {index}
         return free, flops, indices
 
@@ -587,7 +580,7 @@ def _plan_contraction(sum_indices, groups):
                 other = subset ^ part
                 left, right = plans[part], plans[other]
                 free = left[2] | right[2]
-                flops = left[0] + right[0] + size(free)
+                flops = left[0] + right[0] + iteration_count(free)
                 indices = reducible[subset] - reducible[part] - reducible[other]
                 free, extra, indices = reduce_indices(free, indices)
                 candidate = (flops + extra, (part, other), free, indices)
@@ -817,6 +810,29 @@ def traverse_sum(expression, stop_at=None):
         else:
             result.append(expr)
     return result
+
+
+def is_linear_map(node, linear_indices):
+    """Is a sum a linear map of exactly one form argument?
+
+    :arg node: GEM expression
+    :arg linear_indices: set of argument indices
+    :returns: whether the sum depends on exactly one argument index
+    """
+    return (isinstance(node, (Sum, IndexSum))
+            and len(linear_indices.intersection(node.free_indices)) == 1)
+
+
+def has_linear_maps(expressions, linear_indices):
+    """Does a GEM DAG contain sums representing argument linear maps?
+
+    :arg expressions: roots of the GEM expression DAG
+    :arg linear_indices: argument indices
+    :returns: whether preserving linear maps can change the factorisation
+    """
+    linear_indices = frozenset(linear_indices)
+    return any(is_linear_map(node, linear_indices)
+               for node in traversal(tuple(expressions)))
 
 
 def repeated_contractions(expression):
