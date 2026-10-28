@@ -127,7 +127,7 @@
                         <span class="c1"># these by calling get_point_dict(), and</span>
                         <span class="c1"># use the concatenation to make a new PointEval</span>
                         <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">functional</span><span class="o">.</span><span class="n">PointEvaluation</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">_first_point</span><span class="p">(</span><span class="n">Anode</span><span class="p">)</span> <span class="o">+</span> <span class="n">_first_point</span><span class="p">(</span><span class="n">Bnode</span><span class="p">)))</span>
-                    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">Bnode</span><span class="p">,</span> <span class="n">functional</span><span class="o">.</span><span class="n">IntegralMoment</span><span class="p">):</span>
+                    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">Bnode</span><span class="p">,</span> <span class="n">functional</span><span class="o">.</span><span class="n">IntegralMoment</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">Bnode</span><span class="o">.</span><span class="n">deriv_dict</span><span class="p">:</span>
                         <span class="c1"># dummy functional for product with integral moments</span>
                         <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">functional</span><span class="o">.</span><span class="n">Functional</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span>
                                                            <span class="p">{},</span> <span class="s2">"Undefined"</span><span class="p">))</span>
@@ -222,7 +222,7 @@
                     <span class="k">else</span><span class="p">:</span>
                         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"unsupported functional type"</span><span class="p">)</span>
 
-            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">Anode</span><span class="p">,</span> <span class="n">functional</span><span class="o">.</span><span class="n">IntegralMoment</span><span class="p">):</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">Anode</span><span class="p">,</span> <span class="n">functional</span><span class="o">.</span><span class="n">IntegralMoment</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">Anode</span><span class="o">.</span><span class="n">deriv_dict</span><span class="p">:</span>
                 <span class="k">for</span> <span class="n">Bnode</span> <span class="ow">in</span> <span class="n">Bnodes</span><span class="p">:</span>
                     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">Bnode</span><span class="p">,</span> <span class="n">functional</span><span class="o">.</span><span class="n">PointEvaluation</span><span class="p">):</span>
                         <span class="c1"># case: IntMom x PointEval</span>
@@ -562,7 +562,7 @@
     </div>
     <div class="footer" role="contentinfo">
     &#169; Copyright 2026, Firedrake Project.
-      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.1.
     </div>
   </body>
 </html>

@@ -50,8 +50,9 @@
 <span class="c1"># - a reference element domain</span>
 <span class="c1"># - type information</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">chain</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">chain</span><span class="p">,</span> <span class="n">permutations</span><span class="p">,</span> <span class="n">repeat</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">defaultdict</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">cached_property</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">jacobi</span><span class="p">,</span> <span class="n">quadrature</span><span class="p">,</span> <span class="n">quadrature_schemes</span>
@@ -59,7 +60,7 @@
 
 <div class="viewcode-block" id="Functional">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.functional.Functional">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">Functional</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Functional</span><span class="p">:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">"""Abstract class representing a linear functional.</span>
 <span class="sd">    All FIAT functionals are discrete in the sense that</span>
 <span class="sd">    they are written as a weighted sum of (derivatives of components of) their</span>
@@ -94,6 +95,73 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">max_deriv_order</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">wac</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">wac</span> <span class="ow">in</span> <span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="n">deriv_dict</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">max_deriv_order</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_order_tensors</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">"""Represent the functional using points and weights for each order.</span>
+
+<span class="sd">        For derivative order :math:`k`, the weights :math:`W^k` satisfy</span>
+<span class="sd">        :math:`\ell(f) = \sum_k \sum_q W^k_q : D^k f(x_q)`. The axes of</span>
+<span class="sd">        :math:`W^k` are the value axes of ``target_shape``, then :math:`k`</span>
+<span class="sd">        symmetric derivative axes, then the point axis.</span>
+<span class="sd">        """</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">order_dict</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wc_list</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pt_dict</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">order_dict</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">pt</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">((</span><span class="n">w</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,)</span> <span class="o">*</span> <span class="n">sd</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span> <span class="k">for</span> <span class="n">w</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">wc_list</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wac_list</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">deriv_dict</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">for</span> <span class="n">w</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">wac_list</span><span class="p">:</span>
+                <span class="n">order_dict</span><span class="p">[</span><span class="nb">sum</span><span class="p">(</span><span class="n">alpha</span><span class="p">)][</span><span class="n">pt</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">w</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">c</span><span class="p">))</span>
+
+        <span class="n">order_tensors</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">order</span><span class="p">,</span> <span class="n">pt_dict</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">order_dict</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>
+            <span class="n">W</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">target_shape</span><span class="p">,</span> <span class="o">*</span><span class="p">(</span><span class="n">sd</span><span class="p">,)</span> <span class="o">*</span> <span class="n">order</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">pt_dict</span><span class="p">)))</span>
+            <span class="k">for</span> <span class="n">q</span><span class="p">,</span> <span class="n">wac_list</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">pt_dict</span><span class="o">.</span><span class="n">values</span><span class="p">()):</span>
+                <span class="k">for</span> <span class="n">w</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">wac_list</span><span class="p">:</span>
+                    <span class="n">c</span> <span class="o">=</span> <span class="n">c</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="p">(</span><span class="n">c</span><span class="p">,)</span>
+                    <span class="n">indices</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">permutations</span><span class="p">(</span><span class="nb">sum</span><span class="p">(([</span><span class="n">k</span><span class="p">]</span> <span class="o">*</span> <span class="n">a</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">a</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">alpha</span><span class="p">)),</span> <span class="p">[])))</span>
+                    <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">indices</span><span class="p">:</span>
+                        <span class="n">W</span><span class="p">[(</span><span class="o">*</span><span class="n">c</span><span class="p">,</span> <span class="o">*</span><span class="n">index</span><span class="p">,</span> <span class="n">q</span><span class="p">)]</span> <span class="o">+=</span> <span class="n">w</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">indices</span><span class="p">)</span>
+            <span class="n">pts</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">pt_dict</span><span class="p">)</span>
+            <span class="n">order_tensors</span><span class="p">[</span><span class="n">order</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">pts</span><span class="p">,</span> <span class="n">W</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">order_tensors</span>
+
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">orders</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Derivative orders encoded by this functional.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        tuple of int</span>
+<span class="sd">            Orders present in the functional's point and derivative data.</span>
+<span class="sd">        """</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_order_tensors</span><span class="p">))</span>
+
+<div class="viewcode-block" id="Functional.get_order_tensors">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.Functional.get_order_tensors">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_order_tensors</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Return the points and weights for one derivative order.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        order : int</span>
+<span class="sd">            Derivative order of the requested tensors.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        points : tuple of tuple of float</span>
+<span class="sd">            Points at which the functional samples derivatives of ``order``.</span>
+<span class="sd">        weights : numpy.ndarray</span>
+<span class="sd">            Weights are indexed first by component, then by spatial</span>
+<span class="sd">            direction for each derivative, and finally by sampling point.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        KeyError</span>
+<span class="sd">            If this functional has no terms of the requested order.</span>
+<span class="sd">        """</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_order_tensors</span><span class="p">[</span><span class="n">order</span><span class="p">]</span></div>
+
 
 <div class="viewcode-block" id="Functional.evaluate">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.functional.Functional.evaluate">[docs]</a>
@@ -181,7 +249,8 @@
             <span class="c1"># loop over expansion functions</span>
             <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nexp</span><span class="p">):</span>
                 <span class="k">for</span> <span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span> <span class="ow">in</span> <span class="n">wc_list</span><span class="p">:</span>
-                    <span class="n">result</span><span class="p">[</span><span class="n">c</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="o">+=</span> <span class="n">w</span> <span class="o">*</span> <span class="n">bfs</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span>
+                    <span class="n">c</span> <span class="o">=</span> <span class="n">c</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="p">(</span><span class="n">c</span><span class="p">,)</span>
+                    <span class="n">result</span><span class="p">[(</span><span class="o">*</span><span class="n">c</span><span class="p">,</span> <span class="n">i</span><span class="p">)]</span> <span class="o">+=</span> <span class="n">w</span> <span class="o">*</span> <span class="n">bfs</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">deriv_dict</span><span class="p">:</span>
             <span class="n">dpt_dict</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">deriv_dict</span>
@@ -392,67 +461,111 @@
 <span class="sd">    :arg shp: Optional argument giving the value shape of input functions.</span>
 <span class="sd">    """</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">comp</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(),</span> <span class="n">shp</span><span class="o">=</span><span class="nb">tuple</span><span class="p">()):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">Q</span> <span class="o">=</span> <span class="n">Q</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">comp</span><span class="o">=</span><span class="p">(),</span> <span class="n">shp</span><span class="o">=</span><span class="p">(),</span> <span class="n">nm</span><span class="o">=</span><span class="s2">""</span><span class="p">):</span>
+        <span class="n">f_at_qpts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">f_at_qpts</span><span class="p">)</span>
+        <span class="n">points</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">f_at_qpts</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">f_at_qpts</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Mismatch in number of quadrature points and values"</span><span class="p">)</span>
+
+        <span class="n">target_shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">shp</span><span class="p">)</span> <span class="ow">or</span> <span class="n">f_at_qpts</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">comp</span> <span class="o">==</span> <span class="p">():</span>
+            <span class="n">comp</span> <span class="o">=</span> <span class="p">(</span><span class="nb">slice</span><span class="p">(</span><span class="kc">None</span><span class="p">),)</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">target_shape</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">comp</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+            <span class="n">comp</span> <span class="o">=</span> <span class="p">(</span><span class="n">comp</span><span class="p">,)</span>
+        <span class="c1"># f is integrated against the components of the input selected by comp</span>
+        <span class="k">if</span> <span class="n">f_at_qpts</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">target_shape</span><span class="p">)[</span><span class="n">comp</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Coefficient shape does not match the selected components"</span><span class="p">)</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">moveaxis</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">()),</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="p">[(</span><span class="n">wt</span><span class="p">,</span> <span class="n">comp</span><span class="p">)]</span> <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">weights</span><span class="p">)}</span>
+
         <span class="bp">self</span><span class="o">.</span><span class="n">f_at_qpts</span> <span class="o">=</span> <span class="n">f_at_qpts</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">comp</span> <span class="o">=</span> <span class="n">comp</span>
-        <span class="n">points</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">()</span>
-        <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">())</span>
-        <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="p">[(</span><span class="n">wt</span><span class="p">,</span> <span class="n">comp</span><span class="p">)]</span> <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">weights</span><span class="p">)}</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">shp</span><span class="p">,</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="p">{},</span> <span class="s2">"IntegralMoment"</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Q</span> <span class="o">=</span> <span class="n">Q</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">target_shape</span><span class="p">,</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="p">{},</span> <span class="n">nm</span> <span class="ow">or</span> <span class="s2">"IntegralMoment"</span><span class="p">)</span>
+
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_order_tensors</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Represent this moment using points and weights for each order."""</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">order</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_deriv_order</span>
+        <span class="n">W</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">target_shape</span><span class="p">,</span> <span class="o">*</span><span class="p">(</span><span class="n">sd</span><span class="p">,)</span> <span class="o">*</span> <span class="n">order</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Q</span><span class="o">.</span><span class="n">pts</span><span class="p">)))</span>
+        <span class="n">W</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">comp</span><span class="p">]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">f_at_qpts</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">())</span>
+        <span class="k">if</span> <span class="n">order</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="c1"># Only the symmetric part pairs with D^k f.</span>
+            <span class="n">rank</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">target_shape</span><span class="p">)</span>
+            <span class="n">W</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">mean</span><span class="p">([</span><span class="n">W</span><span class="o">.</span><span class="n">transpose</span><span class="p">((</span><span class="o">*</span><span class="nb">range</span><span class="p">(</span><span class="n">rank</span><span class="p">),</span> <span class="o">*</span><span class="n">axes</span><span class="p">,</span> <span class="n">W</span><span class="o">.</span><span class="n">ndim</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span>
+                            <span class="k">for</span> <span class="n">axes</span> <span class="ow">in</span> <span class="n">permutations</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">rank</span><span class="p">,</span> <span class="n">rank</span> <span class="o">+</span> <span class="n">order</span><span class="p">))],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">pts</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">deriv_dict</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">pt_dict</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">order</span><span class="p">:</span> <span class="p">(</span><span class="n">pts</span><span class="p">,</span> <span class="n">W</span><span class="p">)}</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fn</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">"""Evaluate the functional on the function fn."""</span>
-        <span class="n">pts</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pt_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
-        <span class="n">wts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">foo</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">foo</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pt_dict</span><span class="o">.</span><span class="n">values</span><span class="p">())])</span>
-        <span class="n">result</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">([</span><span class="n">fn</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">pts</span><span class="p">],</span> <span class="n">wts</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">comp</span><span class="p">:</span>
-            <span class="n">result</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">comp</span><span class="p">]</span>
-        <span class="k">return</span> <span class="n">result</span></div>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">deriv_dict</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"Evaluation is not yet implemented for </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">))</span>
+        <span class="n">pts</span><span class="p">,</span> <span class="n">W</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_order_tensors</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">([</span><span class="n">fn</span><span class="p">(</span><span class="n">pt</span><span class="p">)</span> <span class="k">for</span> <span class="n">pt</span> <span class="ow">in</span> <span class="n">pts</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">W</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">W</span><span class="o">.</span><span class="n">ndim</span><span class="p">),</span> <span class="p">(</span><span class="o">*</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">W</span><span class="o">.</span><span class="n">ndim</span><span class="p">),</span> <span class="mi">0</span><span class="p">)))</span></div>
 
 
 
 <div class="viewcode-block" id="IntegralMomentOfDerivative">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralMomentOfDerivative">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">IntegralMomentOfDerivative</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Functional giving multi-directional derivative integrated against some function.</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">IntegralMomentOfDerivative</span><span class="p">(</span><span class="n">IntegralMoment</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Functional integrating derivatives against component-shaped coefficients.</span>
 
 <span class="sd">    :arg ref_el: a :class:`Cell`.</span>
 <span class="sd">    :arg Q: a :class:`QuadratureRule`.</span>
 <span class="sd">    :arg f_at_qpts: an array tabulating the function f at the quadrature</span>
 <span class="sd">         points.</span>
-<span class="sd">    :arg *directions: a list of vectors of directions of differentiation.</span>
+<span class="sd">    :arg *directions: Optional directions of differentiation. The last axis</span>
+<span class="sd">         of each direction is a derivative axis, and any leading axes index</span>
+<span class="sd">         components of the input.</span>
 <span class="sd">    :arg comp: Optional argument indicating that only a particular</span>
-<span class="sd">         component of the input function should be integrated against f</span>
+<span class="sd">         component of the input function should be integrated against f.</span>
+<span class="sd">         Without it, the leading axes of f index all components of the input.</span>
 <span class="sd">    :arg shp: Optional argument giving the value shape of input functions.</span>
 <span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">,</span> <span class="o">*</span><span class="n">directions</span><span class="p">,</span> <span class="n">comp</span><span class="o">=</span><span class="p">(),</span> <span class="n">shp</span><span class="o">=</span><span class="p">(),</span> <span class="n">nm</span><span class="o">=</span><span class="s2">""</span><span class="p">):</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">f_at_qpts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">f_at_qpts</span><span class="p">)</span>
+        <span class="n">S</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ones</span><span class="p">(())</span>
+        <span class="k">for</span> <span class="n">direction</span> <span class="ow">in</span> <span class="n">directions</span><span class="p">:</span>
+            <span class="n">S</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="n">S</span><span class="p">,</span> <span class="n">direction</span><span class="p">)</span>
+        <span class="c1"># Components of f, then the directions, then the points</span>
+        <span class="n">shape</span> <span class="o">=</span> <span class="p">(</span><span class="o">*</span><span class="n">f_at_qpts</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="o">*</span><span class="p">(</span><span class="mi">1</span><span class="p">,)</span> <span class="o">*</span> <span class="n">S</span><span class="o">.</span><span class="n">ndim</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">f_at_qpts</span> <span class="o">=</span> <span class="n">f_at_qpts</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span> <span class="o">*</span> <span class="n">S</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">comp</span> <span class="o">==</span> <span class="p">():</span>
+            <span class="n">comp</span> <span class="o">=</span> <span class="p">(</span><span class="nb">slice</span><span class="p">(</span><span class="kc">None</span><span class="p">),)</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">shp</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">comp</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+            <span class="n">comp</span> <span class="o">=</span> <span class="p">(</span><span class="n">comp</span><span class="p">,)</span>
+        <span class="c1"># f is integrated against the components of the input selected by comp</span>
+        <span class="n">comp_shape</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shp</span><span class="p">)[</span><span class="n">comp</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span>
+        <span class="n">order</span> <span class="o">=</span> <span class="n">f_at_qpts</span><span class="o">.</span><span class="n">ndim</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">comp_shape</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="n">expected_shape</span> <span class="o">=</span> <span class="n">comp_shape</span> <span class="o">+</span> <span class="p">(</span><span class="n">sd</span><span class="p">,)</span> <span class="o">*</span> <span class="n">order</span> <span class="o">+</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">pts</span><span class="p">),)</span>
+        <span class="k">if</span> <span class="n">order</span> <span class="o">&lt;</span> <span class="mi">1</span> <span class="ow">or</span> <span class="n">f_at_qpts</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">expected_shape</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Expected component axes, derivative axes, and quadrature points"</span><span class="p">)</span>
+
+        <span class="n">alphas</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">mis</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">order</span><span class="p">)</span>
+        <span class="n">alpha_rows</span> <span class="o">=</span> <span class="p">{</span><span class="n">alpha</span><span class="p">:</span> <span class="n">row</span> <span class="k">for</span> <span class="n">row</span><span class="p">,</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">alphas</span><span class="p">)}</span>
+        <span class="n">sym_tensor</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">alphas</span><span class="p">),</span> <span class="n">sd</span><span class="o">**</span><span class="n">order</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">column</span><span class="p">,</span> <span class="n">index</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">((</span><span class="n">sd</span><span class="p">,)</span> <span class="o">*</span> <span class="n">order</span><span class="p">)):</span>
+            <span class="n">alpha</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">index</span><span class="o">.</span><span class="n">count</span><span class="p">,</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)))</span>
+            <span class="n">sym_tensor</span><span class="p">[</span><span class="n">alpha_rows</span><span class="p">[</span><span class="n">alpha</span><span class="p">],</span> <span class="n">column</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+
+        <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">())</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="n">weights</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="o">*</span><span class="n">comp_shape</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">pts</span><span class="p">)))</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">sym_tensor</span><span class="p">,</span> <span class="n">weights</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">comp_shape</span><span class="p">)))</span>
+        <span class="n">dpt_dict</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="nb">list</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">wt</span><span class="p">,</span> <span class="n">alphas</span><span class="p">,</span> <span class="n">repeat</span><span class="p">(</span><span class="n">comp</span><span class="p">)))</span>
+            <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">(),</span> <span class="n">numpy</span><span class="o">.</span><span class="n">moveaxis</span><span class="p">(</span><span class="n">weights</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+        <span class="p">}</span>
+
         <span class="bp">self</span><span class="o">.</span><span class="n">Q</span> <span class="o">=</span> <span class="n">Q</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">f_at_qpts</span> <span class="o">=</span> <span class="n">f_at_qpts</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">comp</span> <span class="o">=</span> <span class="n">comp</span>
-
-        <span class="n">S</span> <span class="o">=</span> <span class="n">directions</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-        <span class="k">for</span> <span class="n">dj</span> <span class="ow">in</span> <span class="n">directions</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
-            <span class="n">S</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="n">S</span><span class="p">,</span> <span class="n">dj</span><span class="p">)</span>
-
-        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
-        <span class="n">tau</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
-        <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">S</span><span class="o">.</span><span class="n">shape</span><span class="p">):</span>
-            <span class="n">alpha</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">sd</span>
-            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">index</span><span class="p">:</span>
-                <span class="n">alpha</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
-            <span class="n">tau</span><span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">alpha</span><span class="p">)]</span> <span class="o">+=</span> <span class="n">S</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
-
-        <span class="n">points</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">()</span>
-        <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">())</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">weights</span> <span class="o">=</span> <span class="p">{</span><span class="n">alpha</span><span class="p">:</span> <span class="n">weights</span><span class="o">*</span><span class="n">tau</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">tau</span><span class="p">}</span>
-
-        <span class="n">dpt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="p">[(</span><span class="n">wt</span><span class="o">*</span><span class="n">tau</span><span class="p">[</span><span class="n">alpha</span><span class="p">],</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">comp</span><span class="p">)</span> <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">tau</span><span class="p">]</span>
-                    <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">weights</span><span class="p">)}</span>
-
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">shp</span><span class="p">,</span> <span class="p">{},</span> <span class="n">dpt_dict</span><span class="p">,</span> <span class="n">nm</span> <span class="ow">or</span> <span class="s2">"IntegralMomentOfDerivative"</span><span class="p">)</span></div>
+        <span class="n">Functional</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">shp</span><span class="p">,</span> <span class="p">{},</span> <span class="n">dpt_dict</span><span class="p">,</span> <span class="n">nm</span> <span class="ow">or</span> <span class="s2">"IntegralMomentOfDerivative"</span><span class="p">)</span></div>
 
 
 
@@ -475,20 +588,7 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">FrobeniusIntegralMoment</span><span class="p">(</span><span class="n">IntegralMoment</span><span class="p">):</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">nm</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-        <span class="c1"># f_at_qpts is (some shape) x num_qpts</span>
-        <span class="n">shp</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">f_at_qpts</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
-        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">pts</span><span class="p">)</span> <span class="o">!=</span> <span class="n">f_at_qpts</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
-            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">"Mismatch in number of quadrature points and values"</span><span class="p">)</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">Q</span> <span class="o">=</span> <span class="n">Q</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">comp</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">f_at_qpts</span> <span class="o">=</span> <span class="n">f_at_qpts</span>
-        <span class="n">qpts</span><span class="p">,</span> <span class="n">qwts</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">(),</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">()</span>
-        <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">qwts</span><span class="p">),</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,)</span> <span class="o">+</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">shp</span><span class="p">))))</span>
-        <span class="n">alphas</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">shp</span><span class="p">))</span>
-
-        <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="p">[(</span><span class="n">wt</span><span class="p">[</span><span class="n">alpha</span><span class="p">],</span> <span class="n">alpha</span><span class="p">)</span> <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">alphas</span><span class="p">]</span> <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">qpts</span><span class="p">,</span> <span class="n">weights</span><span class="p">)}</span>
-        <span class="n">Functional</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">shp</span><span class="p">,</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="p">{},</span> <span class="n">nm</span> <span class="ow">or</span> <span class="s2">"FrobeniusIntegralMoment"</span><span class="p">)</span></div>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">nm</span><span class="o">=</span><span class="n">nm</span> <span class="ow">or</span> <span class="s2">"FrobeniusIntegralMoment"</span><span class="p">)</span></div>
 
 
 
@@ -581,52 +681,23 @@
 
 <div class="viewcode-block" id="IntegralMomentOfDivergence">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralMomentOfDivergence">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">IntegralMomentOfDivergence</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">IntegralMomentOfDivergence</span><span class="p">(</span><span class="n">IntegralMomentOfDerivative</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Functional representing integral of the divergence of the input</span>
 <span class="sd">    against some tabulated function f."""</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">f_at_qpts</span> <span class="o">=</span> <span class="n">f_at_qpts</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">Q</span> <span class="o">=</span> <span class="n">Q</span>
-
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
-        <span class="n">shp</span> <span class="o">=</span> <span class="n">f_at_qpts</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="p">(</span><span class="n">sd</span><span class="p">,)</span>
-
-        <span class="n">points</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">dpts</span> <span class="o">=</span> <span class="n">points</span>
-        <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">())</span>
-
-        <span class="n">alphas</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)))</span>
-        <span class="n">dpt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="p">[(</span><span class="n">wt</span><span class="p">,</span> <span class="n">alphas</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="p">(</span><span class="n">i</span><span class="p">,))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)]</span>
-                    <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">weights</span><span class="p">)}</span>
-
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">shp</span><span class="p">,</span> <span class="p">{},</span> <span class="n">dpt_dict</span><span class="p">,</span>
-                         <span class="s2">"IntegralMomentOfDivergence"</span><span class="p">)</span></div>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">sd</span><span class="p">),</span> <span class="n">shp</span><span class="o">=</span><span class="p">(</span><span class="n">sd</span><span class="p">,),</span> <span class="n">nm</span><span class="o">=</span><span class="s2">"IntegralMomentOfDivergence"</span><span class="p">)</span></div>
 
 
 
 <div class="viewcode-block" id="IntegralMomentOfTensorDivergence">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralMomentOfTensorDivergence">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">IntegralMomentOfTensorDivergence</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">IntegralMomentOfTensorDivergence</span><span class="p">(</span><span class="n">IntegralMomentOfDerivative</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Like IntegralMomentOfDivergence, but on symmetric tensors."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">f_at_qpts</span> <span class="o">=</span> <span class="n">f_at_qpts</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">Q</span> <span class="o">=</span> <span class="n">Q</span>
-        <span class="n">points</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">dpts</span> <span class="o">=</span> <span class="n">points</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
-        <span class="n">shp</span> <span class="o">=</span> <span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">sd</span><span class="p">)</span>
-
-        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">f_at_qpts</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span>
-        <span class="k">assert</span> <span class="n">f_at_qpts</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">sd</span>
-        <span class="k">assert</span> <span class="n">f_at_qpts</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">)</span>
-        <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">())</span><span class="o">.</span><span class="n">T</span>
-
-        <span class="n">alphas</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)))</span>
-        <span class="n">dpt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="p">[(</span><span class="n">wt</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">alphas</span><span class="p">[</span><span class="n">j</span><span class="p">],</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">))</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">shp</span><span class="p">)]</span>
-                    <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">weights</span><span class="p">)}</span>
-
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(),</span> <span class="p">{},</span> <span class="n">dpt_dict</span><span class="p">,</span> <span class="s2">"IntegralMomentOfDivergence"</span><span class="p">)</span></div>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">sd</span><span class="p">),</span> <span class="n">shp</span><span class="o">=</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">sd</span><span class="p">),</span> <span class="n">nm</span><span class="o">=</span><span class="s2">"IntegralMomentOfTensorDivergence"</span><span class="p">)</span></div>
 
 
 
@@ -669,7 +740,7 @@
 
 <div class="viewcode-block" id="IntegralMomentOfEdgeTangentEvaluation">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralMomentOfEdgeTangentEvaluation">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">IntegralMomentOfEdgeTangentEvaluation</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">IntegralMomentOfEdgeTangentEvaluation</span><span class="p">(</span><span class="n">FrobeniusIntegralMoment</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">"""</span>
 <span class="sd">    \int_e v\cdot t p ds</span>
 
@@ -682,14 +753,9 @@
 <span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">P_at_qpts</span><span class="p">,</span> <span class="n">edge</span><span class="p">):</span>
         <span class="n">t</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_edge_tangent</span><span class="p">(</span><span class="n">edge</span><span class="p">)</span>
-        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
-        <span class="n">transform</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">edge</span><span class="p">)</span>
-        <span class="n">points</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">())</span>
-        <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">P_at_qpts</span><span class="p">,</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">())</span>
-        <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="p">[(</span><span class="n">wt</span><span class="o">*</span><span class="n">t</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="p">(</span><span class="n">i</span><span class="p">,))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)]</span>
-                   <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">weights</span><span class="p">)}</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="p">),</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="p">{},</span>
-                         <span class="s2">"IntegralMomentOfEdgeTangentEvaluation"</span><span class="p">)</span></div>
+        <span class="n">Q</span> <span class="o">=</span> <span class="n">quadrature</span><span class="o">.</span><span class="n">FacetQuadratureRule</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">edge</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">avg</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">f_at_qpts</span> <span class="o">=</span> <span class="n">t</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="n">P_at_qpts</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">,</span> <span class="s2">"IntegralMomentOfEdgeTangentEvaluation"</span><span class="p">)</span></div>
 
 
 
@@ -719,7 +785,7 @@
 
 <div class="viewcode-block" id="IntegralMomentOfFaceTangentEvaluation">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralMomentOfFaceTangentEvaluation">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">IntegralMomentOfFaceTangentEvaluation</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">IntegralMomentOfFaceTangentEvaluation</span><span class="p">(</span><span class="n">FrobeniusIntegralMoment</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">"""</span>
 <span class="sd">    \int_F v \times n \cdot p ds</span>
 
@@ -731,23 +797,11 @@
 <span class="sd">    :arg facet: which facet.</span>
 <span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">P_at_qpts</span><span class="p">,</span> <span class="n">facet</span><span class="p">):</span>
-        <span class="n">P_at_qpts</span> <span class="o">=</span> <span class="p">[[</span><span class="n">P_at_qpts</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">i</span><span class="p">],</span> <span class="n">P_at_qpts</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="n">i</span><span class="p">],</span> <span class="n">P_at_qpts</span><span class="p">[</span><span class="mi">2</span><span class="p">][</span><span class="n">i</span><span class="p">]]</span>
-                     <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">P_at_qpts</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span>
         <span class="n">n</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_scaled_normal</span><span class="p">(</span><span class="n">facet</span><span class="p">)</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
-        <span class="n">transform</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">facet</span><span class="p">)</span>
-        <span class="n">pts</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="n">transform</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">())))</span>
-        <span class="n">weights</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">()</span>
-        <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wgt</span><span class="p">,</span> <span class="n">phi</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">pts</span><span class="p">,</span> <span class="n">weights</span><span class="p">,</span> <span class="n">P_at_qpts</span><span class="p">):</span>
-            <span class="n">phixn</span> <span class="o">=</span> <span class="p">[</span><span class="n">phi</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">*</span><span class="n">n</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">-</span> <span class="n">phi</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">*</span><span class="n">n</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
-                     <span class="n">phi</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">*</span><span class="n">n</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">phi</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">n</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>
-                     <span class="n">phi</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">n</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">phi</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">*</span><span class="n">n</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
-            <span class="n">pt_dict</span><span class="p">[</span><span class="n">pt</span><span class="p">]</span> <span class="o">=</span> <span class="p">[(</span><span class="n">wgt</span><span class="o">*</span><span class="p">(</span><span class="o">-</span><span class="n">n</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">*</span><span class="n">phixn</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="n">n</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">*</span><span class="n">phixn</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="p">)),</span>
-                           <span class="p">(</span><span class="n">wgt</span><span class="o">*</span><span class="p">(</span><span class="n">n</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">*</span><span class="n">phixn</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-</span><span class="n">n</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">phixn</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="p">)),</span>
-                           <span class="p">(</span><span class="n">wgt</span><span class="o">*</span><span class="p">(</span><span class="o">-</span><span class="n">n</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">*</span><span class="n">phixn</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">+</span><span class="n">n</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">phixn</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="p">))]</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="p">),</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="p">{},</span>
-                         <span class="s2">"IntegralMomentOfFaceTangentEvaluation"</span><span class="p">)</span></div>
+        <span class="n">Q</span> <span class="o">=</span> <span class="n">quadrature</span><span class="o">.</span><span class="n">FacetQuadratureRule</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">facet</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">avg</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">f_at_qpts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span><span class="n">P_at_qpts</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">n</span><span class="p">))</span><span class="o">.</span><span class="n">T</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">,</span> <span class="s2">"IntegralMomentOfFaceTangentEvaluation"</span><span class="p">)</span></div>
 
 
 
@@ -777,7 +831,7 @@
 
 <div class="viewcode-block" id="IntegralMomentOfScaledNormalEvaluation">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralMomentOfScaledNormalEvaluation">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">IntegralMomentOfScaledNormalEvaluation</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">IntegralMomentOfScaledNormalEvaluation</span><span class="p">(</span><span class="n">FrobeniusIntegralMoment</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">"""</span>
 <span class="sd">    \int_F v\cdot n p ds</span>
 
@@ -791,12 +845,9 @@
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">P_at_qpts</span><span class="p">,</span> <span class="n">facet</span><span class="p">):</span>
         <span class="n">n</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_scaled_normal</span><span class="p">(</span><span class="n">facet</span><span class="p">)</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
-        <span class="n">transform</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">facet</span><span class="p">)</span>
-        <span class="n">pts</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">())</span>
-        <span class="n">weights</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">()</span> <span class="o">*</span> <span class="n">P_at_qpts</span>
-        <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="p">[(</span><span class="n">wt</span><span class="o">*</span><span class="n">n</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="p">))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)]</span>
-                   <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">pts</span><span class="p">,</span> <span class="n">weights</span><span class="p">)}</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="p">),</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="p">{},</span> <span class="s2">"IntegralMomentOfScaledNormalEvaluation"</span><span class="p">)</span></div>
+        <span class="n">Q</span> <span class="o">=</span> <span class="n">quadrature</span><span class="o">.</span><span class="n">FacetQuadratureRule</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">facet</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">avg</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">f_at_qpts</span> <span class="o">=</span> <span class="n">n</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="n">P_at_qpts</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">,</span> <span class="s2">"IntegralMomentOfScaledNormalEvaluation"</span><span class="p">)</span></div>
 
 
 
@@ -844,7 +895,7 @@
 
 <div class="viewcode-block" id="IntegralMomentOfNormalEvaluation">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralMomentOfNormalEvaluation">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">IntegralMomentOfNormalEvaluation</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">IntegralMomentOfNormalEvaluation</span><span class="p">(</span><span class="n">FrobeniusIntegralMoment</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">"""</span>
 <span class="sd">    \int_F v\cdot n p ds</span>
 <span class="sd">    p \in Polynomials</span>
@@ -854,22 +905,17 @@
 <span class="sd">    :arg facet: which facet.</span>
 <span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">P_at_qpts</span><span class="p">,</span> <span class="n">facet</span><span class="p">):</span>
-        <span class="c1"># scaling on the normal is ok because edge length then weights</span>
-        <span class="c1"># the reference element quadrature appropriately</span>
         <span class="n">n</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_scaled_normal</span><span class="p">(</span><span class="n">facet</span><span class="p">)</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
-        <span class="n">transform</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">facet</span><span class="p">)</span>
-        <span class="n">pts</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">())</span>
-        <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">P_at_qpts</span><span class="p">,</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">())</span>
-        <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="p">[(</span><span class="n">wt</span><span class="o">*</span><span class="n">n</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="p">))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)]</span>
-                   <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">pts</span><span class="p">,</span> <span class="n">weights</span><span class="p">)}</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="p">),</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="p">{},</span> <span class="s2">"IntegralMomentOfNormalEvaluation"</span><span class="p">)</span></div>
+        <span class="n">Q</span> <span class="o">=</span> <span class="n">quadrature</span><span class="o">.</span><span class="n">FacetQuadratureRule</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">facet</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">avg</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">f_at_qpts</span> <span class="o">=</span> <span class="n">n</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="n">P_at_qpts</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">,</span> <span class="s2">"IntegralMomentOfNormalEvaluation"</span><span class="p">)</span></div>
 
 
 
 <div class="viewcode-block" id="IntegralMomentOfTangentialEvaluation">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralMomentOfTangentialEvaluation">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">IntegralMomentOfTangentialEvaluation</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">IntegralMomentOfTangentialEvaluation</span><span class="p">(</span><span class="n">FrobeniusIntegralMoment</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">"""</span>
 <span class="sd">    \int_F v\cdot n p ds</span>
 <span class="sd">    p \in Polynomials</span>
@@ -879,17 +925,12 @@
 <span class="sd">    :arg facet: which facet.</span>
 <span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">P_at_qpts</span><span class="p">,</span> <span class="n">facet</span><span class="p">):</span>
-        <span class="c1"># scaling on the tangent is ok because edge length then weights</span>
-        <span class="c1"># the reference element quadrature appropriately</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
         <span class="k">assert</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">2</span>
         <span class="n">t</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_edge_tangent</span><span class="p">(</span><span class="n">facet</span><span class="p">)</span>
-        <span class="n">transform</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">facet</span><span class="p">)</span>
-        <span class="n">points</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">())</span>
-        <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">P_at_qpts</span><span class="p">,</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">())</span>
-        <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="p">[(</span><span class="n">wt</span><span class="o">*</span><span class="n">t</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="p">))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)]</span>
-                   <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">weights</span><span class="p">)}</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="p">),</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="p">{},</span> <span class="s2">"IntegralMomentOfScaledTangentialEvaluation"</span><span class="p">)</span></div>
+        <span class="n">Q</span> <span class="o">=</span> <span class="n">quadrature</span><span class="o">.</span><span class="n">FacetQuadratureRule</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">facet</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">avg</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">f_at_qpts</span> <span class="o">=</span> <span class="n">t</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="n">P_at_qpts</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">,</span> <span class="s2">"IntegralMomentOfScaledTangentialEvaluation"</span><span class="p">)</span></div>
 
 </pre></div>
 
@@ -929,7 +970,7 @@
     </div>
     <div class="footer" role="contentinfo">
     &#169; Copyright 2026, Firedrake Project.
-      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.1.
     </div>
   </body>
 </html>

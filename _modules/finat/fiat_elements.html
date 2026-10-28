@@ -48,8 +48,14 @@
 <div class="viewcode-block" id="FiatElement">
 <a class="viewcode-back" href="../../finat.html#finat.fiat_elements.FiatElement">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">FiatElement</span><span class="p">(</span><span class="n">FiniteElementBase</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Base class for finite elements for which the tabulation is provided</span>
-<span class="sd">    by FIAT."""</span>
+<span class="w">    </span><span class="sd">"""Base class for finite elements whose tabulation is provided by FIAT.</span>
+
+<span class="sd">    Subclasses may override ``space_dimension()`` to report a smaller dimension</span>
+<span class="sd">    when FIAT nodes encode constraints. In that case, the first</span>
+<span class="sd">    ``space_dimension()`` FIAT nodes must correspond to finite-element degrees</span>
+<span class="sd">    of freedom, with any constraint nodes following them. Constraint nodes</span>
+<span class="sd">    must not be interleaved with finite-element nodes.</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fiat_element</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_element</span> <span class="o">=</span> <span class="n">fiat_element</span>
@@ -71,16 +77,20 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">formdegree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">get_formdegree</span><span class="p">()</span>
 
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_entity_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">entity_dofs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">entity_dofs</span><span class="p">()</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">():</span>
+            <span class="k">return</span> <span class="n">entity_dofs</span>
+        <span class="c1"># The nodes beyond space_dimension() are constraints, not dofs.</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">dim</span><span class="p">:</span> <span class="p">{</span><span class="n">entity</span><span class="p">:</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">dofs</span> <span class="k">if</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">n</span><span class="p">]</span> <span class="k">for</span> <span class="n">entity</span><span class="p">,</span> <span class="n">dofs</span> <span class="ow">in</span> <span class="n">entities</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+                <span class="k">for</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entities</span> <span class="ow">in</span> <span class="n">entity_dofs</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+
 <div class="viewcode-block" id="FiatElement.entity_dofs">
 <a class="viewcode-back" href="../../finat.html#finat.fiat_elements.FiatElement.entity_dofs">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">entity_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">entity_dofs</span><span class="p">()</span></div>
-
-
-<div class="viewcode-block" id="FiatElement.entity_closure_dofs">
-<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.FiatElement.entity_closure_dofs">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">entity_closure_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">entity_closure_dofs</span><span class="p">()</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_entity_dofs</span></div>
 
 
     <span class="nd">@property</span>
@@ -270,20 +280,25 @@
         <span class="c1"># Columns (k) are unique points to evaluate.</span>
         <span class="c1"># Higher indices (*cmp) are tensor indices of the weights when weights</span>
         <span class="c1"># are tensor valued.</span>
-        <span class="n">Q</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">Q</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">dual</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">nodes</span><span class="p">):</span>
             <span class="n">point_dict</span> <span class="o">=</span> <span class="n">dual</span><span class="o">.</span><span class="n">get_point_dict</span><span class="p">()</span>
             <span class="n">pts</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">point_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
             <span class="n">kstart</span><span class="p">,</span> <span class="n">kend</span> <span class="o">=</span> <span class="n">seen</span><span class="p">[</span><span class="n">pts</span><span class="p">]</span>
             <span class="k">for</span> <span class="n">p</span><span class="p">,</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">pts</span><span class="p">,</span> <span class="n">unique_indices</span><span class="p">[</span><span class="n">kstart</span><span class="p">:</span><span class="n">kend</span><span class="p">]):</span>
                 <span class="k">for</span> <span class="n">weight</span><span class="p">,</span> <span class="n">cmp</span> <span class="ow">in</span> <span class="n">point_dict</span><span class="p">[</span><span class="n">p</span><span class="p">]:</span>
-                    <span class="n">Q</span><span class="p">[(</span><span class="n">i</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="o">*</span><span class="n">cmp</span><span class="p">)]</span> <span class="o">=</span> <span class="n">weight</span>
-        <span class="n">identity_weights</span> <span class="o">=</span> <span class="nb">all</span><span class="p">(</span>
-            <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">key</span><span class="p">))</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">weight</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">key</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span>
-            <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">weight</span> <span class="ow">in</span> <span class="n">Q</span><span class="o">.</span><span class="n">items</span><span class="p">())</span>
+                    <span class="n">cmp</span> <span class="o">=</span> <span class="n">cmp</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cmp</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="p">(</span><span class="n">cmp</span><span class="p">,)</span>
+                    <span class="n">Q</span><span class="o">.</span><span class="n">append</span><span class="p">(((</span><span class="n">i</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="o">*</span><span class="n">cmp</span><span class="p">),</span> <span class="n">weight</span><span class="p">))</span>
+        <span class="n">identity_weights</span> <span class="o">=</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">value_shape</span> <span class="ow">and</span> <span class="nb">all</span><span class="p">(</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">index</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span> <span class="ow">and</span> <span class="n">index</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">index</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="ow">and</span> <span class="n">np</span><span class="o">.</span><span class="n">ndim</span><span class="p">(</span><span class="n">weight</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">weight</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">weight</span> <span class="ow">in</span> <span class="n">Q</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">dual_coeffs</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">identity_weights</span><span class="p">:</span>
             <span class="c1"># Identity matrix Q can be expressed symbolically</span>
-            <span class="n">extents</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">max</span><span class="p">,</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">Q</span><span class="o">.</span><span class="n">keys</span><span class="p">())))</span>
+            <span class="n">extents</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+                <span class="nb">max</span><span class="p">(</span><span class="n">index</span><span class="p">[</span><span class="n">axis</span><span class="p">]</span> <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">weight</span> <span class="ow">in</span> <span class="n">Q</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">axis</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+            <span class="p">)</span>
             <span class="n">js</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Index</span><span class="p">(</span><span class="n">extent</span><span class="o">=</span><span class="n">e</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">extents</span><span class="p">)</span>
             <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">js</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span>
             <span class="n">Q</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">ComponentTensor</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Delta</span><span class="p">(</span><span class="o">*</span><span class="n">js</span><span class="p">),</span> <span class="n">js</span><span class="p">)</span>
@@ -294,12 +309,9 @@
             <span class="c1"># significantly by building Q in a COO format rather than DOK (i.e.</span>
             <span class="c1"># storing coords and associated data in (nonzeros, entries) shaped</span>
             <span class="c1"># numpy arrays) to take advantage of numpy multiindexing</span>
-            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">Q</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
-                <span class="n">Qshape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">s</span> <span class="o">+</span> <span class="mi">1</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">Q</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">Qshape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">s</span> <span class="o">+</span> <span class="mi">1</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="nb">map</span><span class="p">(</span><span class="nb">max</span><span class="p">,</span> <span class="o">*</span><span class="n">Q</span><span class="p">))</span>
+            <span class="n">Qshape</span> <span class="o">=</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">allpts</span><span class="p">),</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">value_shape</span><span class="p">)</span>
             <span class="n">Qdense</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">Qshape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
-            <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">Q</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">Q</span><span class="p">:</span>
                 <span class="n">Qdense</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
             <span class="k">if</span> <span class="n">dual_coeffs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="n">Qdense</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">dual_coeffs</span><span class="p">,</span> <span class="n">Qdense</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
@@ -626,7 +638,7 @@
     </div>
     <div class="footer" role="contentinfo">
     &#169; Copyright 2026, Firedrake Project.
-      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.1.
     </div>
   </body>
 </html>

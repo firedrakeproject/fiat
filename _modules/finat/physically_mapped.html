@@ -36,13 +36,36 @@
           <div class="body" role="main">
             
   <h1>Source code for finat.physically_mapped</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABCMeta</span><span class="p">,</span> <span class="n">abstractmethod</span>
+<span></span><span class="sa">r</span><span class="sd">"""Physically mapped elements and the automatic basis transformation.</span>
+
+<span class="sd">Let :math:`\mathcal{P}` map reference functions to the physical cell,</span>
+<span class="sd">including any Piola map.  The physical basis is :math:`M\mathcal{P}\hat\Psi`,</span>
+<span class="sd">where :math:`B_{ij} = n_i(\mathcal{P}\hat\psi_j)` and :math:`M = B^{-T}`</span>
+<span class="sd">(Kirby 2017, Brubeck &amp; Kirby 2025).</span>
+<span class="sd">"""</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABCMeta</span><span class="p">,</span> <span class="n">abstractmethod</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">defaultdict</span><span class="p">,</span> <span class="n">namedtuple</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Mapping</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">cached_property</span><span class="p">,</span> <span class="n">reduce</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">chain</span><span class="p">,</span> <span class="n">product</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">operator</span><span class="w"> </span><span class="kn">import</span> <span class="n">add</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">gem</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.functional</span><span class="w"> </span><span class="kn">import</span> <span class="n">IntegralMoment</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">finat.citations</span><span class="w"> </span><span class="kn">import</span> <span class="n">cite</span>
+
+<span class="n">zero</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">()</span>
+<span class="n">one</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="mf">1.0</span><span class="p">)</span>
+
+<span class="c1">#: A weight transformation and its inverse.</span>
+<span class="n">Pullback</span> <span class="o">=</span> <span class="n">namedtuple</span><span class="p">(</span><span class="s2">"Pullback"</span><span class="p">,</span> <span class="p">[</span><span class="s2">"forward"</span><span class="p">,</span> <span class="s2">"inverse"</span><span class="p">])</span>
+
+<span class="c1">#: The row of :math:`B_0` of a node, the row of the inverse of the diagonal</span>
+<span class="c1">#: block of :math:`B_0`, and the scaling of the row of :math:`B=SB_0`.</span>
+<span class="n">VandermondeRow</span> <span class="o">=</span> <span class="n">namedtuple</span><span class="p">(</span><span class="s2">"VandermondeRow"</span><span class="p">,</span> <span class="p">[</span><span class="s2">"entries"</span><span class="p">,</span> <span class="s2">"inverse"</span><span class="p">,</span> <span class="s2">"scale"</span><span class="p">])</span>
 
 
 <div class="viewcode-block" id="NeedsCoordinateMappingElement">
@@ -67,18 +90,14 @@
 
 <span class="sd">    :arg M: a gem.ListTensor with the basis transformation matrix.</span>
 <span class="sd">    :arg ref_tabulation: a dict of tabulations on the reference cell.</span>
-<span class="sd">    :kwarg indices: an optional list of restriction indices on the basis functions.</span>
 <span class="sd">    """</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">M</span><span class="p">,</span> <span class="n">ref_tabulation</span><span class="p">,</span> <span class="n">indices</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">M</span><span class="p">,</span> <span class="n">ref_tabulation</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">M</span> <span class="o">=</span> <span class="n">M</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">ref_tabulation</span> <span class="o">=</span> <span class="n">ref_tabulation</span>
-        <span class="k">if</span> <span class="n">indices</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">indices</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">M</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">indices</span> <span class="o">=</span> <span class="n">indices</span>
         <span class="c1"># we expect M to be sparse with O(1) nonzeros per row</span>
         <span class="c1"># for each row, get the column index of each nonzero entry</span>
         <span class="n">csr</span> <span class="o">=</span> <span class="p">[[</span><span class="n">j</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">M</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">M</span><span class="o">.</span><span class="n">array</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">],</span> <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">)]</span>
-               <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">indices</span><span class="p">]</span>
+               <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">M</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">csr</span> <span class="o">=</span> <span class="n">csr</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_tabulation_cache</span> <span class="o">=</span> <span class="p">{}</span>
 
@@ -90,7 +109,7 @@
         <span class="n">phi</span> <span class="o">=</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">table</span><span class="p">,</span> <span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="o">*</span><span class="n">ii</span><span class="p">))</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">M</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span>
         <span class="c1"># the sum approach is faster than calling numpy.dot or gem.IndexSum</span>
         <span class="n">exprs</span> <span class="o">=</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">ComponentTensor</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Sum</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">M</span><span class="o">.</span><span class="n">array</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="n">phi</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">js</span><span class="p">)),</span> <span class="n">ii</span><span class="p">)</span>
-                 <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">js</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">indices</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">csr</span><span class="p">)]</span>
+                 <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">js</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">csr</span><span class="p">)]</span>
 
         <span class="n">result</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">ListTensor</span><span class="p">(</span><span class="n">exprs</span><span class="p">)</span>
         <span class="n">result</span><span class="p">,</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">optimise</span><span class="o">.</span><span class="n">unroll_indexsum</span><span class="p">((</span><span class="n">result</span><span class="p">,),</span> <span class="k">lambda</span> <span class="n">index</span><span class="p">:</span> <span class="kc">True</span><span class="p">)</span>
@@ -113,26 +132,290 @@
 
 
 
+<div class="viewcode-block" id="PhysicallyMappedFunctional">
+<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicallyMappedFunctional">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PhysicallyMappedFunctional</span><span class="p">:</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""A FIAT node and the data that maps it to the physical cell.</span>
+
+<span class="sd">    :attr:`pullback_mappings` assigns a mapping to each group of axes of</span>
+<span class="sd">    :attr:`weights`: ``affine``, ``covariant piola``, ``contravariant</span>
+<span class="sd">    piola``, or ``L2 piola`` for a contravariant axis paired with a</span>
+<span class="sd">    covariant axis through the identity.  These mappings act on Cartesian</span>
+<span class="sd">    components if :attr:`frame` is None, and on components in the frame of</span>
+<span class="sd">    the entity :attr:`frame` otherwise.</span>
+
+<span class="sd">    :arg node: The FIAT node.</span>
+<span class="sd">    :arg cell: The reference cell.</span>
+<span class="sd">    :arg dim: The dimension of the entity that supports the node.</span>
+<span class="sd">    :arg entity: The entity that supports the node.</span>
+<span class="sd">    :arg mapping: The FIAT mapping of the node.</span>
+<span class="sd">    :arg avg: If False, an integral moment with a :attr:`frame` is a plain</span>
+<span class="sd">        integral over its entity instead of an average.</span>
+<span class="sd">    :arg tol: Relative tolerance for the range tests on the weights, and</span>
+<span class="sd">        below which entries of the Riesz representation are dropped.</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span> <span class="n">mapping</span><span class="p">,</span> <span class="n">avg</span><span class="p">,</span> <span class="n">tol</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">node</span> <span class="o">=</span> <span class="n">node</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cell</span> <span class="o">=</span> <span class="n">cell</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dim</span> <span class="o">=</span> <span class="n">dim</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">entity</span> <span class="o">=</span> <span class="n">entity</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mapping</span> <span class="o">=</span> <span class="n">mapping</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">avg</span> <span class="o">=</span> <span class="n">avg</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tol</span> <span class="o">=</span> <span class="n">tol</span>
+
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">weights</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""The weights of the node, see :meth:`FIAT.functional.Functional.get_order_tensors`."""</span>
+        <span class="n">node</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">node</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">orders</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> mixes derivative orders."</span><span class="p">)</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">W</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">get_order_tensors</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">orders</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">W</span>
+
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">axis_mappings</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""The mapping of each value and derivative axis of the weights."""</span>
+        <span class="n">rank</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">node</span><span class="o">.</span><span class="n">target_shape</span><span class="p">)</span>
+        <span class="n">words</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapping</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">words</span> <span class="o">==</span> <span class="p">[</span><span class="s2">"affine"</span><span class="p">]:</span>
+            <span class="n">value_mappings</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mapping</span><span class="p">,)</span> <span class="o">*</span> <span class="n">rank</span>
+        <span class="k">elif</span> <span class="n">words</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"double"</span><span class="p">:</span>
+            <span class="n">value_mappings</span> <span class="o">=</span> <span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">words</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2"> piola"</span><span class="p">,)</span> <span class="o">*</span> <span class="mi">2</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">value_mappings</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">word</span><span class="si">}</span><span class="s2"> piola"</span> <span class="k">for</span> <span class="n">word</span> <span class="ow">in</span> <span class="n">words</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">value_mappings</span><span class="p">)</span> <span class="o">!=</span> <span class="n">rank</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"A </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">mapping</span><span class="si">}</span><span class="s2"> functional must have rank </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">value_mappings</span><span class="p">)</span><span class="si">}</span><span class="s2">, not </span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">value_mappings</span> <span class="o">+</span> <span class="p">(</span><span class="s2">"covariant piola"</span><span class="p">,)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">node</span><span class="o">.</span><span class="n">max_deriv_order</span>
+
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">frame</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">"""The entity ``(dim, entity)`` in whose frame :attr:`pullback_mappings` act, or None for Cartesian components.</span>
+
+<span class="sd">        For integral moments on a facet, and for nodes on a facet with</span>
+<span class="sd">        derivatives or matrix values, this is the facet, with the frame of</span>
+<span class="sd">        its tangents and normal.  For an integral moment on an edge of a</span>
+<span class="sd">        tetrahedron with derivatives normal to the edge, this is the edge,</span>
+<span class="sd">        with the frame :math:`(t, t \times n_1, t \times n_2)` of the edge</span>
+<span class="sd">        tangent :math:`t` and the normals to :math:`t` within the two facets</span>
+<span class="sd">        that contain the edge.  Otherwise it is None.</span>
+<span class="sd">        """</span>
+        <span class="n">cell</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">node</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">node</span>
+        <span class="n">moment</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">IntegralMoment</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">dim</span> <span class="o">==</span> <span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span> <span class="ow">and</span> <span class="p">(</span><span class="n">moment</span> <span class="ow">or</span> <span class="n">node</span><span class="o">.</span><span class="n">max_deriv_order</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">target_shape</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dim</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">moment</span> <span class="ow">and</span> <span class="mi">0</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">dim</span> <span class="o">&lt;</span> <span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">covectors</span> <span class="o">=</span> <span class="p">[</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">mapping</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">axis_mappings</span><span class="p">)</span> <span class="k">if</span> <span class="n">mapping</span> <span class="o">==</span> <span class="s2">"covariant piola"</span><span class="p">]</span>
+            <span class="n">Q</span> <span class="o">=</span> <span class="n">tangential_projector</span><span class="p">(</span><span class="n">cell</span><span class="o">.</span><span class="n">compute_tangents</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dim</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity</span><span class="p">))</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">in_range_of</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">weights</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="p">(</span><span class="n">k</span><span class="p">,),</span> <span class="bp">self</span><span class="o">.</span><span class="n">tol</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">covectors</span><span class="p">):</span>
+                <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dim</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">pullback_mappings</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""A dict from each group of axes of :attr:`weights` that map together to its mapping."""</span>
+        <span class="c1"># pullback takes the Kronecker product of the weight transformations in</span>
+        <span class="c1"># the order of this dict.</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">W</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">weights</span>
+        <span class="n">axis_mappings</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">axis_mappings</span>
+        <span class="c1"># Interior moments map every axis as affine.</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">dim</span> <span class="o">==</span> <span class="n">sd</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">node</span><span class="p">,</span> <span class="n">IntegralMoment</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">{(</span><span class="n">k</span><span class="p">,):</span> <span class="s2">"affine"</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">axis_mappings</span><span class="p">))}</span>
+        <span class="c1"># In a frame, each axis keeps its own mapping.</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">frame</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">{(</span><span class="n">k</span><span class="p">,):</span> <span class="n">mapping</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">mapping</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">axis_mappings</span><span class="p">)}</span>
+
+        <span class="c1"># A contravariant axis contracted with a covariant axis through the</span>
+        <span class="c1"># identity is a trace, and the pair maps as L2 piola.</span>
+        <span class="n">delta</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">sd</span><span class="p">)</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
+        <span class="n">trace</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="n">delta</span><span class="p">,</span> <span class="n">delta</span><span class="p">)</span> <span class="o">/</span> <span class="n">sd</span>
+        <span class="n">groups</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">vector</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">axis_mappings</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">l</span><span class="p">,</span> <span class="n">covector</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">axis_mappings</span><span class="p">):</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">vector</span> <span class="o">==</span> <span class="s2">"contravariant piola"</span> <span class="ow">and</span> <span class="n">covector</span> <span class="o">==</span> <span class="s2">"covariant piola"</span>
+                        <span class="ow">and</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">k</span> <span class="ow">in</span> <span class="n">axes</span> <span class="ow">or</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">axes</span> <span class="k">for</span> <span class="n">axes</span> <span class="ow">in</span> <span class="n">groups</span><span class="p">)</span>
+                        <span class="ow">and</span> <span class="n">in_range_of</span><span class="p">(</span><span class="n">W</span><span class="p">,</span> <span class="n">trace</span><span class="p">,</span> <span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">l</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">tol</span><span class="p">)):</span>
+                    <span class="n">groups</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="n">l</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"L2 piola"</span>
+        <span class="c1"># A derivative along the edge maps as affine.</span>
+        <span class="c1"># Every other axis keeps its own mapping.</span>
+        <span class="n">on_edge</span> <span class="o">=</span> <span class="mi">0</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">dim</span> <span class="o">&lt;</span> <span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">mapping</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">axis_mappings</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">k</span> <span class="ow">in</span> <span class="n">axes</span> <span class="k">for</span> <span class="n">axes</span> <span class="ow">in</span> <span class="n">groups</span><span class="p">):</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">on_edge</span> <span class="ow">and</span> <span class="n">mapping</span> <span class="o">==</span> <span class="s2">"covariant piola"</span><span class="p">:</span>
+                <span class="n">Q</span> <span class="o">=</span> <span class="n">tangential_projector</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">compute_tangents</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dim</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity</span><span class="p">))</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">in_range_of</span><span class="p">(</span><span class="n">W</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="p">(</span><span class="n">k</span><span class="p">,),</span> <span class="bp">self</span><span class="o">.</span><span class="n">tol</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Cannot map derivatives normal to an edge of </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">node</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span>
+                <span class="n">mapping</span> <span class="o">=</span> <span class="s2">"affine"</span>
+            <span class="n">groups</span><span class="p">[</span><span class="n">k</span><span class="p">,]</span> <span class="o">=</span> <span class="n">mapping</span>
+        <span class="k">return</span> <span class="n">groups</span>
+
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">scaling_exponent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""The exponent :math:`p` such that the physical node dilates as :math:`h^{-p}`.</span>
+
+<span class="sd">        Each group in :attr:`pullback_mappings` contributes its scaling.  If</span>
+<span class="sd">        :attr:`avg` is False, an integral moment with a :attr:`frame` is a</span>
+<span class="sd">        plain integral over its entity, which contributes :math:`-dim`.</span>
+<span class="sd">        """</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">frame</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">exponents</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"covariant piola"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"contravariant piola"</span><span class="p">:</span> <span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"L2 piola"</span><span class="p">:</span> <span class="n">sd</span><span class="p">}</span>
+            <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="n">exponents</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">mapping</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="k">for</span> <span class="n">mapping</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pullback_mappings</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+        <span class="n">exponent</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">axes</span><span class="p">,</span> <span class="n">mapping</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pullback_mappings</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">mapping</span> <span class="o">==</span> <span class="s2">"covariant piola"</span><span class="p">:</span>
+                <span class="n">exponent</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">elif</span> <span class="n">mapping</span> <span class="o">==</span> <span class="s2">"contravariant piola"</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">in_range_of</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">weights</span><span class="p">,</span> <span class="n">facet_normal_projector</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity</span><span class="p">),</span> <span class="n">axes</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tol</span><span class="p">):</span>
+                <span class="c1"># Tangential components of a contravariant axis</span>
+                <span class="n">exponent</span> <span class="o">+=</span> <span class="mi">2</span> <span class="o">-</span> <span class="n">sd</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">node</span><span class="p">,</span> <span class="n">IntegralMoment</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">avg</span><span class="p">:</span>
+            <span class="n">exponent</span> <span class="o">-=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dim</span>
+        <span class="k">return</span> <span class="n">exponent</span>
+
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">pullback_key</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""The :attr:`frame` and the :attr:`pullback_mappings`."""</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">frame</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pullback_mappings</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
+
+<div class="viewcode-block" id="PhysicallyMappedFunctional.pullback">
+<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicallyMappedFunctional.pullback">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">pullback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">J</span><span class="p">,</span> <span class="n">adjJ</span><span class="p">,</span> <span class="n">detJ</span><span class="p">,</span> <span class="n">metric</span><span class="p">,</span> <span class="n">adj_metric</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""The Kronecker product of the weight transformations of :attr:`pullback_mappings`.</span>
+
+<span class="sd">        :arg J: The Jacobian as an object array of GEM scalars.</span>
+<span class="sd">        :arg adjJ: The adjugate of the Jacobian.</span>
+<span class="sd">        :arg detJ: The determinant of the Jacobian.</span>
+<span class="sd">        :arg metric: The metric :math:`J^TJ`.</span>
+<span class="sd">        :arg adj_metric: The adjugate of the metric.</span>
+<span class="sd">        :returns: A :class:`Pullback`.</span>
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">frame</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">pullbacks</span> <span class="o">=</span> <span class="n">cartesian_pullbacks</span><span class="p">(</span><span class="n">J</span><span class="p">,</span> <span class="n">adjJ</span><span class="p">,</span> <span class="n">detJ</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">pullbacks</span> <span class="o">=</span> <span class="n">frame_pullbacks</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">frame</span><span class="p">,</span> <span class="n">metric</span><span class="p">,</span> <span class="n">adj_metric</span><span class="p">,</span> <span class="n">detJ</span><span class="p">)</span>
+        <span class="n">mappings</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pullback_mappings</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+        <span class="n">unit</span> <span class="o">=</span> <span class="n">LinearCombination</span><span class="p">([</span><span class="n">one</span><span class="p">],</span> <span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="mi">1</span><span class="p">)])</span>
+        <span class="n">forward</span> <span class="o">=</span> <span class="n">reduce</span><span class="p">(</span><span class="n">LinearCombination</span><span class="o">.</span><span class="n">kron</span><span class="p">,</span> <span class="p">(</span><span class="n">pullbacks</span><span class="p">[</span><span class="n">mapping</span><span class="p">]</span><span class="o">.</span><span class="n">forward</span> <span class="k">for</span> <span class="n">mapping</span> <span class="ow">in</span> <span class="n">mappings</span><span class="p">),</span> <span class="n">unit</span><span class="p">)</span>
+        <span class="n">inverse</span> <span class="o">=</span> <span class="n">reduce</span><span class="p">(</span><span class="n">LinearCombination</span><span class="o">.</span><span class="n">kron</span><span class="p">,</span> <span class="p">(</span><span class="n">pullbacks</span><span class="p">[</span><span class="n">mapping</span><span class="p">]</span><span class="o">.</span><span class="n">inverse</span> <span class="k">for</span> <span class="n">mapping</span> <span class="ow">in</span> <span class="n">mappings</span><span class="p">),</span> <span class="n">unit</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Pullback</span><span class="p">(</span><span class="n">forward</span><span class="p">,</span> <span class="n">inverse</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PhysicallyMappedFunctional.to_riesz">
+<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicallyMappedFunctional.to_riesz">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_riesz</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">G</span><span class="p">,</span> <span class="n">D</span><span class="p">):</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">"""The Riesz representation :math:`(GW):D_j` of the node on a basis, where :math:`W` are the :attr:`weights`.</span>
+
+<span class="sd">        For the :meth:`pullback` G and the reference basis, this is the row of</span>
+<span class="sd">        :math:`B_0`, and for its inverse and the basis of the entity of the</span>
+<span class="sd">        node, the row of the inverse of the diagonal block.</span>
+
+<span class="sd">        :arg G: The pullback of the weights, a :class:`LinearCombination` on their axes.</span>
+<span class="sd">        :arg D: The derivatives of the basis at the points of the node, with</span>
+<span class="sd">            the basis followed by the axes of the weights.</span>
+<span class="sd">        :returns: An object array of GEM scalars, one for each basis function.</span>
+<span class="sd">        """</span>
+        <span class="c1"># Contract the weights with the derivatives at the points, and order</span>
+        <span class="c1"># the axes of the groups as in the Kronecker product</span>
+        <span class="n">axes</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">chain</span><span class="o">.</span><span class="n">from_iterable</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pullback_mappings</span><span class="p">))</span>
+        <span class="n">rank</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">axes</span><span class="p">)</span>
+        <span class="n">A</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">weights</span><span class="p">,</span> <span class="n">D</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">A</span> <span class="o">=</span> <span class="n">A</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="n">rank</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">+</span> <span class="n">k</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">axes</span><span class="p">),</span> <span class="o">*</span><span class="n">axes</span><span class="p">,</span> <span class="n">rank</span><span class="p">)</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">weights</span><span class="o">.</span><span class="n">size</span> <span class="o">//</span> <span class="bp">self</span><span class="o">.</span><span class="n">weights</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">G</span><span class="o">.</span><span class="n">contract</span><span class="p">(</span><span class="n">A</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">tol</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PhysicallyMappedFunctional.scaling">
+<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicallyMappedFunctional.scaling">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">scaling</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">J</span><span class="p">,</span> <span class="n">h</span><span class="p">):</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">"""The factor :math:`h^p\,|e|` of the row of the physical Vandermonde matrix :math:`B=SB_0`.</span>
+
+<span class="sd">        Here :math:`p` is :attr:`scaling_exponent`, and :math:`|e|` is the</span>
+<span class="sd">        physical measure of the entity if :attr:`avg` is False and there is</span>
+<span class="sd">        a :attr:`frame`, and 1 otherwise.</span>
+
+<span class="sd">        :arg J: The Jacobian as an object array of GEM scalars.</span>
+<span class="sd">        :arg h: The cell size at each vertex.</span>
+<span class="sd">        :returns: A GEM scalar.</span>
+<span class="sd">        """</span>
+        <span class="n">measure</span> <span class="o">=</span> <span class="n">one</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">frame</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">node</span><span class="p">,</span> <span class="n">IntegralMoment</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">avg</span><span class="p">:</span>
+            <span class="c1"># The physical measure of the support, from the Gram determinant of its tangents</span>
+            <span class="n">T</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">compute_tangents</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dim</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity</span><span class="p">)</span>
+            <span class="n">JT</span> <span class="o">=</span> <span class="n">J</span> <span class="o">@</span> <span class="n">T</span><span class="o">.</span><span class="n">T</span>
+            <span class="n">volume</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">volume_of_subcomplex</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dim</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity</span><span class="p">)</span>
+            <span class="n">measure</span> <span class="o">=</span> <span class="n">volume</span> <span class="o">*</span> <span class="p">(</span><span class="n">determinant</span><span class="p">(</span><span class="n">JT</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">JT</span><span class="p">)</span> <span class="o">/</span> <span class="n">determinant</span><span class="p">(</span><span class="n">T</span> <span class="o">@</span> <span class="n">T</span><span class="o">.</span><span class="n">T</span><span class="p">))</span><span class="o">**</span><span class="mf">0.5</span>
+
+        <span class="n">dilation</span> <span class="o">=</span> <span class="n">one</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scaling_exponent</span>
+        <span class="k">if</span> <span class="n">p</span><span class="p">:</span>
+            <span class="n">vertices</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()[</span><span class="bp">self</span><span class="o">.</span><span class="n">dim</span><span class="p">][</span><span class="bp">self</span><span class="o">.</span><span class="n">entity</span><span class="p">]</span>
+            <span class="n">havg</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">h</span><span class="p">[</span><span class="n">v</span><span class="p">]</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">vertices</span><span class="p">)</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">vertices</span><span class="p">)</span>
+            <span class="n">dilation</span> <span class="o">=</span> <span class="n">havg</span><span class="o">**</span><span class="n">p</span>
+        <span class="k">return</span> <span class="n">measure</span> <span class="o">*</span> <span class="n">dilation</span></div>
+</div>
+
+
+
 <div class="viewcode-block" id="PhysicallyMappedElement">
 <a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicallyMappedElement">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">PhysicallyMappedElement</span><span class="p">(</span><span class="n">NeedsCoordinateMappingElement</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""A mixin that applies a "physical" transformation to tabulated</span>
 <span class="sd">    basis functions."""</span>
 
+    <span class="c1">#: Relative tolerance for the range tests on the weights of each node,</span>
+    <span class="c1">#: and below which entries of the Riesz representation are dropped.</span>
+    <span class="n">tol</span> <span class="o">=</span> <span class="mf">1e-10</span>
+
+    <span class="c1">#: If False, an integral moment with a frame is a plain</span>
+    <span class="c1">#: integral over its entity instead of an average.</span>
+    <span class="n">avg</span> <span class="o">=</span> <span class="kc">True</span>
+
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
         <span class="n">cite</span><span class="p">(</span><span class="s2">"Kirby2018zany"</span><span class="p">)</span>
         <span class="n">cite</span><span class="p">(</span><span class="s2">"Kirby2019zany"</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">restriction_indices</span> <span class="o">=</span> <span class="kc">None</span>
 
 <div class="viewcode-block" id="PhysicallyMappedElement.basis_transformation">
 <a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicallyMappedElement.basis_transformation">[docs]</a>
-    <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">basis_transformation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">"""Transformation matrix for the basis functions.</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">"""Transformation matrix for the basis functions.</span>
 
-<span class="sd">        :arg coordinate_mapping: Object providing physical geometry."""</span>
-        <span class="k">pass</span></div>
+<span class="sd">        :arg coordinate_mapping: Object providing the physical geometry</span>
+<span class="sd">            as GEM expressions.</span>
+<span class="sd">        :returns: A ``gem.ListTensor`` with exposed physical dofs as rows</span>
+<span class="sd">            and the complete reference basis as columns.</span>
+<span class="sd">        """</span>
+        <span class="n">V</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_inverse_physical_vandermonde</span><span class="p">(</span><span class="n">coordinate_mapping</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">ListTensor</span><span class="p">(</span><span class="n">V</span><span class="p">[:,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_physical_indices</span><span class="p">]</span><span class="o">.</span><span class="n">T</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PhysicallyMappedElement.dual_transformation">
+<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicallyMappedElement.dual_transformation">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dual_transformation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">"""Transforms reference dual evaluation into physical dual evaluation.</span>
+
+<span class="sd">        The physical nodes of :math:`f` are :math:`n_i(f) = \sum_j B_{ij}</span>
+<span class="sd">        \hat n_j(F^* f)`, so the reference weights are transformed by</span>
+<span class="sd">        the physical Vandermonde matrix :math:`B`, restricted to the</span>
+<span class="sd">        exposed dofs.</span>
+
+<span class="sd">        :arg Q: The reference dual evaluation gem weight tensor</span>
+<span class="sd">            mapping quadrature points to reference degrees of freedom.</span>
+<span class="sd">        :arg coordinate_mapping: Object providing the physical geometry</span>
+<span class="sd">            as GEM expressions.</span>
+<span class="sd">        :returns: The physical dual evaluation gem weight tensor.</span>
+<span class="sd">        """</span>
+        <span class="n">B</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_physical_vandermonde</span><span class="p">(</span><span class="n">coordinate_mapping</span><span class="p">)</span>
+        <span class="n">indices</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_physical_indices</span>
+        <span class="n">B</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">ListTensor</span><span class="p">(</span><span class="n">B</span><span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">ix_</span><span class="p">(</span><span class="n">indices</span><span class="p">,</span> <span class="n">indices</span><span class="p">)])</span>
+
+        <span class="n">key</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="n">MappedTabulation</span><span class="p">(</span><span class="n">B</span><span class="p">,</span> <span class="p">{</span><span class="n">key</span><span class="p">:</span> <span class="n">Q</span><span class="p">})[</span><span class="n">key</span><span class="p">]</span></div>
 
 
 <div class="viewcode-block" id="PhysicallyMappedElement.map_tabulation">
@@ -140,7 +423,7 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">map_tabulation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_tabulation</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="p">):</span>
         <span class="k">assert</span> <span class="n">coordinate_mapping</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
         <span class="n">M</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">basis_transformation</span><span class="p">(</span><span class="n">coordinate_mapping</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">MappedTabulation</span><span class="p">(</span><span class="n">M</span><span class="p">,</span> <span class="n">ref_tabulation</span><span class="p">,</span> <span class="n">indices</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">restriction_indices</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="n">MappedTabulation</span><span class="p">(</span><span class="n">M</span><span class="p">,</span> <span class="n">ref_tabulation</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="PhysicallyMappedElement.basis_evaluation">
@@ -150,24 +433,169 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">map_tabulation</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="PhysicallyMappedElement.dual_transformation">
-<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicallyMappedElement.dual_transformation">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">dual_transformation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-        <span class="n">M</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">basis_transformation</span><span class="p">(</span><span class="n">coordinate_mapping</span><span class="p">)</span>
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_physical_indices</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""The reference dofs exposed as physical dofs, in local order.</span>
 
-        <span class="n">M</span> <span class="o">=</span> <span class="n">M</span><span class="o">.</span><span class="n">array</span>
-        <span class="k">if</span> <span class="n">M</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">M</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
-            <span class="n">M</span> <span class="o">=</span> <span class="n">M</span><span class="p">[:,</span> <span class="p">:</span><span class="n">M</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+<span class="sd">        These are the dofs of :meth:`entity_dofs`, which omits the</span>
+<span class="sd">        constraint nodes that only complete the transformation.</span>
+<span class="sd">        """</span>
+        <span class="k">return</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">i</span> <span class="k">for</span> <span class="n">entities</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity_dofs</span><span class="p">()</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+                      <span class="k">for</span> <span class="n">dofs</span> <span class="ow">in</span> <span class="n">entities</span><span class="o">.</span><span class="n">values</span><span class="p">()</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">dofs</span><span class="p">)</span>
 
-        <span class="n">M_dual</span> <span class="o">=</span> <span class="n">inverse</span><span class="p">(</span><span class="n">M</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">restriction_indices</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">indices</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">restriction_indices</span>
-            <span class="n">M_dual</span> <span class="o">=</span> <span class="n">M_dual</span><span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">ix_</span><span class="p">(</span><span class="n">indices</span><span class="p">,</span> <span class="n">indices</span><span class="p">)]</span>
-        <span class="n">M_dual</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">ListTensor</span><span class="p">(</span><span class="n">M_dual</span><span class="p">)</span>
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_physical_functionals</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""The physical counterpart of each node of the FIAT dual set."""</span>
+        <span class="n">dual</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">get_dual_set</span><span class="p">()</span>
+        <span class="n">mappings</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">mapping</span><span class="p">()</span>
+        <span class="n">functionals</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">dual</span><span class="o">.</span><span class="n">nodes</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entities</span> <span class="ow">in</span> <span class="n">dual</span><span class="o">.</span><span class="n">get_entity_ids</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">for</span> <span class="n">entity</span><span class="p">,</span> <span class="n">dofs</span> <span class="ow">in</span> <span class="n">entities</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">dofs</span><span class="p">:</span>
+                    <span class="n">functionals</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">PhysicallyMappedFunctional</span><span class="p">(</span><span class="n">dual</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span>
+                                                                <span class="n">mappings</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">avg</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tol</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">functionals</span><span class="p">)</span>
 
-        <span class="n">key</span> <span class="o">=</span> <span class="kc">None</span>
-        <span class="k">return</span> <span class="n">MappedTabulation</span><span class="p">(</span><span class="n">M_dual</span><span class="p">,</span> <span class="p">{</span><span class="n">key</span><span class="p">:</span> <span class="n">Q</span><span class="p">})[</span><span class="n">key</span><span class="p">]</span></div>
-</div>
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_reference_tabulation</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">"""The tabulation of the source nodal basis at the points of the nodes.</span>
+
+<span class="sd">        A dict from each derivative order k to a tuple of a dict from each</span>
+<span class="sd">        point :math:`x_q` to its index q, and the tensor</span>
+<span class="sd">        :math:`D_{jb\gamma q}=(\partial^\gamma\psi^0_j)_b(x_q)` with k</span>
+<span class="sd">        derivative axes :math:`\gamma`, where :math:`\psi^0` is the nodal</span>
+<span class="sd">        basis of the nodes before recombination.  The basis is tabulated one</span>
+<span class="sd">        time for each order.</span>
+<span class="sd">        """</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">num_members</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()</span>
+        <span class="n">tshape</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">value_shape</span><span class="p">()</span>
+        <span class="n">dual</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">get_dual_set</span><span class="p">()</span>
+        <span class="n">points</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">set</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">dual</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
+            <span class="n">order</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">max_deriv_order</span>
+            <span class="n">node_points</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">get_order_tensors</span><span class="p">(</span><span class="n">order</span><span class="p">)</span>
+            <span class="n">points</span><span class="p">[</span><span class="n">order</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">node_points</span><span class="p">)</span>
+
+        <span class="n">C</span> <span class="o">=</span> <span class="n">dual</span><span class="o">.</span><span class="n">get_coeffs</span><span class="p">()</span>
+        <span class="n">derivatives</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">order</span> <span class="ow">in</span> <span class="n">points</span><span class="p">:</span>
+            <span class="n">pts</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">points</span><span class="p">[</span><span class="n">order</span><span class="p">])</span>
+            <span class="n">tabulation</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">pts</span><span class="p">)</span>
+            <span class="n">dshape</span> <span class="o">=</span> <span class="p">(</span><span class="n">sd</span><span class="p">,)</span> <span class="o">*</span> <span class="n">order</span>
+            <span class="n">D</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">num_members</span><span class="p">,</span> <span class="o">*</span><span class="n">tshape</span><span class="p">,</span> <span class="o">*</span><span class="n">dshape</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">pts</span><span class="p">)))</span>
+            <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">dshape</span><span class="p">):</span>
+                <span class="n">D</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="o">*</span><span class="n">index</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">tabulation</span><span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">index</span><span class="o">.</span><span class="n">count</span><span class="p">,</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)))]</span>
+            <span class="k">if</span> <span class="n">C</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="c1"># n = C n_0, so the basis dual to n_0 is psi^0 = C^T psi.</span>
+                <span class="n">D</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">C</span><span class="p">,</span> <span class="n">D</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+            <span class="n">point_index</span> <span class="o">=</span> <span class="p">{</span><span class="n">pt</span><span class="p">:</span> <span class="n">q</span> <span class="k">for</span> <span class="n">q</span><span class="p">,</span> <span class="n">pt</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">pts</span><span class="p">)}</span>
+            <span class="n">derivatives</span><span class="p">[</span><span class="n">order</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">point_index</span><span class="p">,</span> <span class="n">D</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">derivatives</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_vandermonde_rows</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="p">):</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">"""The rows of the physical Vandermonde matrix :math:`B=SB_0` that differ from the identity.</span>
+
+<span class="sd">        :arg coordinate_mapping: Object providing the physical geometry</span>
+<span class="sd">            as GEM expressions.</span>
+<span class="sd">        :returns: A dict from each node number to its :class:`VandermondeRow`.</span>
+<span class="sd">        :raises NotImplementedError: If a row couples to a dof outside the</span>
+<span class="sd">            closure of the entity of the node.</span>
+<span class="sd">        """</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">bary</span><span class="p">,</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">make_points</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">sd</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="c1"># The signed determinant carries the orientation of the tangent.</span>
+            <span class="n">J</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">ListTensor</span><span class="p">([[</span><span class="n">coordinate_mapping</span><span class="o">.</span><span class="n">detJ_at</span><span class="p">(</span><span class="n">bary</span><span class="p">)]])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">J</span> <span class="o">=</span> <span class="n">coordinate_mapping</span><span class="o">.</span><span class="n">jacobian_at</span><span class="p">(</span><span class="n">bary</span><span class="p">)</span>
+        <span class="n">J</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="n">J</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">k</span><span class="p">]</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">J</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">J</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">object</span><span class="p">)</span>
+        <span class="n">adjJ</span><span class="p">,</span> <span class="n">detJ</span> <span class="o">=</span> <span class="n">adjugate_and_determinant</span><span class="p">(</span><span class="n">J</span><span class="p">)</span>
+        <span class="n">metric</span><span class="p">,</span> <span class="n">adj_metric</span> <span class="o">=</span> <span class="n">metric_and_adjugate</span><span class="p">(</span><span class="n">J</span><span class="p">)</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="n">coordinate_mapping</span><span class="o">.</span><span class="n">cell_size</span><span class="p">()</span>
+
+        <span class="n">closure_dofs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">entity_closure_dofs</span><span class="p">()</span>
+        <span class="n">entity_dofs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">entity_dofs</span><span class="p">()</span>
+        <span class="n">tabulation</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reference_tabulation</span>
+        <span class="n">pullbacks</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">rows</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">functional</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_physical_functionals</span><span class="p">):</span>
+            <span class="c1"># Assemble each row by applying the pulled-back functional to the reference basis</span>
+            <span class="n">key</span> <span class="o">=</span> <span class="n">functional</span><span class="o">.</span><span class="n">pullback_key</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">pullbacks</span><span class="p">:</span>
+                <span class="n">pullbacks</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">functional</span><span class="o">.</span><span class="n">pullback</span><span class="p">(</span><span class="n">J</span><span class="p">,</span> <span class="n">adjJ</span><span class="p">,</span> <span class="n">detJ</span><span class="p">,</span> <span class="n">metric</span><span class="p">,</span> <span class="n">adj_metric</span><span class="p">)</span>
+            <span class="n">pullback</span> <span class="o">=</span> <span class="n">pullbacks</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+
+            <span class="n">order</span> <span class="o">=</span> <span class="n">functional</span><span class="o">.</span><span class="n">node</span><span class="o">.</span><span class="n">max_deriv_order</span>
+            <span class="n">points</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">functional</span><span class="o">.</span><span class="n">node</span><span class="o">.</span><span class="n">get_order_tensors</span><span class="p">(</span><span class="n">order</span><span class="p">)</span>
+            <span class="n">point_index</span><span class="p">,</span> <span class="n">D</span> <span class="o">=</span> <span class="n">tabulation</span><span class="p">[</span><span class="n">order</span><span class="p">]</span>
+            <span class="n">D</span> <span class="o">=</span> <span class="n">D</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">[</span><span class="n">point_index</span><span class="p">[</span><span class="n">x</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">points</span><span class="p">]]</span>
+
+            <span class="c1"># Get the row and the row scale</span>
+            <span class="n">row</span> <span class="o">=</span> <span class="n">functional</span><span class="o">.</span><span class="n">to_riesz</span><span class="p">(</span><span class="n">pullback</span><span class="o">.</span><span class="n">forward</span><span class="p">,</span> <span class="n">D</span><span class="p">)</span>
+            <span class="n">scale</span> <span class="o">=</span> <span class="n">functional</span><span class="o">.</span><span class="n">scaling</span><span class="p">(</span><span class="n">J</span><span class="p">,</span> <span class="n">h</span><span class="p">)</span>
+
+            <span class="n">nonzeros</span> <span class="o">=</span> <span class="p">[</span><span class="n">j</span> <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">entry</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">row</span><span class="p">)</span> <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">entry</span><span class="p">,</span> <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">)]</span>
+            <span class="k">if</span> <span class="n">nonzeros</span> <span class="o">==</span> <span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="ow">and</span> <span class="n">row</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">==</span> <span class="n">one</span> <span class="ow">and</span> <span class="n">scale</span> <span class="o">==</span> <span class="n">one</span><span class="p">:</span>
+                <span class="c1"># Skip identity row</span>
+                <span class="k">continue</span>
+
+            <span class="c1"># The row may only couple to the dofs in the closure of its entity</span>
+            <span class="n">closure</span> <span class="o">=</span> <span class="n">closure_dofs</span><span class="p">[</span><span class="n">functional</span><span class="o">.</span><span class="n">dim</span><span class="p">][</span><span class="n">functional</span><span class="o">.</span><span class="n">entity</span><span class="p">]</span>
+            <span class="n">outside</span> <span class="o">=</span> <span class="p">[</span><span class="n">j</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">nonzeros</span> <span class="k">if</span> <span class="n">j</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">closure</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">outside</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"The pullback of dof </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> on entity </span><span class="si">{</span><span class="p">(</span><span class="n">functional</span><span class="o">.</span><span class="n">dim</span><span class="p">,</span><span class="w"> </span><span class="n">functional</span><span class="o">.</span><span class="n">entity</span><span class="p">)</span><span class="si">}</span><span class="s2"> "</span>
+                                          <span class="sa">f</span><span class="s2">"needs dofs </span><span class="si">{</span><span class="n">outside</span><span class="si">}</span><span class="s2"> outside its closure, so it is not local to the entity."</span><span class="p">)</span>
+
+            <span class="c1"># Get the row of the inverse of the diagonal block</span>
+            <span class="n">block</span> <span class="o">=</span> <span class="n">entity_dofs</span><span class="p">[</span><span class="n">functional</span><span class="o">.</span><span class="n">dim</span><span class="p">][</span><span class="n">functional</span><span class="o">.</span><span class="n">entity</span><span class="p">]</span>
+            <span class="n">inverse</span> <span class="o">=</span> <span class="n">functional</span><span class="o">.</span><span class="n">to_riesz</span><span class="p">(</span><span class="n">pullback</span><span class="o">.</span><span class="n">inverse</span><span class="p">,</span> <span class="n">D</span><span class="p">[</span><span class="n">block</span><span class="p">])</span>
+            <span class="n">rows</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">VandermondeRow</span><span class="p">(</span><span class="n">row</span><span class="p">,</span> <span class="n">inverse</span><span class="p">,</span> <span class="n">scale</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">rows</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_recombine</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">A</span><span class="p">):</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">"""For :math:`n=Cn_0`, a matrix over the nodes transforms as :math:`CAC^{-1}`."""</span>
+        <span class="n">C</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">get_dual_set</span><span class="p">()</span><span class="o">.</span><span class="n">get_coeffs</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">C</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">A</span>
+        <span class="k">return</span> <span class="n">C</span> <span class="o">@</span> <span class="n">A</span> <span class="o">@</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">inv</span><span class="p">(</span><span class="n">C</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_physical_vandermonde</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""The physical Vandermonde matrix :math:`B` over all reference dofs."""</span>
+        <span class="n">B</span> <span class="o">=</span> <span class="n">identity</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">())</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_vandermonde_rows</span><span class="p">(</span><span class="n">coordinate_mapping</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">B</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">row</span><span class="o">.</span><span class="n">entries</span> <span class="o">*</span> <span class="n">row</span><span class="o">.</span><span class="n">scale</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_recombine</span><span class="p">(</span><span class="n">B</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_inverse_physical_vandermonde</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="p">):</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">""":math:`B^{-1}=B_0^{-1}S^{-1}` over all reference dofs.</span>
+
+<span class="sd">        Back-substitute the entity blocks of :math:`B_0` in closure order,</span>
+<span class="sd">        retaining completion functions.  The rows of each block e are</span>
+<span class="sd">        :math:`B_{ee}^{-1}(I_e - B_{ec}V_c)` over the rest c of its closure.</span>
+<span class="sd">        """</span>
+        <span class="n">rows</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_vandermonde_rows</span><span class="p">(</span><span class="n">coordinate_mapping</span><span class="p">)</span>
+        <span class="n">closure_dofs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">entity_closure_dofs</span><span class="p">()</span>
+        <span class="n">entity_dofs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">entity_dofs</span><span class="p">()</span>
+        <span class="n">I</span> <span class="o">=</span> <span class="n">identity</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">())</span>
+        <span class="n">V</span> <span class="o">=</span> <span class="n">identity</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">())</span>
+        <span class="k">for</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entities</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">closure_dofs</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>
+            <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="n">entities</span><span class="p">:</span>
+                <span class="n">block</span> <span class="o">=</span> <span class="n">entity_dofs</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">i</span> <span class="ow">in</span> <span class="n">rows</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">block</span><span class="p">):</span>
+                    <span class="k">continue</span>
+                <span class="n">closure</span> <span class="o">=</span> <span class="p">[</span><span class="n">j</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">closure_dofs</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span> <span class="k">if</span> <span class="n">j</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">block</span><span class="p">]</span>
+                <span class="n">inverse</span> <span class="o">=</span> <span class="n">identity</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">block</span><span class="p">))</span>
+                <span class="n">offdiag</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">full</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">block</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">closure</span><span class="p">)),</span> <span class="n">zero</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">object</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">block</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">:</span>
+                        <span class="n">inverse</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">rows</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">inverse</span>
+                        <span class="n">offdiag</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">rows</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">entries</span><span class="p">[</span><span class="n">closure</span><span class="p">]</span>
+                <span class="n">rhs</span> <span class="o">=</span> <span class="n">I</span><span class="p">[</span><span class="n">block</span><span class="p">]</span> <span class="o">-</span> <span class="n">sparse_matmul</span><span class="p">(</span><span class="n">offdiag</span><span class="p">,</span> <span class="n">V</span><span class="p">[</span><span class="n">closure</span><span class="p">])</span>
+                <span class="n">V</span><span class="p">[</span><span class="n">block</span><span class="p">]</span> <span class="o">=</span> <span class="n">sparse_matmul</span><span class="p">(</span><span class="n">inverse</span><span class="p">,</span> <span class="n">rhs</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">rows</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">V</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">V</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">/</span> <span class="n">row</span><span class="o">.</span><span class="n">scale</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_recombine</span><span class="p">(</span><span class="n">V</span><span class="p">)</span></div>
 
 
 
@@ -183,6 +611,7 @@
 <div class="viewcode-block" id="PhysicalGeometry">
 <a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicalGeometry">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">PhysicalGeometry</span><span class="p">(</span><span class="n">metaclass</span><span class="o">=</span><span class="n">ABCMeta</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Geometry callbacks for physical cells."""</span>
 
 <div class="viewcode-block" id="PhysicalGeometry.cell_size">
 <a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicalGeometry.cell_size">[docs]</a>
@@ -202,7 +631,7 @@
 
 <span class="sd">        :arg point: The point in reference space (on the cell) to</span>
 <span class="sd">             evaluate the Jacobian.</span>
-<span class="sd">        :returns: A GEM expression for the Jacobian, shape (gdim, tdim).</span>
+<span class="sd">        :returns: A GEM expression for the Jacobian, shape ``(gdim, tdim)``.</span>
 <span class="sd">        """</span></div>
 
 
@@ -293,10 +722,6 @@
 
 
 
-<span class="n">zero</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">()</span>
-<span class="n">one</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="mf">1.0</span><span class="p">)</span>
-
-
 <div class="viewcode-block" id="identity">
 <a class="viewcode-back" href="../../finat.html#finat.physically_mapped.identity">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">identity</span><span class="p">(</span><span class="o">*</span><span class="n">shape</span><span class="p">):</span>
@@ -348,44 +773,311 @@
 
 
 
-<div class="viewcode-block" id="inverse">
-<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.inverse">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">inverse</span><span class="p">(</span><span class="n">A</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Returns the inverse of A.</span>
+<div class="viewcode-block" id="adjugate_and_determinant">
+<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.adjugate_and_determinant">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">adjugate_and_determinant</span><span class="p">(</span><span class="n">J</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""Return the determinant-scaled inverse and volume factor of a Jacobian.</span>
 
-<span class="sd">    Exploits block-diagonal structure with repeated blocks.</span>
+<span class="sd">    Square matrices use the signed determinant and adjugate.  For a</span>
+<span class="sd">    rectangular matrix the volume factor is :math:`\sqrt{\det(J^T J)}`</span>
+<span class="sd">    and the scaled inverse is :math:`\det J\,J^+`.</span>
+
+<span class="sd">    :arg J: Full-column-rank Jacobian as an object array of GEM scalars.</span>
+<span class="sd">    :returns: The scaled inverse (numerator) and volume factor (denominator).</span>
+<span class="sd">        The transpose of the scaled inverse is the cofactor matrix.</span>
 <span class="sd">    """</span>
-    <span class="n">m</span><span class="p">,</span> <span class="n">n</span> <span class="o">=</span> <span class="n">A</span><span class="o">.</span><span class="n">shape</span>
-    <span class="k">if</span> <span class="n">m</span> <span class="o">!=</span> <span class="n">n</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"A must be square."</span><span class="p">)</span>
-    <span class="n">M</span> <span class="o">=</span> <span class="n">A</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-    <span class="n">cache</span> <span class="o">=</span> <span class="p">{}</span>
-    <span class="n">candidates</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">m</span><span class="p">))</span>
-    <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">candidates</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-        <span class="c1"># Extract a connected component</span>
-        <span class="n">seed</span> <span class="o">=</span> <span class="p">{</span><span class="nb">min</span><span class="p">(</span><span class="n">candidates</span><span class="p">)}</span>
-        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
-            <span class="n">ids</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
-            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">seed</span><span class="p">:</span>
-                <span class="n">ids</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">j</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">candidates</span> <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">M</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="n">i</span><span class="p">],</span> <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">))</span>
-                <span class="n">ids</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">j</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">candidates</span> <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">M</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">],</span> <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">))</span>
-            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">ids</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">seed</span><span class="p">):</span>
-                <span class="k">break</span>
-            <span class="n">seed</span> <span class="o">=</span> <span class="n">ids</span>
-        <span class="n">candidates</span> <span class="o">-=</span> <span class="n">ids</span>
-        <span class="n">ids</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">ids</span><span class="p">)</span>
-        <span class="n">Mii</span> <span class="o">=</span> <span class="n">M</span><span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">ix_</span><span class="p">(</span><span class="n">ids</span><span class="p">,</span> <span class="n">ids</span><span class="p">)]</span>
+    <span class="n">gdim</span><span class="p">,</span> <span class="n">tdim</span> <span class="o">=</span> <span class="n">J</span><span class="o">.</span><span class="n">shape</span>
+    <span class="k">if</span> <span class="n">gdim</span> <span class="o">==</span> <span class="n">tdim</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">adjugate</span><span class="p">(</span><span class="n">J</span><span class="p">),</span> <span class="n">determinant</span><span class="p">(</span><span class="n">J</span><span class="p">))</span>
+    <span class="n">JTJ</span> <span class="o">=</span> <span class="n">J</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">J</span>
+    <span class="n">detJ</span> <span class="o">=</span> <span class="n">determinant</span><span class="p">(</span><span class="n">JTJ</span><span class="p">)</span><span class="o">**</span><span class="mf">0.5</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">adjugate</span><span class="p">(</span><span class="n">JTJ</span><span class="p">)</span> <span class="o">@</span> <span class="n">J</span><span class="o">.</span><span class="n">T</span> <span class="o">/</span> <span class="n">detJ</span><span class="p">,</span> <span class="n">detJ</span><span class="p">)</span></div>
 
-        <span class="c1"># Have we already done this?</span>
-        <span class="n">key</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">ListTensor</span><span class="p">(</span><span class="n">Mii</span><span class="p">)</span>
-        <span class="k">try</span><span class="p">:</span>
-            <span class="n">Minv</span> <span class="o">=</span> <span class="n">cache</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
-        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
-            <span class="n">Minv</span> <span class="o">=</span> <span class="n">adjugate</span><span class="p">(</span><span class="n">Mii</span><span class="p">)</span> <span class="o">/</span> <span class="n">determinant</span><span class="p">(</span><span class="n">Mii</span><span class="p">)</span>
-            <span class="n">cache</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">Minv</span>
 
-        <span class="n">M</span><span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">ix_</span><span class="p">(</span><span class="n">ids</span><span class="p">,</span> <span class="n">ids</span><span class="p">)]</span> <span class="o">=</span> <span class="n">Minv</span>
-    <span class="k">return</span> <span class="n">M</span></div>
+
+<div class="viewcode-block" id="metric_and_adjugate">
+<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.metric_and_adjugate">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">metric_and_adjugate</span><span class="p">(</span><span class="n">J</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""Return the metric :math:`G=J^TJ` and its adjugate, which equals :math:`\operatorname{adj}(J)\operatorname{adj}(J)^T`.</span>
+
+<span class="sd">    :arg J: Full-column-rank Jacobian as an object array of GEM scalars.</span>
+<span class="sd">    :returns: The symmetric matrices :math:`G` and :math:`\operatorname{adj}(G)`.</span>
+<span class="sd">    """</span>
+    <span class="n">G</span> <span class="o">=</span> <span class="n">symmetric</span><span class="p">(</span><span class="n">J</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">J</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">G</span><span class="p">,</span> <span class="n">symmetric</span><span class="p">(</span><span class="n">adjugate</span><span class="p">(</span><span class="n">G</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="symmetric">
+<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.symmetric">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">symmetric</span><span class="p">(</span><span class="n">A</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""The symmetric matrix with the upper triangle of A."""</span>
+    <span class="n">A</span> <span class="o">=</span> <span class="n">A</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">i</span><span class="p">,</span> <span class="n">j</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">tril_indices</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">A</span><span class="p">),</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">A</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">A</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">A</span></div>
+
+
+
+<div class="viewcode-block" id="sparse_matmul">
+<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.sparse_matmul">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">sparse_matmul</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""The product of matrices of GEM scalars, which skips the zero entries."""</span>
+    <span class="n">columns</span> <span class="o">=</span> <span class="p">[[</span><span class="n">j</span> <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">b</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">row</span><span class="p">)</span> <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">)]</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">B</span><span class="p">]</span>
+    <span class="n">C</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">full</span><span class="p">((</span><span class="n">A</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">B</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span> <span class="n">zero</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">object</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">A</span><span class="o">.</span><span class="n">shape</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">A</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">k</span><span class="p">],</span> <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">[</span><span class="n">k</span><span class="p">]:</span>
+                <span class="n">C</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">C</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">+</span> <span class="n">A</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">k</span><span class="p">]</span> <span class="o">*</span> <span class="n">B</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">C</span></div>
+
+
+
+<div class="viewcode-block" id="LinearCombination">
+<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.LinearCombination">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">LinearCombination</span><span class="p">:</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""A matrix :math:`G=\sum_t g_t C_t` of GEM scalars :math:`g_t` and constant matrices :math:`C_t`.</span>
+
+<span class="sd">    :arg coefficients: The coefficients :math:`g_t`.</span>
+<span class="sd">    :arg matrices: The matrices :math:`C_t`.</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">coefficients</span><span class="p">,</span> <span class="n">matrices</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">coefficients</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">coefficients</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">object</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">matrices</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">matrices</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+
+<div class="viewcode-block" id="LinearCombination.from_matrix">
+<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.LinearCombination.from_matrix">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_matrix</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">A</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""The linear combination of the entries of a matrix of GEM scalars."""</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">A</span><span class="p">)</span>
+        <span class="n">units</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">n</span> <span class="o">*</span> <span class="n">n</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
+        <span class="n">entries</span> <span class="o">=</span> <span class="p">[(</span><span class="n">A</span><span class="p">[</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">],</span> <span class="n">units</span><span class="p">[</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">])</span> <span class="k">for</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">A</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">A</span><span class="p">[</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">],</span> <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">)]</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="o">*</span><span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">entries</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="LinearCombination.outer">
+<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.LinearCombination.outer">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">outer</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">v</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""The outer product of a vector u of GEM scalars and a constant vector v."""</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">u</span><span class="p">))])</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">T</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""The transpose."""</span>
+        <span class="k">return</span> <span class="n">LinearCombination</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">coefficients</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">matrices</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__add__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">LinearCombination</span><span class="p">([</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">coefficients</span><span class="p">,</span> <span class="o">*</span><span class="n">other</span><span class="o">.</span><span class="n">coefficients</span><span class="p">],</span> <span class="p">[</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">matrices</span><span class="p">,</span> <span class="o">*</span><span class="n">other</span><span class="o">.</span><span class="n">matrices</span><span class="p">])</span>
+
+<div class="viewcode-block" id="LinearCombination.kron">
+<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.LinearCombination.kron">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">kron</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""The Kronecker product."""</span>
+        <span class="k">return</span> <span class="n">LinearCombination</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">coefficients</span><span class="p">,</span> <span class="n">other</span><span class="o">.</span><span class="n">coefficients</span><span class="p">)</span><span class="o">.</span><span class="n">ravel</span><span class="p">(),</span>
+                                 <span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">kron</span><span class="p">(</span><span class="n">C</span><span class="p">,</span> <span class="n">D</span><span class="p">)</span> <span class="k">for</span> <span class="n">C</span><span class="p">,</span> <span class="n">D</span> <span class="ow">in</span> <span class="n">product</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">matrices</span><span class="p">,</span> <span class="n">other</span><span class="o">.</span><span class="n">matrices</span><span class="p">)])</span></div>
+
+
+<div class="viewcode-block" id="LinearCombination.contract">
+<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.LinearCombination.contract">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">contract</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">A</span><span class="p">,</span> <span class="n">tol</span><span class="p">):</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">"""The contraction :math:`G:A=g^TR` with a constant tensor, where :math:`R_t=C_t:A`.</span>
+
+<span class="sd">        :arg A: A constant tensor whose first two axes match :math:`G`.</span>
+<span class="sd">        :arg tol: Tolerance relative to A and each :math:`C_t` below which</span>
+<span class="sd">            entries of :math:`R` are dropped.</span>
+<span class="sd">        :returns: An object array of GEM scalars with the remaining axes of A.</span>
+<span class="sd">        """</span>
+        <span class="n">R</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">matrices</span><span class="p">,</span> <span class="n">A</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">R</span> <span class="o">=</span> <span class="n">R</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">R</span><span class="p">),</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">cutoffs</span> <span class="o">=</span> <span class="n">tol</span> <span class="o">*</span> <span class="n">numpy</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">A</span><span class="p">)</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">*</span> <span class="n">numpy</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">matrices</span><span class="p">)</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">))[:,</span> <span class="kc">None</span><span class="p">]</span>
+        <span class="n">R</span> <span class="o">=</span> <span class="n">round_to_int</span><span class="p">(</span><span class="n">R</span><span class="p">,</span> <span class="n">cutoffs</span><span class="p">)</span>
+        <span class="n">nonzero</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">R</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">cutoffs</span>
+        <span class="n">R_gem</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="n">R</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">zero</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">object</span><span class="p">)</span>
+        <span class="n">R_gem</span><span class="p">[</span><span class="n">nonzero</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">R</span><span class="p">[</span><span class="n">nonzero</span><span class="p">]]</span>
+        <span class="k">return</span> <span class="n">sparse_matmul</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">coefficients</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:],</span> <span class="n">R_gem</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">A</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">:])</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="round_to_int">
+<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.round_to_int">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">round_to_int</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">tol</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Round the entries of x that lie within tol of an integer."""</span>
+    <span class="n">rounded</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">x</span> <span class="o">-</span> <span class="n">rounded</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">tol</span><span class="p">,</span> <span class="n">rounded</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="cartesian_pullbacks">
+<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.cartesian_pullbacks">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">cartesian_pullbacks</span><span class="p">(</span><span class="n">J</span><span class="p">,</span> <span class="n">adjJ</span><span class="p">,</span> <span class="n">detJ</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""The :class:`Pullback` of each mapping in Cartesian components."""</span>
+    <span class="n">sd</span> <span class="o">=</span> <span class="n">J</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">affine</span> <span class="o">=</span> <span class="n">LinearCombination</span><span class="p">([</span><span class="n">one</span><span class="p">],</span> <span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">sd</span><span class="p">)])</span>
+    <span class="n">contravariant</span> <span class="o">=</span> <span class="n">LinearCombination</span><span class="o">.</span><span class="n">from_matrix</span><span class="p">(</span><span class="n">J</span><span class="o">.</span><span class="n">T</span> <span class="o">/</span> <span class="n">detJ</span><span class="p">)</span>
+    <span class="n">contravariant_inverse</span> <span class="o">=</span> <span class="n">LinearCombination</span><span class="o">.</span><span class="n">from_matrix</span><span class="p">(</span><span class="n">adjJ</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
+    <span class="n">covariant</span> <span class="o">=</span> <span class="n">LinearCombination</span><span class="o">.</span><span class="n">from_matrix</span><span class="p">(</span><span class="n">adjJ</span> <span class="o">/</span> <span class="n">detJ</span><span class="p">)</span>
+    <span class="n">covariant_inverse</span> <span class="o">=</span> <span class="n">LinearCombination</span><span class="o">.</span><span class="n">from_matrix</span><span class="p">(</span><span class="n">J</span><span class="p">)</span>
+    <span class="c1"># The identity on a contravariant axis and a covariant axis pulls back</span>
+    <span class="c1"># as (J^T/detJ) K^T = I/detJ, so the pair scales its weights by 1/detJ.</span>
+    <span class="n">pairing</span> <span class="o">=</span> <span class="n">LinearCombination</span><span class="p">([</span><span class="n">one</span> <span class="o">/</span> <span class="n">detJ</span><span class="p">],</span> <span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">sd</span> <span class="o">*</span> <span class="n">sd</span><span class="p">)])</span>
+    <span class="n">pairing_inverse</span> <span class="o">=</span> <span class="n">LinearCombination</span><span class="p">([</span><span class="n">detJ</span><span class="p">],</span> <span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">sd</span> <span class="o">*</span> <span class="n">sd</span><span class="p">)])</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">"affine"</span><span class="p">:</span> <span class="n">Pullback</span><span class="p">(</span><span class="n">affine</span><span class="p">,</span> <span class="n">affine</span><span class="p">),</span>
+            <span class="s2">"contravariant piola"</span><span class="p">:</span> <span class="n">Pullback</span><span class="p">(</span><span class="n">contravariant</span><span class="p">,</span> <span class="n">contravariant_inverse</span><span class="p">),</span>
+            <span class="s2">"covariant piola"</span><span class="p">:</span> <span class="n">Pullback</span><span class="p">(</span><span class="n">covariant</span><span class="p">,</span> <span class="n">covariant_inverse</span><span class="p">),</span>
+            <span class="s2">"L2 piola"</span><span class="p">:</span> <span class="n">Pullback</span><span class="p">(</span><span class="n">pairing</span><span class="p">,</span> <span class="n">pairing_inverse</span><span class="p">)}</span></div>
+
+
+
+<div class="viewcode-block" id="frame_pullbacks">
+<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.frame_pullbacks">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">frame_pullbacks</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">frame</span><span class="p">,</span> <span class="n">metric</span><span class="p">,</span> <span class="n">adj_metric</span><span class="p">,</span> <span class="n">detJ</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""The :class:`Pullback` of each mapping in the frame of an entity.</span>
+
+<span class="sd">    :arg frame: The entity ``(dim, entity)``, a facet or an edge of a tetrahedron.</span>
+<span class="sd">    :arg metric: The metric :math:`J^TJ`.</span>
+<span class="sd">    :arg adj_metric: The adjugate of the metric.</span>
+<span class="sd">    :arg detJ: The determinant of the Jacobian.</span>
+<span class="sd">    """</span>
+    <span class="n">dim</span><span class="p">,</span> <span class="n">entity</span> <span class="o">=</span> <span class="n">frame</span>
+    <span class="n">sd</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">dim</span> <span class="o">==</span> <span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">pullbacks</span> <span class="o">=</span> <span class="n">facet_pullbacks</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span> <span class="n">metric</span><span class="p">,</span> <span class="n">adj_metric</span><span class="p">,</span> <span class="n">detJ</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">pullbacks</span> <span class="o">=</span> <span class="n">edge_pullbacks</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span> <span class="n">metric</span><span class="p">)</span>
+    <span class="n">affine</span> <span class="o">=</span> <span class="n">LinearCombination</span><span class="p">([</span><span class="n">one</span><span class="p">],</span> <span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">sd</span><span class="p">)])</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">"affine"</span><span class="p">:</span> <span class="n">Pullback</span><span class="p">(</span><span class="n">affine</span><span class="p">,</span> <span class="n">affine</span><span class="p">),</span> <span class="o">**</span><span class="n">pullbacks</span><span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="facet_pullbacks">
+<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.facet_pullbacks">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">facet_pullbacks</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">facet</span><span class="p">,</span> <span class="n">metric</span><span class="p">,</span> <span class="n">adj_metric</span><span class="p">,</span> <span class="n">detJ</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""The :class:`Pullback` of each Piola mapping in the frame of a facet.</span>
+
+<span class="sd">    The frame consists of the tangents of the facet and its scaled normal</span>
+<span class="sd">    :math:`\nu`.  The metric is :math:`G=J^TJ`.</span>
+<span class="sd">    """</span>
+    <span class="n">sd</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+    <span class="n">tangents</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">compute_tangents</span><span class="p">(</span><span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">facet</span><span class="p">)</span>
+    <span class="n">nu</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">compute_scaled_normal</span><span class="p">(</span><span class="n">facet</span><span class="p">)</span>
+    <span class="c1"># The physical normal is the cofactor normal x = adj(J)^T nu = J w, with</span>
+    <span class="c1"># w = adj(G) nu / detJ and |x|^2 = nu^T adj(G) nu.</span>
+    <span class="n">z</span> <span class="o">=</span> <span class="n">adj_metric</span> <span class="o">@</span> <span class="n">nu</span>
+    <span class="n">xx</span> <span class="o">=</span> <span class="n">z</span> <span class="o">@</span> <span class="n">nu</span>
+    <span class="n">covariant</span> <span class="o">=</span> <span class="n">covariant_frame_pullback</span><span class="p">(</span><span class="n">metric</span><span class="p">,</span> <span class="n">tangents</span><span class="p">,</span> <span class="p">[</span><span class="n">nu</span><span class="p">],</span> <span class="p">[</span><span class="n">z</span> <span class="o">/</span> <span class="n">detJ</span><span class="p">],</span> <span class="p">[</span><span class="n">xx</span><span class="o">**</span><span class="mf">0.5</span><span class="p">])</span>
+
+    <span class="c1"># Contravariant weights keep their normal component, and their</span>
+    <span class="c1"># tangential components map through the dual tangents of the facet.</span>
+    <span class="n">nn</span> <span class="o">=</span> <span class="n">nu</span> <span class="o">@</span> <span class="n">nu</span>
+    <span class="n">zt</span> <span class="o">=</span> <span class="p">[</span><span class="n">z</span> <span class="o">@</span> <span class="n">tau</span> <span class="k">for</span> <span class="n">tau</span> <span class="ow">in</span> <span class="n">tangents</span><span class="p">]</span>
+    <span class="n">dual_tangents</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">tangents</span> <span class="o">@</span> <span class="n">tangents</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">tangents</span><span class="p">)</span>
+    <span class="n">matrices</span> <span class="o">=</span> <span class="p">[</span><span class="n">facet_normal_projector</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">facet</span><span class="p">),</span> <span class="n">tangential_projector</span><span class="p">(</span><span class="n">tangents</span><span class="p">),</span>
+                <span class="o">*</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="n">nu</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">dual_tangents</span><span class="p">)]</span>
+    <span class="n">contravariant</span> <span class="o">=</span> <span class="n">LinearCombination</span><span class="p">([</span><span class="n">one</span><span class="p">,</span> <span class="n">xx</span> <span class="o">/</span> <span class="p">(</span><span class="n">detJ</span> <span class="o">*</span> <span class="n">nn</span><span class="p">),</span> <span class="o">*</span><span class="p">(</span><span class="o">-</span><span class="n">c</span> <span class="o">/</span> <span class="p">(</span><span class="n">detJ</span> <span class="o">*</span> <span class="n">nn</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">zt</span><span class="p">)],</span> <span class="n">matrices</span><span class="p">)</span>
+    <span class="n">contravariant_inverse</span> <span class="o">=</span> <span class="n">LinearCombination</span><span class="p">([</span><span class="n">one</span><span class="p">,</span> <span class="n">detJ</span> <span class="o">*</span> <span class="n">nn</span> <span class="o">/</span> <span class="n">xx</span><span class="p">,</span> <span class="o">*</span><span class="p">(</span><span class="n">c</span> <span class="o">/</span> <span class="n">xx</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">zt</span><span class="p">)],</span> <span class="n">matrices</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">"covariant piola"</span><span class="p">:</span> <span class="n">covariant</span><span class="p">,</span>
+            <span class="s2">"contravariant piola"</span><span class="p">:</span> <span class="n">Pullback</span><span class="p">(</span><span class="n">contravariant</span><span class="p">,</span> <span class="n">contravariant_inverse</span><span class="p">)}</span></div>
+
+
+
+<div class="viewcode-block" id="edge_pullbacks">
+<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.edge_pullbacks">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">edge_pullbacks</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">edge</span><span class="p">,</span> <span class="n">metric</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""The :class:`Pullback` of the covariant mapping in the frame of an edge of a tetrahedron.</span>
+
+<span class="sd">    The frame consists of the edge tangent :math:`t` and the normals</span>
+<span class="sd">    :math:`t \times \nu_i` to :math:`t` within the two facets that contain</span>
+<span class="sd">    the edge, with scaled normals :math:`\nu_i`.  The metric is :math:`G=J^TJ`.</span>
+<span class="sd">    """</span>
+    <span class="n">sd</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+    <span class="n">t</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">compute_edge_tangent</span><span class="p">(</span><span class="n">edge</span><span class="p">)</span>
+    <span class="n">nus</span> <span class="o">=</span> <span class="p">[</span><span class="n">cell</span><span class="o">.</span><span class="n">compute_scaled_normal</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">cell</span><span class="o">.</span><span class="n">get_connectivity</span><span class="p">()[(</span><span class="mi">1</span><span class="p">,</span> <span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)][</span><span class="n">edge</span><span class="p">]]</span>
+    <span class="c1"># The physical normal to the edge within facet i is J w_i, where w_i lies</span>
+    <span class="c1"># in the plane of the facet and J w_i is orthogonal to J t.</span>
+    <span class="n">Gt</span> <span class="o">=</span> <span class="n">metric</span> <span class="o">@</span> <span class="n">t</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span><span class="n">Gt</span><span class="p">,</span> <span class="n">nu</span><span class="p">)</span> <span class="k">for</span> <span class="n">nu</span> <span class="ow">in</span> <span class="n">nus</span><span class="p">]</span>
+    <span class="n">norms</span> <span class="o">=</span> <span class="p">[(</span><span class="n">wi</span> <span class="o">@</span> <span class="n">metric</span> <span class="o">@</span> <span class="n">wi</span><span class="p">)</span><span class="o">**</span><span class="mf">0.5</span> <span class="k">for</span> <span class="n">wi</span> <span class="ow">in</span> <span class="n">w</span><span class="p">]</span>
+    <span class="n">covariant</span> <span class="o">=</span> <span class="n">covariant_frame_pullback</span><span class="p">(</span><span class="n">metric</span><span class="p">,</span> <span class="n">t</span><span class="p">[</span><span class="kc">None</span><span class="p">],</span> <span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">nu</span><span class="p">)</span> <span class="k">for</span> <span class="n">nu</span> <span class="ow">in</span> <span class="n">nus</span><span class="p">],</span> <span class="n">w</span><span class="p">,</span> <span class="n">norms</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">"covariant piola"</span><span class="p">:</span> <span class="n">covariant</span><span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="covariant_frame_pullback">
+<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.covariant_frame_pullback">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">covariant_frame_pullback</span><span class="p">(</span><span class="n">metric</span><span class="p">,</span> <span class="n">tangents</span><span class="p">,</span> <span class="n">normals</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">norms</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""The :class:`Pullback` of the covariant mapping in the frame of an entity.</span>
+
+<span class="sd">    The frame :math:`F` consists of the tangents of the entity and its</span>
+<span class="sd">    normals :math:`n_i`.  Its pullback :math:`A` from the physical cell</span>
+<span class="sd">    consists of the same tangents and the pullbacks :math:`w_i|n_i|/|Jw_i|`</span>
+<span class="sd">    of the unit physical normals, scaled by :math:`|n_i|`.  Covariant</span>
+<span class="sd">    weights map by :math:`AF^{-1}`, and back by :math:`FA^{-1}`.</span>
+
+<span class="sd">    :arg metric: The metric :math:`G=J^TJ`.</span>
+<span class="sd">    :arg tangents: The tangents as rows.</span>
+<span class="sd">    :arg normals: The normals :math:`n_i`.</span>
+<span class="sd">    :arg w: The pullbacks :math:`w_i` of the physical normals, with</span>
+<span class="sd">        :math:`\tau^TGw_i = 0` for each tangent :math:`\tau`.</span>
+<span class="sd">    :arg norms: The lengths :math:`|Jw_i|` of the physical normals.</span>
+<span class="sd">    """</span>
+    <span class="n">normals</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">normals</span><span class="p">)</span>
+    <span class="n">lengths</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">normals</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="c1"># The columns of A for the normals</span>
+    <span class="n">A</span> <span class="o">=</span> <span class="p">[</span><span class="n">wi</span> <span class="o">*</span> <span class="p">(</span><span class="n">length</span> <span class="o">/</span> <span class="n">norm</span><span class="p">)</span> <span class="k">for</span> <span class="n">wi</span><span class="p">,</span> <span class="n">norm</span><span class="p">,</span> <span class="n">length</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">norms</span><span class="p">,</span> <span class="n">lengths</span><span class="p">)]</span>
+    <span class="c1"># The dual basis of the frame, as rows</span>
+    <span class="n">dual</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">inv</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">tangents</span><span class="p">,</span> <span class="n">normals</span><span class="p">])</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
+    <span class="n">tangents_dual</span><span class="p">,</span> <span class="n">normals_dual</span> <span class="o">=</span> <span class="n">dual</span><span class="p">[:</span><span class="nb">len</span><span class="p">(</span><span class="n">tangents</span><span class="p">)],</span> <span class="n">dual</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">tangents</span><span class="p">):]</span>
+    <span class="n">forward</span> <span class="o">=</span> <span class="n">reduce</span><span class="p">(</span><span class="n">add</span><span class="p">,</span> <span class="p">(</span><span class="n">LinearCombination</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">n_dual</span><span class="p">)</span> <span class="k">for</span> <span class="n">a</span><span class="p">,</span> <span class="n">n_dual</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">normals_dual</span><span class="p">)),</span>
+                     <span class="n">LinearCombination</span><span class="p">([</span><span class="n">one</span><span class="p">],</span> <span class="p">[</span><span class="n">tangents</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">tangents_dual</span><span class="p">]))</span>
+
+    <span class="c1"># The rows of A^{-1} for the tangents are (T G T^T)^{-1} T G, which vanish</span>
+    <span class="c1"># on the w_i.  The rows for the normals vanish on the tangents, so they</span>
+    <span class="c1"># combine the dual normals through the inverse of N_ij = n_i^* . A_j.</span>
+    <span class="n">GT</span> <span class="o">=</span> <span class="n">metric</span> <span class="o">@</span> <span class="n">tangents</span><span class="o">.</span><span class="n">T</span>
+    <span class="n">g</span> <span class="o">=</span> <span class="n">symmetric</span><span class="p">(</span><span class="n">GT</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">tangents</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
+    <span class="n">components</span> <span class="o">=</span> <span class="n">adjugate</span><span class="p">(</span><span class="n">g</span><span class="p">)</span> <span class="o">@</span> <span class="n">GT</span><span class="o">.</span><span class="n">T</span> <span class="o">/</span> <span class="n">determinant</span><span class="p">(</span><span class="n">g</span><span class="p">)</span>
+    <span class="n">N</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="n">n_dual</span> <span class="o">@</span> <span class="n">a</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">A</span><span class="p">]</span> <span class="k">for</span> <span class="n">n_dual</span> <span class="ow">in</span> <span class="n">normals_dual</span><span class="p">])</span>
+    <span class="n">inverse</span> <span class="o">=</span> <span class="n">reduce</span><span class="p">(</span><span class="n">add</span><span class="p">,</span> <span class="p">(</span><span class="n">LinearCombination</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="n">row</span><span class="p">,</span> <span class="n">tau</span><span class="p">)</span><span class="o">.</span><span class="n">T</span> <span class="k">for</span> <span class="n">tau</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">tangents</span><span class="p">,</span> <span class="n">components</span><span class="p">)),</span>
+                     <span class="n">LinearCombination</span><span class="p">((</span><span class="n">adjugate</span><span class="p">(</span><span class="n">N</span><span class="p">)</span> <span class="o">/</span> <span class="n">determinant</span><span class="p">(</span><span class="n">N</span><span class="p">))</span><span class="o">.</span><span class="n">ravel</span><span class="p">(),</span>
+                                       <span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">n_dual</span><span class="p">)</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">normals</span> <span class="k">for</span> <span class="n">n_dual</span> <span class="ow">in</span> <span class="n">normals_dual</span><span class="p">]))</span>
+    <span class="k">return</span> <span class="n">Pullback</span><span class="p">(</span><span class="n">forward</span><span class="p">,</span> <span class="n">inverse</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="facet_normal_projector">
+<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.facet_normal_projector">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">facet_normal_projector</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">facet</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""The projector onto the normal of a facet."""</span>
+    <span class="n">nu</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">compute_scaled_normal</span><span class="p">(</span><span class="n">facet</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="n">nu</span><span class="p">,</span> <span class="n">nu</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">nu</span> <span class="o">@</span> <span class="n">nu</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="tangential_projector">
+<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.tangential_projector">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">tangential_projector</span><span class="p">(</span><span class="n">tangents</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""The projector :math:`t^T\operatorname{adj}(g)\,t/\det g` onto the span of the tangents t.</span>
+
+<span class="sd">    :arg tangents: The tangents as rows, with the Gram matrix :math:`g=tt^T`.</span>
+<span class="sd">    """</span>
+    <span class="n">g</span> <span class="o">=</span> <span class="n">tangents</span> <span class="o">@</span> <span class="n">tangents</span><span class="o">.</span><span class="n">T</span>
+    <span class="k">return</span> <span class="n">tangents</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">adjugate</span><span class="p">(</span><span class="n">g</span><span class="p">)</span> <span class="o">@</span> <span class="n">tangents</span> <span class="o">/</span> <span class="n">determinant</span><span class="p">(</span><span class="n">g</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="in_range_of">
+<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.in_range_of">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">in_range_of</span><span class="p">(</span><span class="n">weights</span><span class="p">,</span> <span class="n">projector</span><span class="p">,</span> <span class="n">axes</span><span class="p">,</span> <span class="n">tol</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Whether the weights lie in the range of the projector acting on the given axes."""</span>
+    <span class="n">shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">weights</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">axes</span><span class="p">)</span>
+    <span class="n">complement</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">projector</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">-</span> <span class="n">projector</span>
+    <span class="n">residual</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">complement</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">shape</span> <span class="o">+</span> <span class="n">shape</span><span class="p">),</span> <span class="n">weights</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">axes</span><span class="p">),</span> <span class="mi">2</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">axes</span><span class="p">)),</span> <span class="n">axes</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">residual</span><span class="p">)</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">&lt;=</span> <span class="n">tol</span> <span class="o">*</span> <span class="n">numpy</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">weights</span><span class="p">)</span><span class="o">.</span><span class="n">max</span><span class="p">()</span></div>
 
 </pre></div>
 
@@ -425,7 +1117,7 @@
     </div>
     <div class="footer" role="contentinfo">
     &#169; Copyright 2026, Firedrake Project.
-      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.1.
     </div>
   </body>
 </html>

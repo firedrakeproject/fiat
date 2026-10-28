@@ -265,6 +265,26 @@
         <span class="n">formdegree</span> <span class="o">=</span> <span class="mi">1</span>  <span class="c1"># 1-form</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">formdegree</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="s2">"covariant piola"</span><span class="p">)</span></div>
 
+
+
+<div class="viewcode-block" id="contravariant_piola_dual">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.nedelec.contravariant_piola_dual">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">contravariant_piola_dual</span><span class="p">(</span><span class="n">J</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="n">avg</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""Map test functions so their moments commute with contravariant Piola.</span>
+
+<span class="sd">    With quadrature weights scaled by :math:`|\det J|`, the factor is</span>
+<span class="sd">    :math:`\operatorname{sign}(\det J)J^{-T}`. With averaged weights, the</span>
+<span class="sd">    factor is :math:`\det J J^{-T}`.</span>
+
+<span class="sd">    :arg J: Square Jacobian mapping reference to physical coordinates.</span>
+<span class="sd">    :arg values: Reference test functions, shaped ``(nbasis, dim, npoints)``.</span>
+<span class="sd">    :arg avg: Whether the quadrature weights omit the Jacobian measure.</span>
+<span class="sd">    """</span>
+    <span class="n">detJ</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">det</span><span class="p">(</span><span class="n">J</span><span class="p">)</span>
+    <span class="n">scale</span> <span class="o">=</span> <span class="n">detJ</span> <span class="k">if</span> <span class="n">avg</span> <span class="k">else</span> <span class="n">numpy</span><span class="o">.</span><span class="n">sign</span><span class="p">(</span><span class="n">detJ</span><span class="p">)</span>
+    <span class="n">transform</span> <span class="o">=</span> <span class="n">scale</span> <span class="o">*</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">inv</span><span class="p">(</span><span class="n">J</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>
+    <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s2">"ij,bjq-&gt;biq"</span><span class="p">,</span> <span class="n">transform</span><span class="p">,</span> <span class="n">values</span><span class="p">)</span></div>
+
 </pre></div>
 
             <div class="clearer"></div>
@@ -303,7 +323,7 @@
     </div>
     <div class="footer" role="contentinfo">
     &#169; Copyright 2026, Firedrake Project.
-      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.1.
     </div>
   </body>
 </html>

@@ -37,12 +37,10 @@
             
   <h1>Source code for finat.powell_sabin</h1><div class="highlight"><pre>
 <span></span><span class="kn">import</span><span class="w"> </span><span class="nn">FIAT</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">gem</span><span class="w"> </span><span class="kn">import</span> <span class="n">ListTensor</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">finat.argyris</span><span class="w"> </span><span class="kn">import</span> <span class="n">_edge_transform</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">finat.citations</span><span class="w"> </span><span class="kn">import</span> <span class="n">cite</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">finat.fiat_elements</span><span class="w"> </span><span class="kn">import</span> <span class="n">ScalarFiatElement</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">finat.physically_mapped</span><span class="w"> </span><span class="kn">import</span> <span class="n">identity</span><span class="p">,</span> <span class="n">PhysicallyMappedElement</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">finat.physically_mapped</span><span class="w"> </span><span class="kn">import</span> <span class="n">PhysicallyMappedElement</span>
 
 
 <div class="viewcode-block" id="QuadraticPowellSabin6">
@@ -50,30 +48,7 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">QuadraticPowellSabin6</span><span class="p">(</span><span class="n">PhysicallyMappedElement</span><span class="p">,</span> <span class="n">ScalarFiatElement</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
         <span class="n">cite</span><span class="p">(</span><span class="s2">"PowellSabin1977"</span><span class="p">)</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">QuadraticPowellSabin6</span><span class="p">(</span><span class="n">cell</span><span class="p">))</span>
-
-<div class="viewcode-block" id="QuadraticPowellSabin6.basis_transformation">
-<a class="viewcode-back" href="../../finat.html#finat.powell_sabin.QuadraticPowellSabin6.basis_transformation">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">basis_transformation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="p">):</span>
-        <span class="n">Js</span> <span class="o">=</span> <span class="p">[</span><span class="n">coordinate_mapping</span><span class="o">.</span><span class="n">jacobian_at</span><span class="p">(</span><span class="n">vertex</span><span class="p">)</span>
-              <span class="k">for</span> <span class="n">vertex</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">()]</span>
-
-        <span class="n">h</span> <span class="o">=</span> <span class="n">coordinate_mapping</span><span class="o">.</span><span class="n">cell_size</span><span class="p">()</span>
-
-        <span class="n">d</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">()</span>
-        <span class="n">M</span> <span class="o">=</span> <span class="n">identity</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">())</span>
-
-        <span class="n">cur</span> <span class="o">=</span> <span class="mi">0</span>
-        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">d</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
-            <span class="n">cur</span> <span class="o">+=</span> <span class="mi">1</span>  <span class="c1"># skip the vertex</span>
-            <span class="n">J</span> <span class="o">=</span> <span class="n">Js</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
-            <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">d</span><span class="p">):</span>
-                <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">d</span><span class="p">):</span>
-                    <span class="n">M</span><span class="p">[</span><span class="n">cur</span><span class="o">+</span><span class="n">j</span><span class="p">,</span> <span class="n">cur</span><span class="o">+</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">J</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="n">k</span><span class="p">]</span> <span class="o">/</span> <span class="n">h</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
-            <span class="n">cur</span> <span class="o">+=</span> <span class="n">d</span>
-
-        <span class="k">return</span> <span class="n">ListTensor</span><span class="p">(</span><span class="n">M</span><span class="p">)</span></div>
-</div>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">QuadraticPowellSabin6</span><span class="p">(</span><span class="n">cell</span><span class="p">))</span></div>
 
 
 
@@ -83,33 +58,7 @@
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">avg</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">avg</span> <span class="o">=</span> <span class="n">avg</span>
         <span class="n">cite</span><span class="p">(</span><span class="s2">"PowellSabin1977"</span><span class="p">)</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">QuadraticPowellSabin12</span><span class="p">(</span><span class="n">cell</span><span class="p">))</span>
-
-<div class="viewcode-block" id="QuadraticPowellSabin12.basis_transformation">
-<a class="viewcode-back" href="../../finat.html#finat.powell_sabin.QuadraticPowellSabin12.basis_transformation">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">basis_transformation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="p">):</span>
-        <span class="n">J</span> <span class="o">=</span> <span class="n">coordinate_mapping</span><span class="o">.</span><span class="n">jacobian_at</span><span class="p">([</span><span class="mi">1</span><span class="o">/</span><span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="o">/</span><span class="mi">3</span><span class="p">])</span>
-
-        <span class="n">V</span> <span class="o">=</span> <span class="n">identity</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">())</span>
-
-        <span class="n">sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">()</span>
-        <span class="n">top</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
-        <span class="n">voffset</span> <span class="o">=</span> <span class="n">sd</span> <span class="o">+</span> <span class="mi">1</span>
-        <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
-            <span class="n">s</span> <span class="o">=</span> <span class="n">voffset</span> <span class="o">*</span> <span class="n">v</span>
-            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">):</span>
-                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">):</span>
-                    <span class="n">V</span><span class="p">[</span><span class="n">s</span><span class="o">+</span><span class="mi">1</span><span class="o">+</span><span class="n">i</span><span class="p">,</span> <span class="n">s</span><span class="o">+</span><span class="mi">1</span><span class="o">+</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">J</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span>
-
-        <span class="n">_edge_transform</span><span class="p">(</span><span class="n">V</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="p">,</span> <span class="n">avg</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">avg</span><span class="p">)</span>
-
-        <span class="c1"># Patch up conditioning</span>
-        <span class="n">h</span> <span class="o">=</span> <span class="n">coordinate_mapping</span><span class="o">.</span><span class="n">cell_size</span><span class="p">()</span>
-        <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
-            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">):</span>
-                <span class="n">V</span><span class="p">[:,</span> <span class="n">voffset</span><span class="o">*</span><span class="n">v</span><span class="o">+</span><span class="mi">1</span><span class="o">+</span><span class="n">k</span><span class="p">]</span> <span class="o">/=</span> <span class="n">h</span><span class="p">[</span><span class="n">v</span><span class="p">]</span>
-        <span class="k">return</span> <span class="n">ListTensor</span><span class="p">(</span><span class="n">V</span><span class="o">.</span><span class="n">T</span><span class="p">)</span></div>
-</div>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">QuadraticPowellSabin12</span><span class="p">(</span><span class="n">cell</span><span class="p">))</span></div>
 
 </pre></div>
 
@@ -149,7 +98,7 @@
     </div>
     <div class="footer" role="contentinfo">
     &#169; Copyright 2026, Firedrake Project.
-      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.1.
     </div>
   </body>
 </html>
