@@ -1311,8 +1311,11 @@ def componentwise(op, *exprs):
     Each expression must either have the same shape, or else be
     scalar. Shaped expressions are indexed, the op is applied to the
     scalar expressions and the result is wrapped up in a ComponentTensor.
+    If every expression is scalar, the op is applied to them directly.
 
     """
+    if not any(e.shape for e in exprs):
+        return op(*exprs)
     shapes = set(e.shape for e in exprs)
     if len(shapes - {()}) > 1:
         raise ValueError("expressions must have matching shape (or else be scalar)")
