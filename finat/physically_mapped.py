@@ -39,12 +39,12 @@ class MappedTabulation(Mapping):
     """A lazy tabulation dict that applies the basis transformation only
     on the requested derivatives.
 
-    :arg matvec: a callable that applies the basis transformation to a
+    :arg transform: a callable that applies the basis transformation to a
         reference tabulation, with the basis functions as the first axis.
     :arg ref_tabulation: a dict of tabulations on the reference cell.
     """
-    def __init__(self, matvec, ref_tabulation):
-        self.matvec = matvec
+    def __init__(self, transform, ref_tabulation):
+        self.transform = transform
         self.ref_tabulation = ref_tabulation
         self._tabulation_cache = {}
 
@@ -52,7 +52,7 @@ class MappedTabulation(Mapping):
         try:
             return self._tabulation_cache[alpha]
         except KeyError:
-            result = self.matvec(self.ref_tabulation[alpha])
+            result = self.transform(self.ref_tabulation[alpha])
             return self._tabulation_cache.setdefault(alpha, result)
 
     def __iter__(self):
@@ -303,23 +303,26 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         """
         B = self._vandermonde_matrix(coordinate_mapping).array()
         indices = self._physical_indices
-        B = gem.ListTensor(B[numpy.ix_(indices, indices)])
-        return sparse_matvec(B, Q)
+        return sparse_dense_matmul(B[numpy.ix_(indices, indices)], Q)
 
     def map_tabulation(self, ref_tabulation, coordinate_mapping):
         assert coordinate_mapping is not None
         B = self._vandermonde_matrix(coordinate_mapping)
-        return MappedTabulation(partial(self._physical_tabulation, B), ref_tabulation)
+        transform = partial(self.apply_transform, B.transpose_solve)
+        return MappedTabulation(transform, ref_tabulation)
 
-    def _physical_tabulation(self, B, table):
-        r"""The physical tabulation :math:`B^{-T}\phi` on the exposed dofs.
+    def apply_transform(self, transform, table):
+        r"""Apply a transformation of the reference basis to a tabulation, on the exposed dofs.
 
-        :arg B: The :class:`VandermondeMatrix`.
+        :arg transform: A callable that maps a list of GEM scalars, one for
+            each reference basis function, to an object array of GEM scalars,
+            one for each reference dof, such as :meth:`VandermondeMatrix.transpose_solve`.
         :arg table: A reference tabulation with the basis functions as the first axis.
+        :returns: A GEM tensor with the exposed dofs as the first axis.
         """
         ii = gem.indices(len(table.shape)-1)
         phi = [gem.Indexed(table, (j, *ii)) for j in range(table.shape[0])]
-        chi = B.transpose_solve(phi)
+        chi = transform(phi)
         exprs = [gem.ComponentTensor(chi[i], ii) for i in self._physical_indices]
         result, = gem.optimise.unroll_indexsum((gem.ListTensor(exprs),), lambda index: True)
         return result
@@ -335,8 +338,10 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         These are the dofs of :meth:`entity_dofs`, which omits the
         constraint nodes that only complete the transformation.
         """
-        return sorted(i for entities in self.entity_dofs().values()
-                      for dofs in entities.values() for i in dofs)
+        entity_dofs = self.entity_dofs()
+        return sorted(chain.from_iterable(entity_dofs[dim][entity]
+                                          for dim in entity_dofs
+                                          for entity in entity_dofs[dim]))
 
     @cached_property
     def _physical_dual_set(self):
@@ -606,7 +611,7 @@ class VandermondeMatrix:
         point.
 
         :arg phi: The GEM scalars :math:`\phi`, one for each reference dof.
-        :returns: A list of GEM scalars, one for each reference dof.
+        :returns: An object array of GEM scalars, one for each reference dof.
         """
         C = self.dual.coeffs
         if C is not None:
@@ -614,8 +619,8 @@ class VandermondeMatrix:
             phi = sparse_vecmat(phi, literal_array(C))
 
         entity_ids = self.dual.entity_ids
-        chi = [None] * len(phi)
-        rhs = [None] * len(phi)
+        chi = numpy.empty(len(phi), dtype=object)
+        rhs = numpy.empty(len(phi), dtype=object)
         for dim in sorted(entity_ids, reverse=True):
             for entity, dofs in entity_ids[dim].items():
                 if not dofs:
@@ -725,18 +730,6 @@ class PhysicalGeometry(metaclass=ABCMeta):
                 (gdim, )."""
 
 
-def sparse_matvec(M, table):
-    """The product of a gem.ListTensor M, with O(1) nonzeros per row, and a table."""
-    ii = gem.indices(len(table.shape)-1)
-    phi = [gem.Indexed(table, (j, *ii)) for j in range(M.shape[1])]
-    # the sum approach is faster than calling numpy.dot or gem.IndexSum
-    exprs = [gem.ComponentTensor(gem.Sum(*(M.array[i, j] * phi[j] for j in range(M.shape[1])
-                                           if not isinstance(M.array[i, j], gem.Zero))), ii)
-             for i in range(M.shape[0])]
-    result, = gem.optimise.unroll_indexsum((gem.ListTensor(exprs),), lambda index: True)
-    return result
-
-
 def determinant(A):
     """Returns the determinant of A"""
     n = A.shape[0]
@@ -826,7 +819,10 @@ def literal_array(A):
 
 
 def sparse_matmul(A, B):
-    """The product of matrices of GEM scalars, which skips the zero entries."""
+    """The product :math:`AB` of matrices of GEM scalars, which skips the zero entries.
+
+    :returns: An object array of GEM scalars.
+    """
     columns = [[j for j, b in enumerate(row) if not isinstance(b, gem.Zero)] for row in B]
     C = numpy.full((A.shape[0], B.shape[1]), zero, dtype=object)
     for i, k in numpy.ndindex(A.shape):
@@ -836,23 +832,36 @@ def sparse_matmul(A, B):
     return C
 
 
-def count_nonzeros(A):
-    """The number of entries of an object array of GEM scalars that are not GEM zeros."""
-    return sum(not isinstance(a, gem.Zero) for a in A.flat)
-
-
 def sparse_vecmat(x, A):
     """The product :math:`x^TA` of a vector and a matrix of GEM scalars, which skips the zero entries.
 
-    :returns: A list of GEM scalars, one for each column of A.
+    :returns: An object array of GEM scalars, one for each column of A.
     """
-    y = [zero] * A.shape[1]
-    for xi, row in zip(x, A):
-        if not isinstance(xi, gem.Zero):
-            for j, entry in enumerate(row):
-                if not isinstance(entry, gem.Zero):
-                    y[j] = gem.Sum(y[j], gem.Product(entry, xi))
+    y = numpy.full(A.shape[1], zero, dtype=object)
+    for i, j in numpy.ndindex(A.shape):
+        if not isinstance(x[i], gem.Zero) and not isinstance(A[i, j], gem.Zero):
+            y[j] = gem.Sum(y[j], gem.Product(A[i, j], x[i]))
     return y
+
+
+def sparse_dense_matmul(A, table):
+    """The product of a matrix of GEM scalars and a GEM tensor, which skips the zero entries.
+
+    :arg A: An object array of GEM scalars.
+    :arg table: A GEM tensor with the columns of A as its first axis.
+    :returns: A GEM tensor with the rows of A as its first axis.
+    """
+    ii = gem.indices(len(table.shape)-1)
+    phi = [gem.Indexed(table, (j, *ii)) for j in range(A.shape[1])]
+    # the sum approach is faster than calling numpy.dot or gem.IndexSum
+    exprs = [gem.ComponentTensor(y, ii) for y in sparse_vecmat(phi, A.T)]
+    result, = gem.optimise.unroll_indexsum((gem.ListTensor(exprs),), lambda index: True)
+    return result
+
+
+def count_nonzeros(A):
+    """The number of entries of an object array of GEM scalars that are not GEM zeros."""
+    return sum(not isinstance(a, gem.Zero) for a in A.flat)
 
 
 class LinearCombination:
