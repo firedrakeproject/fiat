@@ -301,35 +301,42 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
             as GEM expressions.
         :returns: The physical dual evaluation gem weight tensor.
         """
-        B = self._vandermonde_matrix(coordinate_mapping).array()
-        indices = self._physical_indices
-        return sparse_dense_matmul(B[numpy.ix_(indices, indices)], Q)
-
-    def map_tabulation(self, ref_tabulation, coordinate_mapping):
-        assert coordinate_mapping is not None
         B = self._vandermonde_matrix(coordinate_mapping)
-        transform = partial(self.apply_transform, B.transpose_solve)
-        return MappedTabulation(transform, ref_tabulation)
+        indices = self._physical_indices
+        Bmat = B.array()[numpy.ix_(indices, indices)]
+        return sparse_dense_matmul(Bmat, Q)
 
-    def apply_transform(self, transform, table):
-        r"""Apply a transformation of the reference basis to a tabulation, on the exposed dofs.
+    def apply_transform(self, B, table):
+        r"""Apply :math:`M=B^{-T}` to a reference tabulation, on the exposed dofs.
 
-        :arg transform: A callable that maps a list of GEM scalars, one for
-            each reference basis function, to an object array of GEM scalars,
-            one for each reference dof, such as :meth:`VandermondeMatrix.transpose_solve`.
+        :arg B: The :class:`VandermondeMatrix`.
         :arg table: A reference tabulation with the basis functions as the first axis.
         :returns: A GEM tensor with the exposed dofs as the first axis.
         """
         ii = gem.indices(len(table.shape)-1)
         phi = [gem.Indexed(table, (j, *ii)) for j in range(table.shape[0])]
-        chi = transform(phi)
+        chi = B.transpose_solve(phi)
         exprs = [gem.ComponentTensor(chi[i], ii) for i in self._physical_indices]
         result, = gem.optimise.unroll_indexsum((gem.ListTensor(exprs),), lambda index: True)
         return result
 
     def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
-        result = super().basis_evaluation(order, ps, entity=entity)
-        return self.map_tabulation(result, coordinate_mapping)
+        r"""Return code for evaluating the physical basis at known points on the reference element.
+
+        The reference tabulation is transformed by :math:`M=B^{-T}` one
+        derivative at a time, when it is requested.
+
+        :arg order: return derivatives up to this order.
+        :arg ps: the point set object.
+        :arg entity: the cell entity on which to tabulate.
+        :arg coordinate_mapping: a :class:`PhysicalGeometry` object that
+            provides the physical geometry callbacks.
+        :returns: A :class:`MappedTabulation`, a dict from each derivative
+            multiindex to a GEM tensor with the exposed dofs as the first axis.
+        """
+        ref_tabulation = super().basis_evaluation(order, ps, entity=entity)
+        B = self._vandermonde_matrix(coordinate_mapping)
+        return MappedTabulation(partial(self.apply_transform, B), ref_tabulation)
 
     @cached_property
     def _physical_indices(self):
@@ -339,9 +346,8 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         constraint nodes that only complete the transformation.
         """
         entity_dofs = self.entity_dofs()
-        return sorted(chain.from_iterable(entity_dofs[dim][entity]
-                                          for dim in entity_dofs
-                                          for entity in entity_dofs[dim]))
+        return sorted(i for dim in entity_dofs for entity in entity_dofs[dim]
+                      for i in entity_dofs[dim][entity])
 
     @cached_property
     def _physical_dual_set(self):
@@ -355,6 +361,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
 
     def _vandermonde_matrix(self, coordinate_mapping):
         """The :class:`VandermondeMatrix` on the physical cell."""
+        assert coordinate_mapping is not None
         return VandermondeMatrix(self._physical_dual_set, self._reference_tabulation, coordinate_mapping)
 
 
@@ -372,26 +379,32 @@ class PhysicallyMappedDualSet:
     def __init__(self, dual, mappings, avg, tol):
         cell = dual.get_reference_element()
         nodes = dual.get_nodes()
+        entity_ids = dual.get_entity_ids()
         functionals = [None] * len(nodes)
-        for dim, entities in dual.get_entity_ids().items():
-            for entity, dofs in entities.items():
-                for i in dofs:
+        for dim in entity_ids:
+            for entity in entity_ids[dim]:
+                for i in entity_ids[dim][entity]:
                     functionals[i] = PhysicallyMappedFunctional(nodes[i], cell, dim, entity,
                                                                 mappings[i], avg, tol)
         self.cell = cell
         self.tol = tol
         self.functionals = tuple(functionals)
         self.coeffs = dual.get_coeffs()
-        self.entity_ids = dual.get_entity_ids()
+        self.entity_ids = entity_ids
         self.entity_closure_ids = dual.get_entity_closure_ids()
 
     @cached_property
     def groups(self):
-        """A dict from each entity ``(dim, entity)`` and :attr:`~PhysicallyMappedFunctional.pullback_key` to its nodes."""
-        groups = defaultdict(list)
-        for i, functional in enumerate(self.functionals):
-            groups[functional.dim, functional.entity, functional.pullback_key].append(i)
-        return dict(groups)
+        """A dict mapping each dimension and entity to a dict mapping each :attr:`~PhysicallyMappedFunctional.pullback_key` to its nodes on the entity."""
+        groups = {}
+        for dim in self.entity_ids:
+            groups[dim] = {}
+            for entity in self.entity_ids[dim]:
+                nodes = defaultdict(list)
+                for i in self.entity_ids[dim][entity]:
+                    nodes[self.functionals[i].pullback_key].append(i)
+                groups[dim][entity] = dict(nodes)
+        return groups
 
     def tabulate(self, poly_set):
         r"""The tabulation of a nodal basis at the points of the nodes.
@@ -480,9 +493,9 @@ class VandermondeMatrix:
     are :math:`\sum_t g_tR_t`, with the same GEM scalars :math:`g_t` from the
     geometry, and constant matrices :math:`R_t` from the reference cell, see
     :class:`RowGroup`.  The blocks of the back-substitution in
-    :meth:`transpose_solve` are expanded one time from the
-    :meth:`~LinearCombination.collect_terms`, in :attr:`couplings` and in the
-    inverses of the :class:`RowGroup` objects.  Their entries do not depend
+    :meth:`transpose_solve`, :attr:`off_diagonal_blocks` and
+    :attr:`inverses`, are expanded one time from the
+    :meth:`~LinearCombination.collect_terms`.  Their entries do not depend
     on the points of a tabulation, so the back-substitution multiplies each
     entry with a tabulated value.
 
@@ -491,99 +504,110 @@ class VandermondeMatrix:
         reference basis.
     :arg coordinate_mapping: Object providing the physical geometry
         as GEM expressions.
-    :raises NotImplementedError: If a row couples to a dof outside the
-        closure of the entity of the node.
     """
 
     def __init__(self, dual, tabulation, coordinate_mapping):
+        self.dual = dual
+        self.tabulation = tabulation
+        self.coordinate_mapping = coordinate_mapping
+
+    @cached_property
+    def groups(self):
+        """A dict mapping each dimension and entity to the :class:`RowGroup` objects of the entity.
+
+        :raises NotImplementedError: If a row couples to a dof outside the
+            closure of the entity of the node.
+        """
+        dual = self.dual
         sd = dual.cell.get_spatial_dimension()
         bary, = dual.cell.make_points(sd, 0, sd + 1)
         if sd == 1:
             # The signed determinant carries the orientation of the tangent.
-            J = gem.ListTensor([[coordinate_mapping.detJ_at(bary)]])
+            J = gem.ListTensor([[self.coordinate_mapping.detJ_at(bary)]])
         else:
-            J = coordinate_mapping.jacobian_at(bary)
+            J = self.coordinate_mapping.jacobian_at(bary)
         J = numpy.array([[J[i, k] for k in range(J.shape[1])] for i in range(J.shape[0])], dtype=object)
         adjJ, detJ = adjugate_and_determinant(J)
         metric, adj_metric = metric_and_adjugate(J)
-        h = coordinate_mapping.cell_size()
+        h = self.coordinate_mapping.cell_size()
 
         columns = list(range(len(dual.functionals)))
         pullbacks = {}
-        groups = defaultdict(list)
-        for (dim, entity, key), nodes in dual.groups.items():
-            # Assemble the rows by applying the pulled-back nodes to the reference basis
-            if key not in pullbacks:
-                pullbacks[key] = dual.functionals[nodes[0]].pullback(J, adjJ, detJ, metric, adj_metric)
-            pullback = pullbacks[key]
-            entries = dual.to_riesz(nodes, pullback.forward, tabulation, columns)
+        groups = {}
+        for dim in dual.groups:
+            groups[dim] = {}
+            for entity in dual.groups[dim]:
+                diag = dual.entity_ids[dim][entity]
+                closure = dual.entity_closure_ids[dim][entity]
+                groups[dim][entity] = []
+                for key, nodes in dual.groups[dim][entity].items():
+                    # Assemble the rows by applying the pulled-back nodes to the reference basis
+                    if key not in pullbacks:
+                        pullbacks[key] = dual.functionals[nodes[0]].pullback(J, adjJ, detJ, metric, adj_metric)
+                    pullback = pullbacks[key]
+                    entries = dual.to_riesz(nodes, pullback.forward, self.tabulation, columns)
 
-            # The rows may only couple to the dofs in the closure of their entity
-            closure = dual.entity_closure_ids[dim][entity]
-            outside = [j for j in numpy.flatnonzero(entries.matrices.any(axis=(0, 1))) if j not in closure]
-            if outside:
-                raise NotImplementedError(f"The pullback of dofs {nodes} on entity {(dim, entity)} "
-                                          f"needs dofs {outside} outside its closure, so it is not local to the entity.")
+                    # The rows may only couple to the dofs in the closure of their entity
+                    outside = [j for j in numpy.flatnonzero(entries.matrices.any(axis=(0, 1))) if j not in closure]
+                    if outside:
+                        raise NotImplementedError(f"The pullback of dofs {nodes} on entity {(dim, entity)} needs dofs "
+                                                  f"{outside} outside its closure, so it is not local to the entity.")
 
-            block = dual.entity_ids[dim][entity]
-            inverse = dual.to_riesz(nodes, pullback.inverse, tabulation, block).collect_terms().expand()
-            scales = [dual.functionals[i].scaling(h) for i in nodes]
-            groups[dim, entity].append(RowGroup(nodes, entries, inverse, scales))
+                    inverse = dual.to_riesz(nodes, pullback.inverse, self.tabulation, diag).collect_terms().expand()
+                    scales = [dual.functionals[i].scaling(h) for i in nodes]
+                    groups[dim][entity].append(RowGroup(nodes, entries, inverse, scales))
+        return groups
 
-        # The inverse of the diagonal block of B on each entity, with
-        # B_ee^{-1} = B0_ee^{-1} S_e^{-1}
-        scale = {i: s for row_groups in groups.values() for group in row_groups
-                 for i, s in zip(group.nodes, group.scales)}
+    @cached_property
+    def inverses(self):
+        r"""A dict mapping each dimension and entity e to the inverse :math:`B_{ee}^{-1}` of its diagonal block.
+
+        With :math:`B=SB_0`, :math:`B_{ee}^{-1}=(B_0)_{ee}^{-1}S_e^{-1}`.
+        Each is an object array of GEM scalars.
+        """
         inverses = {}
-        for (dim, entity), row_groups in groups.items():
-            block = dual.entity_ids[dim][entity]
-            inverse = numpy.full((len(block), len(block)), zero, dtype=object)
-            for group in row_groups:
-                inverse[[block.index(i) for i in group.nodes]] = group.inverse
-            reciprocals = [one if scale[j] == one else gem.Division(one, scale[j]) for j in block]
-            inverses[dim, entity] = inverse * numpy.array(reciprocals, dtype=object)
+        for dim in self.groups:
+            inverses[dim] = {}
+            for entity in self.groups[dim]:
+                diag = self.dual.entity_ids[dim][entity]
+                inverse = numpy.full((len(diag), len(diag)), zero, dtype=object)
+                reciprocals = numpy.full(len(diag), one, dtype=object)
+                for group in self.groups[dim][entity]:
+                    rows = [diag.index(i) for i in group.nodes]
+                    inverse[rows] = group.inverse
+                    reciprocals[rows] = [one if s == one else gem.Division(one, s) for s in group.scales]
+                inverses[dim][entity] = inverse * reciprocals
+        return inverses
 
-        # The negated rows of B outside each diagonal block, on the entity
-        # blocks of the support of the rows.  Since chi_f = rhs_f B_ff^{-1},
-        # a coupling multiplies rhs_f by B_ff^{-1} B_fe instead of chi_f by
-        # B_fe if that has no more nonzeros.
-        owners = {j: (dim, entity) for dim, entities in dual.entity_ids.items()
-                  for entity, dofs in entities.items() for j in dofs}
-        couplings = defaultdict(list)
-        for (dim, entity), row_groups in groups.items():
-            block = dual.entity_ids[dim][entity]
-            for group in row_groups:
-                support = {owners[j] for j in numpy.flatnonzero(group.entries.matrices.any(axis=(0, 1)))}
-                support.discard((dim, entity))
-                for other_dim, other_entity in sorted(support):
-                    R = group.entries.matrices[:, :, dual.entity_ids[other_dim][other_entity]]
-                    coupling = LinearCombination(group.entries.coefficients, -R).collect_terms().expand()
-                    coupling = coupling * numpy.array(group.scales, dtype=object)[:, None]
-                    composed = sparse_matmul(inverses[dim, entity][:, [block.index(i) for i in group.nodes]], coupling)
-                    if count_nonzeros(composed) <= count_nonzeros(coupling):
-                        couplings[other_dim, other_entity].append((block, composed, True))
-                    else:
-                        couplings[other_dim, other_entity].append((group.nodes, coupling, False))
-        self.dual = dual
-        #: A dict from each entity to its :class:`RowGroup` objects.
-        self.groups = dict(groups)
-        #: A dict from each entity to the inverse of the diagonal block of
-        #: :math:`B` on its dofs, as an object array of GEM scalars.
-        self.inverses = inverses
-        #: A dict from each entity e to the triples of dofs of another entity
-        #: f, a matrix of GEM scalars from those dofs to the dofs of e, and
-        #: whether it acts on the right-hand side :math:`\phi_f - \sum
-        #: B_{gf}^T\chi_g` of f, as :math:`-B_{ff}^{-1}B_{fe}`, or else on
-        #: :math:`\chi_f`, as :math:`-B_{fe}`.
-        self.couplings = dict(couplings)
+    @cached_property
+    def off_diagonal_blocks(self):
+        r"""A dict mapping each dimension and entity e to its off-diagonal block :math:`-B_{ec}`.
+
+        Here c is the rest of the closure of e, the only dofs that the rows
+        of e couple to.  Each is an object array of GEM scalars.
+        """
+        blocks = {}
+        for dim in self.groups:
+            blocks[dim] = {}
+            for entity in self.groups[dim]:
+                diag = self.dual.entity_ids[dim][entity]
+                offdiag = [j for j in self.dual.entity_closure_ids[dim][entity] if j not in diag]
+                block = numpy.full((len(diag), len(offdiag)), zero, dtype=object)
+                for group in self.groups[dim][entity]:
+                    R = group.entries.matrices[:, :, offdiag]
+                    entries = LinearCombination(group.entries.coefficients, -R).collect_terms().expand()
+                    block[[diag.index(i) for i in group.nodes]] = entries * numpy.array(group.scales, dtype=object)[:, None]
+                blocks[dim][entity] = block
+        return blocks
 
     def array(self):
         """The physical Vandermonde matrix :math:`B` over all reference dofs, as an object array of GEM scalars."""
         n = len(self.dual.functionals)
         B = numpy.full((n, n), zero, dtype=object)
-        for groups in self.groups.values():
-            for group in groups:
-                B[group.nodes] = group.entries.expand() * numpy.array(group.scales, dtype=object)[:, None]
+        for dim in self.groups:
+            for entity in self.groups[dim]:
+                for group in self.groups[dim][entity]:
+                    B[group.nodes] = group.entries.expand() * numpy.array(group.scales, dtype=object)[:, None]
         C = self.dual.coeffs
         if C is None:
             return B
@@ -604,8 +628,10 @@ class VandermondeMatrix:
         Back-substitute :math:`B^T\chi=\phi` over the entity blocks in
         decreasing dimension,
         :math:`\chi_e = B_{ee}^{-T}(\phi_e - \sum_f B_{fe}^T\chi_f)` over the
-        entities f whose closure contains e, using only the nonzero entries
-        of :math:`B` and of the inverses of its diagonal blocks.  With
+        entities f whose closure contains e.  Once :math:`\chi_e` is known,
+        it is subtracted from the right-hand sides of the rest of the
+        closure of e, using only the nonzero entries of :math:`B` and of the
+        inverses of its diagonal blocks.  With
         :math:`B=SB_0`, these blocks carry the scaling :math:`S`, so it
         multiplies entries once per cell instead of :math:`\chi` at each
         point.
@@ -619,21 +645,15 @@ class VandermondeMatrix:
             phi = sparse_vecmat(phi, literal_array(C))
 
         entity_ids = self.dual.entity_ids
+        closure_ids = self.dual.entity_closure_ids
+        rhs = numpy.array(phi, dtype=object)
         chi = numpy.empty(len(phi), dtype=object)
-        rhs = numpy.empty(len(phi), dtype=object)
         for dim in sorted(entity_ids, reverse=True):
-            for entity, dofs in entity_ids[dim].items():
-                if not dofs:
-                    continue
-                rhs_block = [phi[j] for j in dofs]
-                for nodes, coupling, on_rhs in self.couplings.get((dim, entity), []):
-                    y = sparse_vecmat([(rhs if on_rhs else chi)[i] for i in nodes], coupling)
-                    rhs_block = [gem.Sum(a, b) for a, b in zip(rhs_block, y)]
-
-                chi_block = sparse_vecmat(rhs_block, self.inverses[dim, entity])
-                for j, r, value in zip(dofs, rhs_block, chi_block):
-                    rhs[j] = r
-                    chi[j] = value
+            for entity in entity_ids[dim]:
+                diag = entity_ids[dim][entity]
+                offdiag = [j for j in closure_ids[dim][entity] if j not in diag]
+                chi[diag] = sparse_vecmat(rhs[diag], self.inverses[dim][entity])
+                rhs[offdiag] += sparse_vecmat(chi[diag], self.off_diagonal_blocks[dim][entity])
 
         if C is not None:
             chi = sparse_vecmat(chi, literal_array(numpy.linalg.inv(C)))
@@ -828,7 +848,7 @@ def sparse_matmul(A, B):
     for i, k in numpy.ndindex(A.shape):
         if not isinstance(A[i, k], gem.Zero):
             for j in columns[k]:
-                C[i, j] = gem.Sum(C[i, j], gem.Product(A[i, k], B[k, j]))
+                C[i, j] += A[i, k] * B[k, j]
     return C
 
 
@@ -840,7 +860,7 @@ def sparse_vecmat(x, A):
     y = numpy.full(A.shape[1], zero, dtype=object)
     for i, j in numpy.ndindex(A.shape):
         if not isinstance(x[i], gem.Zero) and not isinstance(A[i, j], gem.Zero):
-            y[j] = gem.Sum(y[j], gem.Product(A[i, j], x[i]))
+            y[j] += A[i, j] * x[i]
     return y
 
 
@@ -857,11 +877,6 @@ def sparse_dense_matmul(A, table):
     exprs = [gem.ComponentTensor(y, ii) for y in sparse_vecmat(phi, A.T)]
     result, = gem.optimise.unroll_indexsum((gem.ListTensor(exprs),), lambda index: True)
     return result
-
-
-def count_nonzeros(A):
-    """The number of entries of an object array of GEM scalars that are not GEM zeros."""
-    return sum(not isinstance(a, gem.Zero) for a in A.flat)
 
 
 class LinearCombination:
@@ -923,8 +938,9 @@ class LinearCombination:
 
     def expand(self):
         r"""The GEM scalars :math:`\sum_t g_tC_t`, as an object array of the shape of :math:`C_t`."""
-        C = literal_array(self.matrices.reshape(len(self.matrices), -1))
-        return sparse_matmul(self.coefficients[None, :], C).reshape(self.matrices.shape[1:])
+        shape = self.matrices.shape[1:]
+        C = literal_array(self.matrices.reshape(len(self.matrices), numpy.prod(shape, dtype=int)))
+        return sparse_matmul(self.coefficients[None, :], C).reshape(shape)
 
     def collect_terms(self):
         r"""Collect the terms with proportional :math:`C_t` into one term, and drop the terms with :math:`C_t=0`.
@@ -943,7 +959,7 @@ class LinearCombination:
             C = C / pivot
             key = tuple(numpy.round(C.ravel(), 12))
             if key in terms:
-                terms[key] = (gem.Sum(terms[key][0], gem.Literal(pivot) * g), C)
+                terms[key] = (terms[key][0] + gem.Literal(pivot) * g, C)
             else:
                 terms[key] = (gem.Literal(pivot) * g, C)
         coefficients = [g for g, _ in terms.values()]

@@ -108,9 +108,9 @@ def check_zany_mapping(element, ref_to_phys, *args, **kwargs):
     if isinstance(finat_element, PhysicallyMappedElement):
         Mgem = finat_element.basis_transformation(ref_to_phys)
         M = evaluate([Mgem])[0].arr
-        key = (0,) * sd
-        mapped = finat_element.map_tabulation({key: gem.Literal(ref_vals_piola)}, ref_to_phys)
-        ref_vals_zany = evaluate([mapped[key]])[0].arr
+        B = finat_element._vandermonde_matrix(ref_to_phys)
+        mapped = finat_element.apply_transform(B, gem.Literal(ref_vals_piola))
+        ref_vals_zany = evaluate([mapped])[0].arr
     else:
         M = np.eye(num_dofs, num_bfs)
         ref_vals_zany = ref_vals_piola

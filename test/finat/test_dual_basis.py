@@ -442,9 +442,9 @@ def test_recombined_physical_dual(ref_to_phys, scaled_ref_to_phys, scaled):
         transformed.basis_transformation(mapping)])]
     assert numpy.allclose(BC, C @ B @ numpy.linalg.inv(C))
     assert numpy.allclose(BC @ M.T, numpy.eye(len(C)))
-    # The back-substitution in map_tabulation applies the same transformation.
+    # The back-substitution in apply_transform applies the same transformation.
     table = numpy.random.default_rng(0).random((len(C), 4))
-    mapped = transformed.map_tabulation({None: gem.Literal(table)}, mapping)[None]
+    mapped = transformed.apply_transform(transformed._vandermonde_matrix(mapping), gem.Literal(table))
     assert numpy.allclose(evaluate([mapped])[0].arr, M @ table)
 
 
