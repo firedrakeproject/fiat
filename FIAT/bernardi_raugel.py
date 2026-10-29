@@ -103,30 +103,32 @@ class BernardiRaugelDualSet(dual_set.DualSet):
 
             thats = {f: ref_el.compute_tangents(sd-1, f) for f in facets}
             perp = lambda *v: numpy.array([v[0][1], -v[0][0]]) if len(v) == 1 else numpy.cross(*v)
-            if rotated:
-                moments = [(False, 0, Qn, fn_at_qpts), (True, None, Qt, ft_at_qpts)]
-            elif reduced:
-                moments = [(True, None, Qn, fn_at_qpts)]
-            else:
-                moments = [(True, None, Qn, fn_at_qpts)]
-                moments.extend((False, i-1, Qt, ft_at_qpts) for i in range(1, sd))
-            for normal, tangent, Q, phi in moments:
+            ndir = 1 if reduced else sd
+            for i in range(ndir):
                 for f in sorted(facets):
                     cur = len(nodes)
                     nhat = perp(*thats[f])
-                    if normal:
-                        # Face moment against n \phi_n
+                    if i == 0:
+                        # Normal DoF: face moment against n \phi_n
+                        Q = Qn[f]
+                        phi = fn_at_qpts
                         comp = nhat
                     else:
-                        # Face moment against t \phi_t
+                        # Tangential constraint
+                        Q = Qt[f]
+                        phi = ft_at_qpts
                         if sd == 2:
-                            comp = thats[f][tangent]
+                            # Face moment against t \phi_t
+                            comp = thats[f][i-1]
                         else:
                             # Face moment against (n x t_j) \phi_t
-                            comp = perp(nhat, thats[f][tangent])
+                            comp = perp(nhat, thats[f][i-1])
 
-                    Qf = Q[f]
-                    nodes.append(FrobeniusIntegralMoment(ref_el, Qf, numpy.outer(comp, phi)))
+                    if rotated:
+                        # Rotate counterclockwise: n becomes t, and t becomes -n
+                        comp = -perp(comp)
+
+                    nodes.append(FrobeniusIntegralMoment(ref_el, Q, numpy.outer(comp, phi)))
                     entity_ids[sd-1][f].extend(range(cur, len(nodes)))
         super().__init__(nodes, ref_el, entity_ids)
 
@@ -136,8 +138,8 @@ class BernardiRaugel(finite_element.CiarletElement):
 
     This element does not belong to a Stokes complex, but can be paired with
     DG_{k-1}. This pair is inf-sup stable, but only weakly divergence-free.
-    The rotated variant retains tangential facet moments and constrains the
-    normal facet bubbles instead.
+    The rotated element is its counterclockwise rotation in two dimensions,
+    with tangential facet moments as dofs and normal facet bubbles constrained.
     """
     def __init__(self, ref_el, order=1, hierarchical=False, quad_scheme=None, rotated=False):
         degree = ref_el.get_spatial_dimension()

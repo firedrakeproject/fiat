@@ -22,5 +22,8 @@ class ReducedWalkington(PhysicallyMappedElement, ScalarFiatElement):
         cite("Walkington2010")
         super().__init__(FIAT.Walkington(cell, degree=degree, reduced=True))
 
+    # FIAT gives a 64 DOF element whose last 24 nodes constrain the faces
+    # and edges, and are used in the transformation.  However, we only
+    # have a 40 DOF element.
     def space_dimension(self):
         return 40

@@ -15,6 +15,7 @@
 # we have an interface for defining sets of functionals (moments against
 # an entire set of polynomials)
 
+import math
 import numpy
 from itertools import chain
 from FIAT import expansions
@@ -188,6 +189,50 @@ def spanning_basis(A, nullspace=False, rtol=1e-10):
     num_sv = len([s for s in sig if abs(s) > atol])
     basis = vt[num_sv:] if nullspace else vt[:num_sv]
     return numpy.reshape(basis, (-1, *A.shape[1:]))
+
+
+def TaylorConstrainedPolynomialSet(poly_set, constraints):
+    r"""Return the subspace whose barycenter value is given by the vertex jets.
+
+    The members :math:`p` of the subspace satisfy
+
+    .. math::
+
+        p(x_T) = \frac{1}{n} \sum_z \sum_{k} c_k \sum_{|\alpha| = k}
+        \frac{(x_T - z)^\alpha}{\alpha!} \partial^\alpha p(z),
+
+    where :math:`x_T` is the barycenter of the cell and :math:`z` ranges over
+    its :math:`n` vertices.
+
+    Parameters
+    ----------
+    poly_set : PolynomialSet
+        A scalar-valued polynomial set.
+    constraints : sequence of float
+        The weights :math:`c_k` of the terms of order :math:`k` in the
+        Taylor expansion about each vertex.
+
+    Returns
+    -------
+    PolynomialSet
+        The subspace of ``poly_set`` that satisfies the constraint.
+    """
+    ref_el = poly_set.get_reference_element()
+    cell = ref_el.get_parent() or ref_el
+    sd = cell.get_spatial_dimension()
+    vertices = numpy.asarray(cell.get_vertices())
+    barycenter = numpy.mean(vertices, axis=0)
+
+    tab = poly_set.tabulate(numpy.vstack([vertices, barycenter]), len(constraints) - 1)
+    constraint = tab[(0,) * sd][:, -1]
+    for k, c in enumerate(constraints):
+        for alpha in mis(sd, k):
+            weights = numpy.prod((barycenter - vertices) ** alpha, axis=1)
+            weights *= c / (len(vertices) * numpy.prod([math.factorial(a) for a in alpha]))
+            constraint = constraint - numpy.dot(tab[alpha][:, :-1], weights)
+
+    basis = spanning_basis(constraint[numpy.newaxis, :], nullspace=True)
+    return poly_set.recombine(basis)
 
 
 def polynomial_set_union_normalized(A, B):
