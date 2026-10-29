@@ -245,6 +245,17 @@ def test_gn_trace(sd):
             assert numpy.allclose(tangential_moments, 0)
 
 
+def test_rotated_br_trace():
+    # The normal trace of the rotated element is linear on each edge
+    br = BernardiRaugel(T, rotated=True)
+    vertices = numpy.asarray(T.get_vertices())
+    for e, (v0, v1) in T.get_topology()[1].items():
+        pts = [vertices[v0], (vertices[v0] + vertices[v1]) / 2, vertices[v1]]
+        vals = br.tabulate(0, pts)[(0, 0)][:9]
+        normal_trace = numpy.tensordot(vals, T.compute_normal(e), axes=(1, 0))
+        assert numpy.allclose(normal_trace[:, 1], (normal_trace[:, 0] + normal_trace[:, 2]) / 2)
+
+
 @pytest.mark.parametrize("cell", (T, S))
 @pytest.mark.parametrize("family", ("AQ", "CH", "GN", "GN2"))
 def test_minimal_stokes_space(cell, family):

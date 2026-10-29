@@ -47,10 +47,13 @@ def BernardiRaugelSpace(ref_el, order):
 
 class BernardiRaugelDualSet(dual_set.DualSet):
     """The Bernardi-Raugel dual set."""
-    def __init__(self, ref_el, order=1, degree=None, reduced=False, ref_complex=None, hierarchical=False, quad_scheme=None):
+    def __init__(self, ref_el, order=1, degree=None, reduced=False, ref_complex=None,
+                 hierarchical=False, quad_scheme=None, rotated=False):
         if ref_complex is None:
             ref_complex = ref_el
         sd = ref_el.get_spatial_dimension()
+        if rotated and sd != 2:
+            raise ValueError("Rotated Bernardi-Raugel is only defined in two dimensions")
         if degree is None:
             degree = sd
         if order > sd:
@@ -121,6 +124,10 @@ class BernardiRaugelDualSet(dual_set.DualSet):
                             # Face moment against (n x t_j) \phi_t
                             comp = perp(nhat, thats[f][i-1])
 
+                    if rotated:
+                        # Rotate counterclockwise: n becomes t, and t becomes -n
+                        comp = -perp(comp)
+
                     nodes.append(FrobeniusIntegralMoment(ref_el, Q, numpy.outer(comp, phi)))
                     entity_ids[sd-1][f].extend(range(cur, len(nodes)))
         super().__init__(nodes, ref_el, entity_ids)
@@ -131,12 +138,17 @@ class BernardiRaugel(finite_element.CiarletElement):
 
     This element does not belong to a Stokes complex, but can be paired with
     DG_{k-1}. This pair is inf-sup stable, but only weakly divergence-free.
+    The rotated element is its counterclockwise rotation in two dimensions,
+    with tangential facet moments as dofs and normal facet bubbles constrained.
     """
-    def __init__(self, ref_el, order=1, hierarchical=False, quad_scheme=None):
+    def __init__(self, ref_el, order=1, hierarchical=False, quad_scheme=None, rotated=False):
         degree = ref_el.get_spatial_dimension()
         if order >= degree:
             raise ValueError(f"{type(self).__name__} only defined for order < dim")
         poly_set = BernardiRaugelSpace(ref_el, order)
-        dual = BernardiRaugelDualSet(ref_el, order, degree=degree, hierarchical=hierarchical, quad_scheme=quad_scheme)
+        dual = BernardiRaugelDualSet(ref_el, order, degree=degree,
+                                     hierarchical=hierarchical, quad_scheme=quad_scheme,
+                                     rotated=rotated)
         formdegree = 0
-        super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")
+        mapping = "covariant piola" if rotated else "contravariant piola"
+        super().__init__(poly_set, dual, degree, formdegree, mapping=mapping)

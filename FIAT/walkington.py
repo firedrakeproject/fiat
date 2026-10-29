@@ -7,6 +7,8 @@
 # This is not quite Walkington, but is 65-dofs and includes 20 extra constraint
 # functionals.  The first 45 basis functions are the reference element
 # bfs, but the extra 20 are used in the transformation theory.
+# The reduced element has 64 dofs.  It drops the barycenter dof, and its
+# 4 face moments against the quartic bubble join the 20 extra constraints.
 
 from FIAT import finite_element, polynomial_set, macro
 from FIAT.bernstein import BernsteinPolynomialSet
@@ -24,7 +26,7 @@ import numpy
 
 
 class WalkingtonDualSet(DualSet):
-    def __init__(self, ref_el, degree):
+    def __init__(self, ref_el, degree, reduced=False):
         top = ref_el.get_topology()
         sd = ref_el.get_spatial_dimension()
         entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
@@ -43,8 +45,12 @@ class WalkingtonDualSet(DualSet):
 
         # Face dofs: moments or normal derivative
         ref_face = ref_el.construct_subelement(2)
-        Q_face = create_quadrature(ref_face, degree-1)
-        f_at_qpts = numpy.ones(Q_face.get_weights().shape)
+        if reduced:
+            Q_face, phis = make_projected_bubble_moments(ref_face, degree-2, interpolant_deg=degree-1)
+            f_at_qpts = phis[-1]
+        else:
+            Q_face = create_quadrature(ref_face, degree-1)
+            f_at_qpts = numpy.ones(Q_face.get_weights().shape)
         for face in sorted(top[2]):
             cur = len(nodes)
             Q = FacetQuadratureRule(ref_el, 2, face, Q_face, avg=True)
@@ -52,12 +58,13 @@ class WalkingtonDualSet(DualSet):
             nodes.append(IntegralMomentOfDerivative(ref_el, Q, f_at_qpts, n))
             entity_ids[2][face].extend(range(cur, len(nodes)))
 
-        # Interior dof: point evaluation at barycenter
-        for entity in top[sd]:
-            cur = len(nodes)
-            x, = ref_el.make_points(sd, entity, sd+1)
-            nodes.append(PointEvaluation(ref_el, x))
-            entity_ids[sd][entity].extend(range(cur, len(nodes)))
+        if not reduced:
+            # Interior dof: point evaluation at barycenter
+            for entity in top[sd]:
+                cur = len(nodes)
+                x, = ref_el.make_points(sd, entity, sd+1)
+                nodes.append(PointEvaluation(ref_el, x))
+                entity_ids[sd][entity].extend(range(cur, len(nodes)))
 
         # Constraint dofs
         # Face-edge constraint: the normal derivative along an edge within
@@ -93,15 +100,20 @@ class WalkingtonDualSet(DualSet):
 
 
 class Walkington(finite_element.CiarletElement):
-    """The Walkington C1 macroelement."""
+    """The Walkington C1 macroelement.
 
-    def __init__(self, ref_el, degree=5):
+    The reduced element determines the barycenter value from the vertex
+    jets, so that it still contains the cubics."""
+
+    def __init__(self, ref_el, degree=5, reduced=False):
         if ref_el.get_shape() != TETRAHEDRON:
             raise ValueError(f"{type(self).__name__} only defined on tetrahedron")
         if degree != 5:
             raise ValueError(f"{type(self).__name__} only defined for degree=5.")
 
-        dual = WalkingtonDualSet(ref_el, degree)
         ref_complex = macro.AlfeldSplit(ref_el)
         poly_set = BernsteinPolynomialSet(ref_complex, degree, order=1, vorder=4)
+        if reduced:
+            poly_set = polynomial_set.TaylorConstrainedPolynomialSet(poly_set, (1, 2/3, 1/3))
+        dual = WalkingtonDualSet(ref_el, degree, reduced=reduced)
         super().__init__(poly_set, dual, degree)
