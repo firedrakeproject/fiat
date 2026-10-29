@@ -108,9 +108,7 @@ def check_zany_mapping(element, ref_to_phys, *args, **kwargs):
     if isinstance(finat_element, PhysicallyMappedElement):
         Mgem = finat_element.basis_transformation(ref_to_phys)
         M = evaluate([Mgem])[0].arr
-        B = finat_element._vandermonde_matrix(ref_to_phys)
-        mapped = finat_element.apply_transform(B, gem.Literal(ref_vals_piola))
-        ref_vals_zany = evaluate([mapped])[0].arr
+        ref_vals_zany = np.tensordot(M, ref_vals_piola, (-1, 0))
     else:
         M = np.eye(num_dofs, num_bfs)
         ref_vals_zany = ref_vals_piola

@@ -306,16 +306,18 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         Bmat = B.array()[numpy.ix_(indices, indices)]
         return sparse_dense_matmul(Bmat, Q)
 
-    def apply_transform(self, B, table):
-        r"""Apply :math:`M=B^{-T}` to a reference tabulation, on the exposed dofs.
+    def apply_transform(self, transform, table):
+        r"""Apply a transformation of the reference basis to a tabulation, on the exposed dofs.
 
-        :arg B: The :class:`VandermondeMatrix`.
+        :arg transform: A callable that maps the GEM scalars of the reference
+            basis functions to an object array of GEM scalars, one for each
+            reference dof, such as :meth:`VandermondeMatrix.transpose_solve`.
         :arg table: A reference tabulation with the basis functions as the first axis.
         :returns: A GEM tensor with the exposed dofs as the first axis.
         """
         ii = gem.indices(len(table.shape)-1)
         phi = [gem.Indexed(table, (j, *ii)) for j in range(table.shape[0])]
-        chi = B.transpose_solve(phi)
+        chi = transform(phi)
         exprs = [gem.ComponentTensor(chi[i], ii) for i in self._physical_indices]
         result, = gem.optimise.unroll_indexsum((gem.ListTensor(exprs),), lambda index: True)
         return result
@@ -336,7 +338,8 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         """
         ref_tabulation = super().basis_evaluation(order, ps, entity=entity)
         B = self._vandermonde_matrix(coordinate_mapping)
-        return MappedTabulation(partial(self.apply_transform, B), ref_tabulation)
+        transform = partial(self.apply_transform, B.transpose_solve)
+        return MappedTabulation(transform, ref_tabulation)
 
     @cached_property
     def _physical_indices(self):
@@ -618,9 +621,8 @@ class VandermondeMatrix:
 
         The row j is :math:`B^{-T}e_j` from :meth:`transpose_solve`.
         """
-        n = len(self.dual.functionals)
-        return numpy.array([self.transpose_solve([one if i == j else zero for i in range(n)])
-                            for j in range(n)], dtype=object)
+        I = identity(len(self.dual.functionals))
+        return numpy.array([self.transpose_solve(e) for e in I], dtype=object)
 
     def transpose_solve(self, phi):
         r"""The GEM scalars :math:`\chi=B^{-T}\phi`, without forming :math:`B^{-1}`.
@@ -748,6 +750,13 @@ class PhysicalGeometry(metaclass=ABCMeta):
 
         :returns: a GEM expression for the physical vertices, shape
                 (gdim, )."""
+
+
+def identity(*shape):
+    V = numpy.eye(*shape, dtype=object)
+    for multiindex in numpy.ndindex(V.shape):
+        V[multiindex] = zero if V[multiindex] == 0 else one
+    return V
 
 
 def determinant(A):
