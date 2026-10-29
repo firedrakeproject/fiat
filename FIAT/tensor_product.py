@@ -87,7 +87,7 @@ class TensorProductElement(FiniteElement):
                         # these by calling get_point_dict(), and
                         # use the concatenation to make a new PointEval
                         nodes.append(functional.PointEvaluation(ref_el, _first_point(Anode) + _first_point(Bnode)))
-                    elif isinstance(Bnode, functional.IntegralMoment):
+                    elif isinstance(Bnode, functional.IntegralMoment) and not Bnode.deriv_dict:
                         # dummy functional for product with integral moments
                         nodes.append(functional.Functional(None, None, None,
                                                            {}, "Undefined"))
@@ -182,7 +182,7 @@ class TensorProductElement(FiniteElement):
                     else:
                         raise NotImplementedError("unsupported functional type")
 
-            elif isinstance(Anode, functional.IntegralMoment):
+            elif isinstance(Anode, functional.IntegralMoment) and not Anode.deriv_dict:
                 for Bnode in Bnodes:
                     if isinstance(Bnode, functional.PointEvaluation):
                         # case: IntMom x PointEval

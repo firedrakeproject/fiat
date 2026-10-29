@@ -60,7 +60,8 @@ class WalkingtonDualSet(DualSet):
             entity_ids[sd][entity].extend(range(cur, len(nodes)))
 
         # Constraint dofs
-        # Face-edge constraint: normal derivative along edge is cubic
+        # Face-edge constraint: the normal derivative along an edge within
+        # each of its faces is cubic, attached to the edge
         edges = ref_el.get_connectivity()[(2, 1)]
         ref_edge = ref_el.construct_subelement(1)
         Q_edge = create_quadrature(ref_edge, 2*(degree-1))
@@ -70,11 +71,7 @@ class WalkingtonDualSet(DualSet):
         Q_face, phis = make_projected_bubble_moments(ref_face, degree-2)
         phi = phis[-1]
 
-        extra_entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
-        extra_nodes = []
-
         for face in sorted(top[2]):
-            cur = len(nodes)
             thats = ref_el.compute_tangents(sd-1, face)
             nface = -numpy.cross(*thats)
             nface /= numpy.linalg.norm(nface)
@@ -84,18 +81,14 @@ class WalkingtonDualSet(DualSet):
                 te = ref_el.compute_edge_tangent(e)
                 nfe = numpy.cross(te, nface)
                 nfe /= numpy.linalg.norm(nfe)
+                entity_ids[1][e].append(len(nodes))
                 nodes.append(IntegralMomentOfDerivative(ref_el, Q, leg4_at_qpts, nfe))
 
+            cur = len(nodes)
             Q = FacetQuadratureRule(ref_el, 2, face, Q_face, avg=True)
             nodes.extend(IntegralMomentOfDerivative(ref_el, Q, phi, nface, t) for t in thats)
             entity_ids[2][face].extend(range(cur, len(nodes)))
 
-            cur = len(extra_nodes)
-            extra_nodes.extend(IntegralMomentOfDerivative(ref_el, Q, phi, thats[i], thats[j])
-                               for i in range(2) for j in range(i, 2))
-            extra_entity_ids[2][face].extend(range(cur, len(extra_nodes)))
-
-        self.nodal_completion = DualSet(extra_nodes, ref_el, extra_entity_ids)
         super().__init__(nodes, ref_el, entity_ids)
 
 
