@@ -10,7 +10,7 @@
 # transformation theory.
 
 from FIAT import finite_element, polynomial_set, expansions
-from FIAT.bernardi_raugel import BernardiRaugelSpace, BernardiRaugelDualSet, BernardiRaugel
+from FIAT.bernardi_raugel import BernardiRaugelSpace, BernardiRaugelDualSet
 from FIAT.alfeld_sorokina import AlfeldSorokina
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini
 from FIAT.macro import AlfeldSplit
@@ -18,6 +18,7 @@ from FIAT.quadrature_schemes import create_quadrature
 from FIAT.restricted import RestrictedElement
 from FIAT.nodal_enriched import NodalEnrichedElement
 
+from scipy.linalg import block_diag
 import numpy
 import math
 
@@ -25,8 +26,11 @@ import math
 def GuzmanNeilanSpace(ref_el, order, kind=1, reduced=False):
     r"""Return a basis for the (extended) Guzman-Neilan H1 space.
 
-    Project the extended Bernardi-Raugel space (Pk + FacetBubble)^d
+    Project the extended Bernardi-Raugel space (Pk + FacetBubble + InteriorBubble P_{k-2})^d
     into C0 Pk(Alfeld)^d with P_{k-1} divergence, preserving its trace.
+    For kind = 1, the interior bubble is the hat function associated with the
+    barycenter of the Alfeld split, so that the space does not increase its degree.
+    For kind = 2, C0 Pk(Alfeld) already contains interior bubbles.
 
     :arg ref_el: a simplex
     :arg order: the maximal polynomial degree
@@ -44,16 +48,27 @@ def GuzmanNeilanSpace(ref_el, order, kind=1, reduced=False):
         B = modified_bubble_subspace(B)
 
     K = ref_complex if kind == 2 else ref_el
-    num_bubbles = sd + 1
-    if reduced:
-        BR = BernardiRaugel(K, order, hierarchical=True).get_nodal_basis()
-        reduced_dim = BR.get_num_members() - (sd-1) * (sd+1)
-        BR = BR.take(list(range(reduced_dim)))
-    else:
-        num_bubbles *= sd
-        BR = BernardiRaugelSpace(K, order)
+    BR = BernardiRaugelSpace(K, order, ref_complex=ref_complex)
 
-    GN = constant_div_projection(BR, C0, B, num_bubbles)
+    # The bubbles are numbered after the Pk^d basis
+    top = K.get_topology()
+    dimPk = sd * sum(math.comb(order-1, dim) * len(top[dim]) for dim in range(order))
+    if reduced:
+        # Keep only the normal component of the facet bubbles
+        facets = sorted(set(top[sd-1]) - set(K.get_interior_facets(sd-1) or ()))
+        normals = numpy.array([K.compute_normal(f) for f in facets])
+        coeffs = BR.get_coeffs()
+        ids = slice(dimPk, dimPk + sd * len(facets))
+        facet_bubbles = numpy.tensordot(block_diag(*normals), coeffs[ids], axes=(1, 0))
+        coeffs = numpy.concatenate([coeffs[:ids.start], facet_bubbles, coeffs[ids.stop:]])
+        BR = polynomial_set.PolynomialSet(BR.get_reference_element(), BR.degree, BR.embedded_degree,
+                                          BR.get_expansion_set(), coeffs)
+    num_bubbles = BR.get_num_members() - dimPk
+
+    # The divergence of the bubbles is projected onto P_{k-1}(ref_el),
+    # this includes the constants as the facet bubbles have nonzero flux
+    pressure = polynomial_set.ONPolynomialSet(ref_el, max(order-1, 0))
+    GN = constant_div_projection(BR, C0, B, num_bubbles, pressure)
     return GN
 
 
@@ -65,8 +80,9 @@ class GuzmanNeilanH1(finite_element.CiarletElement):
             raise ValueError(f"{type(self).__name__} is only defined for order < dim")
         degree = sd
         poly_set = GuzmanNeilanSpace(ref_el, order, kind=kind)
-        ref_complex = poly_set.get_reference_element() if kind == 2 else ref_el
-        dual = BernardiRaugelDualSet(ref_complex, order, degree=degree, quad_scheme=quad_scheme)
+        ref_complex = poly_set.get_reference_element()
+        K = ref_complex if kind == 2 else ref_el
+        dual = BernardiRaugelDualSet(K, order, degree=degree, ref_complex=ref_complex, quad_scheme=quad_scheme)
         formdegree = sd - 1  # (n-1)-form
         super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")
 
@@ -186,8 +202,12 @@ def modified_bubble_subspace(B):
     return M
 
 
-def constant_div_projection(BR, C0, M, num_bubbles):
-    """Project the BR space into C0 Pk(Alfeld)^d with P_{k-1} divergence."""
+def constant_div_projection(BR, C0, M, num_bubbles, pressure):
+    """Project the BR space into C0 Pk(Alfeld)^d with divergence in the pressure space.
+
+    The divergence of the BR bubbles is corrected with the modified bubbles M,
+    so that it becomes its L2 projection onto the pressure space.
+    """
     ref_complex = C0.get_reference_element()
     sd = ref_complex.get_spatial_dimension()
     degree = C0.degree
@@ -202,9 +222,13 @@ def constant_div_projection(BR, C0, M, num_bubbles):
 
     U = M.tabulate(qpts, 1)
     X = BR.tabulate(qpts, 1)
+    # Remove the L2 projection onto the pressure space from the divergence of the bubbles
+    R = pressure.tabulate(qpts)[(0,)*sd]
+    divX = div(X)[-num_bubbles:]
+    divX -= numpy.linalg.solve(inner(R, R, qwts), inner(R, divX, qwts)).T @ R
     # Invert the divergence
     B = inner(P, div(U), qwts)
-    g = inner(P, div(X)[-num_bubbles:], qwts)
+    g = inner(P, divX, qwts)
     w = numpy.linalg.solve(B, g)
 
     # Add correction to BR bubbles

@@ -212,6 +212,30 @@ def test_gn_dofs(element, sd, quad_scheme):
     assert numpy.allclose(div_moments, expected)
 
 
+@pytest.mark.parametrize("element", (GuzmanNeilanFirstKindH1, BernardiRaugel))
+def test_interior_bubbles(element):
+    # Test that the interior bubbles control the gradient of DG_{k-1}
+    cell = S
+    sd = cell.get_spatial_dimension()
+    order = 2
+    fe = element(cell, order)
+    reduced_dim = fe.space_dimension() - (sd-1)*(sd+1)
+    assert reduced_dim == 37
+
+    ref_complex = fe.get_reference_complex()
+    Q = create_quadrature(ref_complex, 2*fe.degree())
+    qpts, qwts = Q.get_points(), Q.get_weights()
+    tab = fe.tabulate(1, qpts)
+
+    # The divergence of the interior bubbles against the mean-free DG_{k-1} is nonsingular
+    P = ONPolynomialSet(cell, order-1).tabulate(qpts)[(0,)*sd]
+    P = P[1:] - numpy.dot(P[1:], qwts)[:, None] / sum(qwts)
+    ids = fe.entity_dofs()[sd][0]
+    assert len(ids) == len(P)
+    B = inner(div(tab)[ids], P, qwts)
+    assert numpy.linalg.matrix_rank(B) == len(P)
+
+
 @pytest.mark.parametrize("sd", (2, 3))
 def test_gn_trace(sd):
     degree = 1
