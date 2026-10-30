@@ -66,11 +66,13 @@ def GuzmanNeilanSpace(ref_el, order, kind=1, reduced=False):
     if reduced:
         # Keep only the normal component of the facet bubbles
         facets = sorted(set(top[sd-1]) - set(K.get_interior_facets(sd-1) or ()))
-        normals = numpy.array([K.compute_normal(f) for f in facets])
         coeffs = BR.get_coeffs()
         ids = slice(dimPk, dimPk + sd * len(facets))
-        facet_bubbles = numpy.einsum("fi,ficj->fcj", normals,
-                                     coeffs[ids].reshape(len(facets), sd, sd, -1))
+        facet_bubbles = []
+        for i, f in enumerate(facets):
+            normal = K.compute_normal(f)
+            bubbles = coeffs[dimPk + sd*i:dimPk + sd*(i+1)]
+            facet_bubbles.append(sum(n * bubble for n, bubble in zip(normal, bubbles)))
         coeffs = numpy.concatenate([coeffs[:ids.start], facet_bubbles, coeffs[ids.stop:]])
         BR = polynomial_set.PolynomialSet(BR.get_reference_element(), BR.degree, BR.embedded_degree,
                                           BR.get_expansion_set(), coeffs)
