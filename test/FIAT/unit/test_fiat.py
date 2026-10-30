@@ -656,6 +656,8 @@ def test_error_point_high_order(element):
     'Lagrange(T, 1)',
     'Bernstein(I, 1)',
     'Bernstein(T, 1)',
+    'EnrichedElement(Lagrange(I, 1), Bubble(I, 2))',
+    'EnrichedElement(Lagrange(T, 1), Bubble(T, 3))',
 ])
 def test_single_point_tabulation(element):
     L = eval(element)
