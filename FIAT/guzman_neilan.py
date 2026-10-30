@@ -4,10 +4,8 @@
 #
 # Written by Pablo D. Brubeck (brubeck@protonmail.com), 2024
 
-# This is not quite Guzman-Neilan, but it has 2*dim*(dim+1) dofs and includes
-# dim**2-1 extra constraint functionals.  The first (dim+1)**2 basis functions
-# are the reference element bfs, but the extra dim**2-1 are used in the
-# transformation theory.
+# The extended element includes dim-1 tangential constraints on each facet.
+# These are numbered last and used in the basis transformation.
 
 from FIAT import finite_element, polynomial_set, expansions
 from FIAT.bernardi_raugel import BernardiRaugelSpace, BernardiRaugelDualSet
@@ -18,7 +16,6 @@ from FIAT.quadrature_schemes import create_quadrature
 from FIAT.restricted import RestrictedElement
 from FIAT.nodal_enriched import NodalEnrichedElement
 
-from scipy.linalg import block_diag
 import numpy
 import math
 
@@ -32,13 +29,21 @@ def GuzmanNeilanSpace(ref_el, order, kind=1, reduced=False):
     barycenter of the Alfeld split, so that the space does not increase its degree.
     For kind = 2, C0 Pk(Alfeld) already contains interior bubbles.
 
-    :arg ref_el: a simplex
-    :arg order: the maximal polynomial degree
-    :kwarg kind: kind = 1 gives Pk^d + GN bubbles,
-                 kind = 2 gives C0 Pk(Alfeld)^d + GN bubbles.
-    :kwarg reduced: Include tangential bubbles if reduced = False.
+    Parameters
+    ----------
+    ref_el : FIAT.reference_element.Cell
+        A simplex.
+    order : int
+        The polynomial degree k.
+    kind : int, optional
+        Use Pk for kind 1, or C0 Pk(Alfeld) for kind 2.
+    reduced : bool, optional
+        Omit tangential facet bubbles if True.
 
-    :returns: a PolynomialSet basis for the Guzman-Neilan H1 space.
+    Returns
+    -------
+    FIAT.polynomial_set.PolynomialSet
+        A basis for the Guzman-Neilan H1 space.
     """
     sd = ref_el.get_spatial_dimension()
     ref_complex = AlfeldSplit(ref_el)
@@ -48,7 +53,12 @@ def GuzmanNeilanSpace(ref_el, order, kind=1, reduced=False):
         B = modified_bubble_subspace(B)
 
     K = ref_complex if kind == 2 else ref_el
-    BR = BernardiRaugelSpace(K, order, ref_complex=ref_complex)
+    BR = BernardiRaugelSpace(K, order)
+    interior = None
+    if kind == 1 and order > 1:
+        # Use the Alfeld hat in place of the unsplit cell bubble.
+        interior = take_interior_bubbles(C0, degree=order-1)
+        BR = BR.take(list(range(len(BR) - len(interior))))
 
     # The bubbles are numbered after the Pk^d basis
     top = K.get_topology()
@@ -59,17 +69,17 @@ def GuzmanNeilanSpace(ref_el, order, kind=1, reduced=False):
         normals = numpy.array([K.compute_normal(f) for f in facets])
         coeffs = BR.get_coeffs()
         ids = slice(dimPk, dimPk + sd * len(facets))
-        facet_bubbles = numpy.tensordot(block_diag(*normals), coeffs[ids], axes=(1, 0))
+        facet_bubbles = numpy.einsum("fi,ficj->fcj", normals,
+                                     coeffs[ids].reshape(len(facets), sd, sd, -1))
         coeffs = numpy.concatenate([coeffs[:ids.start], facet_bubbles, coeffs[ids.stop:]])
         BR = polynomial_set.PolynomialSet(BR.get_reference_element(), BR.degree, BR.embedded_degree,
                                           BR.get_expansion_set(), coeffs)
-    num_bubbles = BR.get_num_members() - dimPk
+    num_bubbles = len(BR) - dimPk + (len(interior) if interior is not None else 0)
 
     # The divergence of the bubbles is projected onto P_{k-1}(ref_el),
     # this includes the constants as the facet bubbles have nonzero flux
-    pressure = polynomial_set.ONPolynomialSet(ref_el, max(order-1, 0))
-    GN = constant_div_projection(BR, C0, B, num_bubbles, pressure)
-    return GN
+    pressure = polynomial_set.ONPolynomialSet(ref_el, max(order-1, 0), scale="orthonormal")
+    return divergence_projection(BR, C0, B, num_bubbles, pressure, interior=interior)
 
 
 class GuzmanNeilanH1(finite_element.CiarletElement):
@@ -91,8 +101,9 @@ class GuzmanNeilanFirstKindH1(GuzmanNeilanH1):
     """The Guzman-Neilan H1-conforming (extended) macroelement of the first kind.
 
     Reference element: a simplex of any dimension.
-    Function space: Pk^d + normal facet bubbles with div in P0, with 1 <= k < dim.
-    Degrees of freedom: evaluation at Pk lattice points, and normal moments on faces.
+    Function space: Pk^d + facet and interior bubbles with div in P_{k-1}, 1 <= k < dim.
+    Degrees of freedom: evaluation at Pk lattice points, normal moments on faces,
+    and cell moments for k >= 2.
 
     This element belongs to a Stokes complex, and is paired with unsplit DG_{k-1}.
     """
@@ -104,7 +115,7 @@ class GuzmanNeilanSecondKindH1(GuzmanNeilanH1):
     """The Guzman-Neilan H1-conforming (extended) macroelement of the second kind.
 
     Reference element: a simplex of any dimension.
-    Function space: C0 Pk^d(Alfeld) + normal facet bubbles with div in P0, with 1 <= k < dim.
+    Function space: C0 Pk^d(Alfeld) + facet bubbles with div in P_{k-1}, 1 <= k < dim.
     Degrees of freedom: evaluation at Pk(Alfeld) lattice points, and normal moments on faces.
 
     This element belongs to a Stokes complex, and is paired with DG_{k-1}(Alfeld).
@@ -202,11 +213,31 @@ def modified_bubble_subspace(B):
     return M
 
 
-def constant_div_projection(BR, C0, M, num_bubbles, pressure):
+def divergence_projection(BR, C0, M, num_bubbles, pressure, interior=None):
     """Project the BR space into C0 Pk(Alfeld)^d with divergence in the pressure space.
 
     The divergence of the BR bubbles is corrected with the modified bubbles M,
     so that it becomes its L2 projection onto the pressure space.
+
+    Parameters
+    ----------
+    BR : FIAT.polynomial_set.PolynomialSet
+        The extended Bernardi-Raugel space, with bubbles numbered last.
+    C0 : FIAT.polynomial_set.PolynomialSet
+        The continuous piecewise polynomial space containing the result.
+    M : FIAT.polynomial_set.PolynomialSet
+        Interior bubbles whose divergences span mean-zero piecewise P_{d-1}.
+    num_bubbles : int
+        Number of basis functions to correct, including interior.
+    pressure : FIAT.polynomial_set.PolynomialSet
+        An L2-orthonormal basis for the target divergence space on the unsplit simplex.
+    interior : FIAT.polynomial_set.PolynomialSet, optional
+        Interior bubbles to append to BR before correcting the divergence.
+
+    Returns
+    -------
+    FIAT.polynomial_set.PolynomialSet
+        The corrected space, with the same traces as BR.
     """
     ref_complex = C0.get_reference_element()
     sd = ref_complex.get_spatial_dimension()
@@ -222,10 +253,13 @@ def constant_div_projection(BR, C0, M, num_bubbles, pressure):
 
     U = M.tabulate(qpts, 1)
     X = BR.tabulate(qpts, 1)
+    if interior is not None:
+        Y = interior.tabulate(qpts, 1)
+        X = {alpha: numpy.concatenate([X[alpha], Y[alpha]]) for alpha in X}
     # Remove the L2 projection onto the pressure space from the divergence of the bubbles
     R = pressure.tabulate(qpts)[(0,)*sd]
     divX = div(X)[-num_bubbles:]
-    divX -= numpy.linalg.solve(inner(R, R, qwts), inner(R, divX, qwts)).T @ R
+    divX -= inner(divX, R, qwts) @ R
     # Invert the divergence
     B = inner(P, div(U), qwts)
     g = inner(P, divX, qwts)
@@ -234,7 +268,7 @@ def constant_div_projection(BR, C0, M, num_bubbles, pressure):
     # Add correction to BR bubbles
     v = C0.tabulate(qpts)[(0,)*sd]
     coeffs = numpy.linalg.solve(inner(v, v, qwts), inner(v, X[(0,)*sd], qwts))
-    coeffs = coeffs.T.reshape(BR.get_num_members(), sd, -1)
+    coeffs = coeffs.T.reshape(-1, sd, C0.get_coeffs().shape[-1])
     coeffs[-num_bubbles:] -= numpy.tensordot(w, M.get_coeffs(), axes=(0, 0))
     GN = polynomial_set.PolynomialSet(ref_complex, degree, degree,
                                       C0.get_expansion_set(), coeffs)

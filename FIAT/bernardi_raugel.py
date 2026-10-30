@@ -4,10 +4,8 @@
 #
 # Written by Pablo D. Brubeck (brubeck@protonmail.com), 2024
 
-# This is not quite Bernardi-Raugel, but it includes dim-1 extra tangential
-# constraint functionals on each facet.  These are numbered last, so the
-# first basis functions are the reference element bfs, while the extra ones
-# are used in the transformation theory.
+# The extended element includes dim-1 tangential constraints on each facet.
+# These are numbered last and used in the basis transformation.
 
 from FIAT import finite_element, dual_set, polynomial_set, expansions
 from FIAT.check_format_variant import parse_quadrature_scheme
@@ -20,12 +18,11 @@ import numpy
 import math
 
 
-def BernardiRaugelSpace(ref_el, order, ref_complex=None):
+def BernardiRaugelSpace(ref_el, order):
     """Return a basis for the extended Bernardi-Raugel space.
 
     The space is (Pk + FacetBubble + InteriorBubble P_{k-2})^d.  The interior
-    bubbles are only needed when Pk has no degrees of freedom in the interior
-    of ref_el, which is the case for an unsplit simplex with k < d.
+    bubbles are needed for k >= 2 when Pk has no interior degrees of freedom.
 
     Parameters
     ----------
@@ -33,27 +30,22 @@ def BernardiRaugelSpace(ref_el, order, ref_complex=None):
         The reference cell or macrocell.
     order : int
         The polynomial degree k.
-    ref_complex : FIAT.reference_element.Cell, optional
-        A split of ref_el on which the interior bubble is defined as the
-        lowest-degree C0 bubble.  This is the cell bubble of degree d+1 on an
-        unsplit simplex, and the piecewise linear hat function associated with
-        the barycenter on an Alfeld split.  Defaults to ref_el.
 
     Returns
     -------
     FIAT.polynomial_set.PolynomialSet
         A basis for the extended Bernardi-Raugel space, with the Pk basis
-        numbered first.  It is defined on ref_complex if it includes interior
-        bubbles, and on ref_el otherwise.
+        numbered first, followed by facet and interior bubbles.
     """
-    if ref_complex is None:
-        ref_complex = ref_el
     sd = ref_el.get_spatial_dimension()
     if order > sd:
         raise ValueError("The Bernardi-Raugel space is only defined for order <= dim")
-    Pd = polynomial_set.ONPolynomialSet(ref_el, sd, shape=(sd,), scale=1, variant="bubble")
-    dimPd = expansions.polynomial_dimension(ref_el, sd, continuity="C0")
-    entity_ids = expansions.polynomial_entity_ids(ref_el, sd, continuity="C0")
+    # An interior entity of dimension j contributes Pk bubbles when j < k.
+    interior = order > 1 and not any(ref_el.get_interior_facets(dim) for dim in range(order))
+    degree = sd + order - 1 if interior else sd
+    Pd = polynomial_set.ONPolynomialSet(ref_el, degree, shape=(sd,), scale=1, variant="bubble")
+    dimPd = expansions.polynomial_dimension(ref_el, degree, continuity="C0")
+    entity_ids = expansions.polynomial_entity_ids(ref_el, degree, continuity="C0")
 
     slices = {dim: slice(math.comb(order-1, dim)) for dim in range(order)}
     slices.pop(sd-1, None)
@@ -67,46 +59,15 @@ def BernardiRaugelSpace(ref_el, order, ref_complex=None):
     facets = list(set(entity_ids[sd-1]) - set(interior_facets))
     ids.extend(i + j*dimPd
                for f in sorted(facets)
-               for i in entity_ids[sd-1][f]
+               for i in entity_ids[sd-1][f][:1]
                for j in range(sd))
-    BR = Pd.take(ids)
-    if order < 2 or has_interior_lattice(ref_el, order):
-        return BR
-
-    # The lowest-degree bubble is the first hierarchical basis function
-    # on the lowest-dimensional interior entity of ref_complex
-    dim = min((d for d in range(sd) if ref_complex.get_interior_facets(d)), default=sd)
-    entity, = ref_complex.get_interior_facets(dim) if dim < sd else ref_complex.get_topology()[sd]
-    bubble_ids = expansions.polynomial_entity_ids(ref_complex, dim+1, continuity="C0")
-    bubble = polynomial_set.ONPolynomialSet(ref_complex, dim+1, variant="bubble")
-    bubble = bubble.take(bubble_ids[dim][entity][:1])
-
-    # Tabulate the interior bubbles and L2-project the space onto ref_complex
-    degree = max(sd, dim + order - 1)
-    Q = create_quadrature(ref_complex, 2 * degree)
-    qpts, qwts = Q.get_points(), Q.get_weights()
-    z = (0,) * sd
-    Pk2 = polynomial_set.ONPolynomialSet(ref_el, order-2).tabulate(qpts)[z]
-    interior = numpy.multiply(Pk2, bubble.tabulate(qpts)[z])
-    interior = numpy.multiply(interior[:, None, None, :], numpy.eye(sd)[None, :, :, None])
-    vals = numpy.concatenate([BR.tabulate(qpts)[z], interior.reshape(-1, sd, len(qwts))])
-
-    U = polynomial_set.ONPolynomialSet(ref_complex, degree, shape=(sd,), scale=1, variant="bubble")
-    phis = U.tabulate(qpts)[z]
-    mass = numpy.tensordot(numpy.multiply(phis, qwts), phis, axes=((1, 2), (1, 2)))
-    rhs = numpy.tensordot(numpy.multiply(phis, qwts), vals, axes=((1, 2), (1, 2)))
-    coeffs = numpy.tensordot(numpy.linalg.solve(mass, rhs), U.get_coeffs(), axes=(0, 0))
-    return polynomial_set.PolynomialSet(ref_complex, degree, degree, U.get_expansion_set(), coeffs)
-
-
-def has_interior_lattice(ref_el, order):
-    """Return whether the Pk lattice has points in the interior of ref_el."""
-    sd = ref_el.get_spatial_dimension()
-    top = ref_el.get_topology()
-    interior = {dim: ref_el.get_interior_facets(dim) or () for dim in range(sd)}
-    interior[sd] = sorted(top[sd])
-    return any(len(ref_el.make_points(dim, entity, order)) > 0
-               for dim in interior for entity in interior[dim])
+    if interior:
+        # The cell bubbles of degree d+k-1 span b_K P_{k-2}.
+        ids.extend(i + j*dimPd
+                   for cell in sorted(entity_ids[sd])
+                   for i in entity_ids[sd][cell]
+                   for j in range(sd))
+    return Pd.take(ids)
 
 
 class BernardiRaugelDualSet(dual_set.DualSet):
@@ -195,7 +156,7 @@ class BernardiRaugelDualSet(dual_set.DualSet):
                     nodes.append(FrobeniusIntegralMoment(ref_el, Q, numpy.outer(comp, phi)))
                     entity_ids[sd-1][f].extend(range(cur, len(nodes)))
 
-                if i == 0 and order > 1 and not has_interior_lattice(ref_el, order):
+                if i == 0 and order > 1 and not any(ref_el.get_interior_facets(dim) for dim in range(order)):
                     # Interior DoFs: cell averages against the scaled facet normals,
                     # these are preserved by the contravariant Piola pullback
                     cur = len(nodes)
