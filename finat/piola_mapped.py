@@ -123,6 +123,9 @@ class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
                     if len(nodes[cur].deriv_dict) > 0:
                         V[cur, cur] = detJ
                         k += 1
+                    elif nodes[cur].functional_type == "FrobeniusIntegralMoment":
+                        # Moments against cofactor-mapped vectors are preserved by the Piola pullback
+                        k += 1
                     else:
                         s = dofs[dim][e][k:k+sd]
                         V[numpy.ix_(s, s)] = Finv
