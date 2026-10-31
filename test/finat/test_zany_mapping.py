@@ -1,11 +1,48 @@
 import FIAT
 import finat
+import gem
 import numpy as np
 import pytest
 import pprint
+from math import comb
 
 from gem.interpreter import evaluate
+from finat.fiat_elements import FiatElement
 from finat.physically_mapped import PhysicallyMappedElement
+from finat.physically_mapped import adjugate_and_determinant
+
+
+def test_rectangular_adjugate_and_determinant():
+    J = gem.Literal(np.array([[3., 0.], [0., 4.], [0., 0.]]))
+    J = np.array([[J[i, k] for k in range(2)] for i in range(3)], dtype=object)
+    adjJ, detJ = adjugate_and_determinant(J)
+    assert evaluate([detJ])[0].arr == pytest.approx(12.)
+    K = evaluate([gem.ListTensor(adjJ.T)])[0].arr
+    assert np.allclose(K, [[4, 0], [0, 3], [0, 0]])
+    adjJ = evaluate([gem.ListTensor(adjJ)])[0].arr
+    assert adjJ.shape == (2, 3)
+    assert np.allclose(adjJ, [[4, 0, 0], [0, 3, 0]])
+
+
+@pytest.fixture(params=["positive", "negative"])
+def phys_el(request):
+    K = {dim: FIAT.ufc_simplex(dim) for dim in (1, 2, 3)}
+    K[1].vertices = ((0.1,), (1.27,))
+    K[2].vertices = ((0.0, 0.1), (1.17, -0.09), (0.15, 1.84))
+    K[3].vertices = ((0, 0, 0),
+                     (1., 0.1, -0.37),
+                     (0.01, 0.987, -.23),
+                     (-0.1, -0.2, 1.38))
+    if request.param == "negative":
+        # swap two vertices to reverse the orientation
+        for dim in K:
+            v = list(K[dim].vertices)
+            if dim == 1:
+                v[0], v[1] = v[1], v[0]
+            else:
+                v[1], v[2] = v[2], v[1]
+            K[dim].vertices = tuple(v)
+    return K
 
 
 def make_unisolvent_points(element, interior=False):
@@ -103,6 +140,13 @@ def check_zany_mapping(element, ref_to_phys, *args, **kwargs):
     assert np.allclose(ref_vals_zany, phys_vals[:num_dofs]), pp.pformat((np.round(error, 8).tolist(), *inds))
 
 
+@pytest.mark.parametrize("element, degree", [
+    *((finat.Hermite, k) for k in range(3, 6)),
+])
+def test_C1_interval(ref_to_phys, element, degree):
+    check_zany_mapping(element, ref_to_phys[1], degree)
+
+
 @pytest.mark.parametrize("element", [
                          finat.Morley,
                          finat.Hermite,
@@ -116,6 +160,7 @@ def test_C1_triangle(ref_to_phys, element):
 
 @pytest.mark.parametrize("element", [
                          finat.Morley,
+                         finat.Hermite,
                          finat.Walkington,
                          ])
 def test_C1_tetrahedron(ref_to_phys, element):
@@ -171,18 +216,29 @@ zany_piola_elements = {
 
 
 @pytest.mark.parametrize("dimension, element", [
-                         *((2, e) for e in zany_piola_elements[2]),
-                         *((2, e) for e in zany_piola_elements[3]),
-                         *((3, e) for e in zany_piola_elements[3]),
-                         ])
+    *((2, e) for e in zany_piola_elements[2]),
+    *((2, e) for e in zany_piola_elements[3]),
+    *((3, e) for e in zany_piola_elements[3]),
+])
 def test_piola(ref_to_phys, element, dimension):
     check_zany_mapping(element, ref_to_phys[dimension])
 
 
-def test_quadratic_guzman_neilan(ref_to_phys):
-    element = finat.GuzmanNeilanFirstKindH1
-    dimension = 3
-    degree = 2
+class UnreducedArnoldWinther(PhysicallyMappedElement, FiatElement):
+    """The Arnold-Winther element with its divergence constraint dofs exposed."""
+    def __init__(self, cell, degree=3):
+        super().__init__(FIAT.ArnoldWinther(cell, degree))
+
+
+def test_unreduced_arnold_winther(ref_to_phys):
+    check_zany_mapping(UnreducedArnoldWinther, ref_to_phys[2])
+
+
+@pytest.mark.parametrize("dimension, element, degree", [
+    (3, finat.MardalTaiWinther, 2),
+    (3, finat.GuzmanNeilanFirstKindH1, 2),
+])
+def test_high_order_stokes_elements(ref_to_phys, element, dimension, degree):
     check_zany_mapping(element, ref_to_phys[dimension], degree)
 
 
@@ -211,3 +267,149 @@ def test_affine(ref_to_phys, element, degree, variant, dimension):
 @pytest.mark.parametrize("variant", [None, "iso"])
 def test_macro_piola(ref_to_phys, element, degree, variant, dimension):
     check_zany_mapping(element, ref_to_phys[dimension], degree, variant=variant)
+
+
+def check_dual_evaluation(element, ref_to_phys, *args, **kwargs):
+    """The physical nodes are dual to the physical basis functions."""
+    finat_element = element(ref_to_phys.ref_cell, *args, **kwargs)
+    sd = ref_to_phys.ref_cell.get_spatial_dimension()
+    Q, x = finat_element.dual_basis
+    Q = finat_element.dual_transformation(Q, coordinate_mapping=ref_to_phys)
+    phi = finat_element.basis_evaluation(0, x, coordinate_mapping=ref_to_phys)[(0,)*sd]
+
+    i, j = gem.indices(2)
+    shape_indices = gem.indices(len(phi.shape) - 1)
+    expr = gem.IndexSum(Q[(i, *shape_indices)] * phi[(j, *shape_indices)],
+                        (*x.indices, *shape_indices))
+    result = evaluate([gem.ComponentTensor(expr, (i, j))])[0].arr
+    assert np.allclose(result, np.eye(finat_element.space_dimension()))
+
+
+# FInAT has no dual basis for elements with derivative nodes
+dual_basis_elements = [e for e in zany_piola_elements[3]
+                       if e not in (finat.AlfeldSorokina, finat.GuzmanNeilanH1div)]
+
+
+@pytest.mark.parametrize("dimension, element", [
+    *((2, e) for e in zany_piola_elements[2]),
+    *((2, e) for e in dual_basis_elements),
+    *((3, e) for e in dual_basis_elements),
+])
+def test_dual_evaluation(ref_to_phys, element, dimension):
+    check_dual_evaluation(element, ref_to_phys[dimension])
+
+
+class SymbolicMapping:
+    def __init__(self, sd):
+        self.J = gem.Variable("J", (sd, sd))
+        self.h = gem.Variable("h", (sd + 1,))
+
+    def jacobian_at(self, point):
+        return self.J
+
+    def cell_size(self):
+        return self.h
+
+
+def transformations(element, sd):
+    mapping = SymbolicMapping(sd)
+    return element._physical_vandermonde(mapping), element._inverse_physical_vandermonde(mapping)
+
+
+def nonzeros(row):
+    return {j for j, entry in enumerate(row) if not isinstance(entry, gem.Zero)}
+
+
+@pytest.mark.parametrize("element, degree, first_degree", [
+    (finat.HsiehCloughTocher, 3, 3),
+    (finat.HsiehCloughTocher, 4, 3),
+    (finat.HsiehCloughTocher, 5, 3),
+    (finat.Argyris, 5, 5),
+    (finat.Argyris, 6, 5),
+    (finat.Argyris, 7, 5),
+])
+def test_edge_moment_sparsity(element, degree, first_degree):
+    """Integration by parts couples a normal moment to its endpoints and matching trace moment."""
+    cell = FIAT.ufc_simplex(2)
+    element = element(cell, degree, avg=True)
+    B, V = transformations(element, 2)
+    dofs = element._element.entity_dofs()
+    k = degree - first_degree
+    for edge, edge_dofs in dofs[1].items():
+        endpoints = {dofs[0][v][0] for v in cell.get_topology()[1][edge]}
+        for mode, i in enumerate(edge_dofs[:k + 1]):
+            # Integral p_i d_t f = [p_i f] - Integral p_i' f.
+            expected = {i} | endpoints
+            if mode:
+                expected.add(edge_dofs[k + mode])
+            assert nonzeros(B[i]) == expected
+            assert nonzeros(V[i]) == expected
+        for i in edge_dofs[k + 1:]:
+            assert nonzeros(B[i]) == {i}
+            assert nonzeros(V[i]) == {i}
+
+
+@pytest.mark.parametrize("sd, element, degree", [
+    (2, finat.Hermite, 3),
+    (3, finat.Hermite, 3),
+    (2, finat.Argyris, 5),
+    (2, finat.AlfeldC2, 5),
+    (2, finat.BrambleZlamalC2, 9),
+    (3, finat.Walkington, 5),
+])
+def test_vertex_jet_sparsity(sd, element, degree):
+    """An affine chain rule mixes only derivatives of the same order at the same vertex."""
+    element = element(FIAT.ufc_simplex(sd), degree)
+    B, V = transformations(element, sd)
+    for dofs in element._element.entity_dofs()[0].values():
+        for i in dofs:
+            order = element._element.dual_basis()[i].max_deriv_order
+            expected = {j for j in dofs if element._element.dual_basis()[j].max_deriv_order == order}
+            assert nonzeros(B[i]) == expected
+            assert nonzeros(V[i]) == expected
+
+
+@pytest.mark.parametrize("sd, order", [(2, 1), (3, 1), (3, 2)])
+def test_piola_facet_sparsity(sd, order):
+    """MTW normal moments are invariant; each tangential moment couples only to matching normal weights."""
+    element = finat.MardalTaiWinther(FIAT.ufc_simplex(sd), order)
+    B, V = transformations(element, sd)
+    nnormal = comb(order + sd - 1, sd - 1)
+    for dofs in element._element.entity_dofs()[sd - 1].values():
+        for i in dofs[:nnormal]:
+            assert nonzeros(B[i]) == {i}
+            assert nonzeros(V[i]) == {i}
+        for mode, i in enumerate(dofs[nnormal:]):
+            # Constant tangents pair with the constant normal moment;
+            # the 3D radial tangent pairs with the two linear normal moments.
+            normal_dofs = dofs[1:3] if mode == 2 else dofs[:1]
+            expected = {i, *normal_dofs}
+            assert nonzeros(B[i]) == expected
+            assert nonzeros(V[i]) == expected
+
+
+@pytest.mark.parametrize("sd, element, degree", [
+    (2, finat.Bell, 5),
+    (2, finat.ReducedHsiehCloughTocher, 3),
+    (2, finat.MardalTaiWinther, 1),
+    (3, finat.MardalTaiWinther, 2),
+    (2, finat.ArnoldWinther, 3),
+    (3, finat.Walkington, 5),
+])
+def test_entity_closure_sparsity(sd, element, degree):
+    """Back-substitution introduces no couplings outside entity closures, including constraints."""
+    element = element(FIAT.ufc_simplex(sd), degree)
+    B, V = transformations(element, sd)
+    closures = element._element.entity_closure_dofs()
+    for entities in closures.values():
+        for closure_dofs in entities.values():
+            allowed = set(closure_dofs)
+            for i in closure_dofs:
+                assert nonzeros(B[i]) <= allowed
+                assert nonzeros(V[i]) <= allowed
+
+    ndof = element.space_dimension()
+    M = element.basis_transformation(SymbolicMapping(sd)).array
+    assert M.shape == (ndof, element._element.space_dimension())
+    assert np.array_equal([[isinstance(entry, gem.Zero) for entry in row] for row in M],
+                          [[isinstance(entry, gem.Zero) for entry in row] for row in V[:, :ndof].T])

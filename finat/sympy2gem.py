@@ -1,6 +1,5 @@
 from functools import singledispatch, reduce
 
-import numpy
 import sympy
 try:
     import symengine
@@ -130,18 +129,7 @@ def sympy2gem_le(node, self):
 @sympy2gem.register(sympy.Piecewise)
 @sympy2gem.register(symengine.Piecewise)
 def sympy2gem_conditional(node, self):
-    expr = None
-    pieces = []
-    for v, c in node.args:
-        if isinstance(c, (bool, numpy.bool, sympy.logic.boolalg.BooleanTrue)) and c:
-            expr = self(v)
-            break
-        pieces.append((v, c))
-    if expr is None:
-        expr = gem.Literal(float("nan"))
-    for v, c in reversed(pieces):
-        expr = gem.Conditional(self(c), self(v), expr)
-    return expr
+    return gem.Piecewise(*[(self(v), self(c)) for v, c in node.args])
 
 
 @sympy2gem.register(sympy.ITE)

@@ -16,7 +16,7 @@ indices.
 
 from abc import ABCMeta
 from itertools import chain, repeat
-from functools import reduce
+from functools import partial, reduce
 from operator import attrgetter
 from numbers import Integral, Number
 
@@ -36,7 +36,7 @@ __all__ = ['Node', 'Identity', 'Literal', 'Zero', 'Failure',
            'IndexSum', 'ListTensor', 'Concatenate', 'Delta', 'OrientationVariableIndex',
            'index_sum', 'partial_indexed', 'reshape', 'view',
            'indices', 'as_gem', 'FlexiblyIndexed',
-           'Inverse', 'Solve', 'extract_type', 'uint_type']
+           'Inverse', 'Solve', 'extract_type', 'uint_type', 'Piecewise']
 
 
 uint_type = numpy.dtype(numpy.uintc)
@@ -88,28 +88,29 @@ class Node(NodeBase, metaclass=NodeMeta):
             indices = (indices, )
         return Indexed(self, indices)
 
+    def __neg__(self):
+        return componentwise(Product, minus, self)
+
     def __add__(self, other):
-        return componentwise(Sum, self, as_gem(other))
+        return componentwise(Sum, self, as_gem(other, dtype=self.dtype))
 
     def __radd__(self, other):
-        return as_gem(other).__add__(self)
+        return as_gem(other, dtype=self.dtype).__add__(self)
 
     def __sub__(self, other):
-        return componentwise(
-            Sum, self,
-            componentwise(Product, Literal(-1), as_gem(other)))
+        return componentwise(Sum, self, -as_gem(other, dtype=self.dtype))
 
     def __rsub__(self, other):
-        return as_gem(other).__sub__(self)
+        return as_gem(other, dtype=self.dtype).__sub__(self)
 
     def __mul__(self, other):
-        return componentwise(Product, self, as_gem(other))
+        return componentwise(Product, self, as_gem(other, dtype=self.dtype))
 
     def __rmul__(self, other):
-        return as_gem(other).__mul__(self)
+        return as_gem(other, dtype=self.dtype).__mul__(self)
 
     def __matmul__(self, other):
-        other = as_gem(other)
+        other = as_gem(other, dtype=self.dtype)
         if not self.shape and not other.shape:
             return Product(self, other)
         elif not (self.shape and other.shape):
@@ -122,7 +123,25 @@ class Node(NodeBase, metaclass=NodeMeta):
         return ComponentTensor(IndexSum(expr, (k, )), (*i, *j))
 
     def __rmatmul__(self, other):
-        return as_gem(other).__matmul__(self)
+        return as_gem(other, dtype=self.dtype).__matmul__(self)
+
+    def __abs__(self):
+        return componentwise(partial(MathFunction, "abs"), self)
+
+    def __pow__(self, other):
+        return componentwise(Power, self, as_gem(other))
+
+    def __lt__(self, other):
+        return componentwise(partial(Comparison, "<"), self, as_gem(other, dtype=self.dtype))
+
+    def __gt__(self, other):
+        return componentwise(partial(Comparison, ">"), self, as_gem(other, dtype=self.dtype))
+
+    def __le__(self, other):
+        return componentwise(partial(Comparison, "<="), self, as_gem(other, dtype=self.dtype))
+
+    def __ge__(self, other):
+        return componentwise(partial(Comparison, ">="), self, as_gem(other, dtype=self.dtype))
 
     @property
     def T(self):
@@ -272,7 +291,6 @@ class Literal(Constant):
     __back__ = ('dtype',)
 
     def __new__(cls, array, dtype=None):
-        array = asarray(array)
         return super(Literal, cls).__new__(cls)
 
     def __init__(self, array, dtype=None):
@@ -306,6 +324,9 @@ class Literal(Constant):
     @property
     def shape(self):
         return self.array.shape
+
+    def __bool__(self):
+        return bool(self.value)
 
 
 class Variable(Terminal):
@@ -553,8 +574,8 @@ class LogicalOr(Scalar):
         self.children = a, b
 
 
-class Conditional(Node):
-    __slots__ = ('children', 'shape')
+class Conditional(Scalar):
+    __slots__ = ('children',)
 
     def __new__(cls, condition, then, else_):
         assert not condition.shape
@@ -567,7 +588,6 @@ class Conditional(Node):
 
         self = super(Conditional, cls).__new__(cls)
         self.children = condition, then, else_
-        self.shape = then.shape
         self.dtype = Node.inherit_dtype_from_children((then, else_))
         return self
 
@@ -613,7 +633,7 @@ class Index(IndexBase):
 
     def __lt__(self, other):
         # Allow sorting of free indices in Python 3
-        return id(self) < id(other)
+        return self.count < other.count
 
     def __getstate__(self):
         return self.name, self.extent, self.count
@@ -786,11 +806,6 @@ class FlexiblyIndexed(Scalar):
                     idxs_.append((index, stride))
                     # last += (unknown_extent - 1) * stride
                 elif isinstance(index, int):
-                    # TODO: Attach dtype to each Node.
-                    # Here, we should simply be able to do:
-                    # >>> offset_ += index * stride
-                    # but "+" and "*" are not currently correctly overloaded
-                    # for indices (integers); they assume floats.
                     if not isinstance(offset, Integral):
                         raise NotImplementedError(f"Found non-Integral offset : {offset}")
                     if isinstance(stride, Constant):
@@ -855,8 +870,11 @@ class ComponentTensor(Node):
 
         # Index folding
         if isinstance(expression, Indexed):
-            if multiindex == expression.multiindex:
-                return expression.children[0]
+            child, = expression.children
+            # Simplify ComponentTensor(Indexed(child, i), i) -> child
+            # Only fold if the child does not depend on the multiindex
+            if multiindex == expression.multiindex and not (set(multiindex) & set(child.free_indices)):
+                return child
 
         self = super(ComponentTensor, cls).__new__(cls)
         self.children = (expression,)
@@ -1128,7 +1146,7 @@ def unique(indices):
     :arg indices: iterable of indices
     :returns: sorted tuple of unique free indices
     """
-    return tuple(sorted(set(indices), key=id))
+    return tuple(sorted(set(indices), key=lambda index: index.count))
 
 
 def index_sum(expression, indices):
@@ -1269,6 +1287,7 @@ def view(expression, *slices):
 
 # Static one object for quicker constant folding
 one = Literal(1)
+minus = Literal(-1, dtype=int)
 
 
 # Syntax sugar
@@ -1303,13 +1322,17 @@ def componentwise(op, *exprs):
     return ComponentTensor(op(*exprs), i)
 
 
-def as_gem(expr):
+def as_gem(expr, dtype=None):
     """Attempt to convert an expression into GEM of scalar type.
 
     Parameters
     ----------
     expr : Node or Number
         The expression.
+    dtype : numpy.dtype, optional
+        The dtype of the node that ``expr`` combines with. A number then
+        converts to the smallest dtype that holds both its value and
+        ``dtype``. Without ``dtype``, a number converts to float or complex.
 
     Returns
     -------
@@ -1325,7 +1348,17 @@ def as_gem(expr):
     if isinstance(expr, Node):
         return expr
     elif isinstance(expr, Number):
-        return Literal(expr)
+        if dtype is not None:
+            dtype = numpy.result_type(dtype, numpy.min_scalar_type(expr))
+        return Literal(expr, dtype=dtype)
+    elif isinstance(expr, (bool, numpy.bool)):
+        return Literal(bool(expr))
+    elif isinstance(expr, numpy.ndarray):
+        if expr.dtype == object:
+            expr = numpy.vectorize(as_gem)(expr)
+            return ListTensor(expr)
+        else:
+            return Literal(expr)
     else:
         raise ValueError("Do not know how to convert %r to GEM" % expr)
 
@@ -1360,3 +1393,31 @@ def as_gem_uint(expr):
 def extract_type(expressions, klass):
     """Collects objects of type klass in expressions."""
     return tuple(node for node in traversal(expressions) if isinstance(node, klass))
+
+
+def Piecewise(*args):
+    """Represents a piecewise function.
+
+    Parameters
+    ----------
+    *args
+        Each argument is a 2-tuple defining an expression and condition.
+
+    Returns
+    -------
+    Node
+        A nested Conditional.
+
+    """
+    expr = None
+    pieces = []
+    for v, c in args:
+        if isinstance(c, (bool, numpy.bool, Literal)) and c:
+            expr = as_gem(v)
+            break
+        pieces.append((as_gem(v), as_gem(c)))
+    if expr is None:
+        expr = Literal(float("nan"))
+    for v, c in reversed(pieces):
+        expr = Conditional(c, v, expr)
+    return expr

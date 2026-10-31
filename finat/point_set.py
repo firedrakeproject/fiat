@@ -27,7 +27,7 @@ class AbstractPointSet(abc.ABC):
     @property
     @abc.abstractmethod
     def points(self):
-        """A flattened numpy array of points or ``UnknownPointsArray``
+        """A flattened numpy array of points or :class:`UnknownPointsArray`
         object with shape (# of points, point dimension)."""
 
     @property
@@ -46,6 +46,15 @@ class AbstractPointSet(abc.ABC):
     def expression(self):
         """GEM expression describing the points, with free indices
         ``self.indices`` and shape (point dimension,)."""
+
+    @cached_property
+    def point_sets(self):
+        """The point sets this point set is a union of.
+
+        A plain point set is the union of just itself; overridden by
+        :class:`UnionPointSet` for the point sets it is actually a union of.
+        """
+        return (self,)
 
 
 class PointSingleton(AbstractPointSet):
@@ -76,13 +85,13 @@ class PointSingleton(AbstractPointSet):
 
     @cached_property
     def expression(self):
-        return gem.Literal(self.point)
+        return gem.as_gem(self.point)
 
 
 class UnknownPointsArray():
     """A placeholder for a set of unknown points with appropriate length
-    and size but without indexable values. For use with
-    :class:`AbstractPointSet`s whose points are not known at compile
+    and size but without indexable values. For use with an
+    :class:`AbstractPointSet` whose points are not known at compile
     time."""
     def __init__(self, shape):
         """
@@ -98,13 +107,13 @@ class UnknownPointsArray():
 
 class UnknownPointSet(AbstractPointSet):
     """A point set representing a vector of points with unknown
-    locations but known ``gem.Variable`` expression.
+    locations but known :class:`gem.gem.Variable` expression.
 
-    The ``.points`` property is an `UnknownPointsArray` object with
+    The ``.points`` property is an :class:`UnknownPointsArray` object with
     shape (N, D) where N is the number of points and D is their
     dimension.
 
-    The ``.expression`` property is a derived `gem.partial_indexed` with
+    The ``.expression`` property is a derived :func:`gem.gem.partial_indexed` with
     shape (D,) and free indices for the points N."""
 
     def __init__(self, points_expr):
@@ -231,6 +240,27 @@ class TensorPointSet(AbstractPointSet):
             len(self.factors) == len(other.factors) and \
             all(s.almost_equal(o, tolerance=tolerance)
                 for s, o in zip(self.factors, other.factors))
+
+
+class UnionPointSet(PointSet):
+    """All of the points of several point sets, along a single point index.
+
+    :arg point_sets: the point sets to take the union of, in the order they
+        occupy the point index.  A union of unions is flattened.
+
+    These are the points of a dual basis that evaluates summand by summand,
+    named so that a function space can be built on them.  The point sets are
+    kept because an element that needs their structure to tabulate -- a tensor
+    product, which cannot factor the union -- tabulates on each in turn.
+    """
+
+    def __init__(self, point_sets):
+        self.point_sets = tuple(chain(*(ps.point_sets for ps in point_sets)))
+        super().__init__(numpy.concatenate([ps.points
+                                            for ps in self.point_sets]))
+
+    def __repr__(self):
+        return f"{type(self).__name__}({self.point_sets!r})"
 
 
 class FacetPointSet(AbstractPointSet):

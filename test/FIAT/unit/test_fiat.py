@@ -50,7 +50,7 @@ from FIAT.arnold_winther import ArnoldWinther, ArnoldWintherNC  # noqa: F401
 from FIAT.hu_zhang import HuZhang                               # noqa: F401
 from FIAT.bernardi_raugel import BernardiRaugel                 # noqa: F401
 from FIAT.argyris import Argyris                                # noqa: F401
-from FIAT.hermite import CubicHermite                           # noqa: F401
+from FIAT.hermite import Hermite                                # noqa: F401
 from FIAT.morley import Morley                                  # noqa: F401
 from FIAT.hct import HsiehCloughTocher                          # noqa: F401
 from FIAT.c2_elements import AlfeldC2, BrambleZlamalC2          # noqa: F401
@@ -66,6 +66,7 @@ from FIAT.nodal_enriched import NodalEnrichedElement
 from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen    # noqa: F401
 from FIAT.histopolation import Histopolation                    # noqa: F401
 from FIAT.wuxu import WuXuH3NC, WuXuRobustH3NC                  # noqa: F401
+from FIAT.walkington import Walkington                         # noqa: F401
 
 P = Point()
 I = UFCInterval()  # noqa: E741
@@ -353,15 +354,17 @@ elements = [
     "Argyris(T, 6, 'integral')",
     "WuXuH3NC(T, 4)",
     "WuXuRobustH3NC(T, 7)",
-    "CubicHermite(I)",
-    "CubicHermite(T)",
-    "CubicHermite(S)",
+    "Hermite(I)",
+    "Hermite(I, 4)",
+    "Hermite(T)",
+    "Hermite(S)",
     "Morley(T)",
     "Morley(S)",
     "BernardiRaugel(T)",
     "BernardiRaugel(S)",
-    "MardalTaiWinther(T, 3)",
-    "MardalTaiWinther(S, 4)",
+    "MardalTaiWinther(T, 1)",
+    "MardalTaiWinther(S, 1)",
+    "MardalTaiWinther(S, 2)",
     "ArnoldWintherNC(T, 2)",
     "ArnoldWinther(T, 3)",
     "HuZhang(T, 3)",

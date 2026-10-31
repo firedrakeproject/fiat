@@ -106,12 +106,12 @@ register_element("Gopalakrishnan-Lederer-Schoberl 2nd kind", "GLS2", 2, HCurlDiv
 
 register_element("Nonconforming Arnold-Winther", "AWnc", 2, HDiv, "double contravariant Piola", (2, 2), ("triangle",))
 register_element("Conforming Arnold-Winther", "AWc", 2, HDiv, "double contravariant Piola", (3, None), ("triangle",))
-register_element("Hu-Zhang", "HZ", 2, HDiv, "double contravariant Piola", (3, None), ("triangle"))
+register_element("Hu-Zhang", "HZ", 2, HDiv, "double contravariant Piola", (3, None), ("triangle",))
 
 # Zany elements
 register_element("Bernardi-Raugel", "BR", 1, H1, "contravariant Piola", (1, None), simplices[1:])
 register_element("Bernardi-Raugel Bubble", "BRB", 1, H1, "contravariant Piola", (None, None), simplices[1:])
-register_element("Mardal-Tai-Winther", "MTW", 1, H1, "contravariant Piola", (3, 4), ("triangle", "tetrahedron"))
+register_element("Mardal-Tai-Winther", "MTW", 1, H1, "contravariant Piola", (1, 2), ("triangle", "tetrahedron"))
 register_element("Hermite", "HER", 0, H1, "custom", (3, 3), simplices)
 register_element("Argyris", "ARG", 0, H2, "custom", (5, None), ("triangle",))
 register_element("Bell", "BELL", 0, H2, "custom", (5, 5), ("triangle",))
@@ -182,8 +182,8 @@ register_alias("DGT",
                lambda family, dim, order, degree: ("HDiv Trace", order))
 
 # New elements introduced for the periodic table 2014
-register_element("Q", None, 0, H1, "identity", (1, None), cubes)
-register_element("DQ", None, 0, L2, "identity", (0, None), cubes)
+register_element("Q", None, 0, H1, "identity", (1, None), cubes[1:])
+register_element("DQ", None, 0, L2, "identity", (0, None), cubes[1:])
 register_element("RTCE", None, 1, HCurl, "covariant Piola", (1, None), ("quadrilateral",))
 register_element("RTCF", None, 1, HDiv, "contravariant Piola", (1, None), ("quadrilateral",))
 register_element("NCE", None, 1, HCurl, "covariant Piola", (1, None), ("hexahedron",))
@@ -224,7 +224,7 @@ register_alias("N2F", lambda family, dim, order,
 
 # discontinuous elements using l2 pullbacks
 register_element("DPC L2", None, 0, L2, "L2 Piola", (1, None), cubes)
-register_element("DQ L2", None, 0, L2, "L2 Piola", (0, None), cubes)
+register_element("DQ L2", None, 0, L2, "L2 Piola", (0, None), cubes[1:])
 register_element("Gauss-Legendre L2", "GL L2", 0, L2, "L2 Piola", (0, None),
                  ("interval",))
 register_element("Discontinuous Lagrange L2", "DG L2", 0, L2, "L2 Piola", (0, None),
@@ -478,6 +478,8 @@ def canonical_element_description(family, cell, order, form_degree):
         else:
             bump = 2
         embedded_degree += bump
+    elif family == "Mardal-Tai-Winther":
+        embedded_degree = tdim + 1
     elif any(bubble in family for bubble in ("Guzman-Neilan", "Bernardi-Raugel")):
         embedded_degree = tdim
 

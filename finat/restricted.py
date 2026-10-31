@@ -1,4 +1,4 @@
-from functools import singledispatch
+from functools import partial, singledispatch
 from itertools import chain
 
 import FIAT
@@ -11,6 +11,40 @@ from finat.physically_mapped import PhysicallyMappedElement
 
 # Sentinel for when restricted element is empty
 null_element = object()
+
+
+class RestrictedPhysicallyMappedElement(PhysicallyMappedElement, FiatElement):
+    """A restricted PhysicallyMappedElement.
+
+    The physical transformation is that of the parent element over all
+    reference dofs; the restriction only selects which dofs are exposed.
+
+    :arg element: the PhysicallyMappedElement to be restricted.
+    :arg indices: the reference dofs to be kept.
+    """
+    def __init__(self, element, indices):
+        super().__init__(element._element)
+        self._parent = element
+        # Some finat elements, e.g. Bell, already expose a subset of the
+        # reference dofs. Therefore, we need to compose the restrictions.
+        parent_indices = element._physical_indices
+        self._physical_indices = [i for i in parent_indices if i in indices]
+        local = {i: k for k, i in enumerate(self._physical_indices)}
+        edofs = element.entity_dofs()
+        self._entity_dofs = {d: {e: [local[parent_indices[k]] for k in edofs[d][e] if parent_indices[k] in local]
+                                 for e in edofs[d]} for d in edofs}
+
+    def _physical_vandermonde(self, coordinate_mapping):
+        return self._parent._physical_vandermonde(coordinate_mapping)
+
+    def _inverse_physical_vandermonde(self, coordinate_mapping):
+        return self._parent._inverse_physical_vandermonde(coordinate_mapping)
+
+    def space_dimension(self):
+        return len(self._physical_indices)
+
+    def entity_dofs(self):
+        return self._entity_dofs
 
 
 @singledispatch
@@ -38,17 +72,19 @@ def restrict_fiat(element, domain, take_closure):
     except ValueError:
         return null_element
 
-    if element.space_dimension() == re.space_dimension():
-        # FIAT.RestrictedElement wipes out entity_permuations.
+    if isinstance(element, PhysicallyMappedElement) and not (domain == "interior" and not take_closure):
+        restricted = RestrictedPhysicallyMappedElement(element, re._indices)
+    else:
+        restricted = FiatElement(re)
+
+    if restricted.space_dimension() == 0:
+        return null_element
+    if restricted.space_dimension() == element.space_dimension():
+        # FIAT.RestrictedElement wipes out entity_permutations.
         # In case the restriction is trivial we return the original element
         # to avoid reconstructing the space with an undesired permutation.
         return element
-    return FiatElement(re)
-
-
-@restrict.register(PhysicallyMappedElement)
-def restrict_physically_mapped(element, domain, take_closure):
-    raise NotImplementedError("Can't restrict Physically Mapped things")
+    return restricted
 
 
 @restrict.register(finat.FlattenedDimensions)
@@ -82,7 +118,10 @@ def restrict_enriched(element, domain, take_closure):
     elif not any(isinstance(e, finat.mixed.MixedSubElement) for e in element.elements):
         elements = tuple(restrict(e, domain, take_closure)
                          for e in element.elements)
-        reconstruct = finat.EnrichedElement
+        # Restriction selects disjoint subsets of the DoFs, so the restricted
+        # subelements are nodal whenever the original ones are.
+        reconstruct = partial(finat.EnrichedElement,
+                              is_nodal_enriched=element.is_nodal_enriched)
     else:
         raise NotImplementedError("Not expecting enriched with mixture of MixedSubElement and others")
 
@@ -93,30 +132,21 @@ def restrict_enriched(element, domain, take_closure):
         return null_element
 
 
-@restrict.register(finat.HCurlElement)
-def restrict_hcurl(element, domain, take_closure):
+@restrict.register(finat.hdivcurl.WrapperElementBase)
+def restrict_hdivcurl(element, domain, take_closure):
+    """Restrict an element that wraps another with a pullback.
+
+    The pullback acts on each subelement separately, so it preserves
+    whichever subelements the restriction selects, and with them the
+    nodality of the restricted element.
+    """
     restricted = restrict(element.wrappee, domain, take_closure)
     if restricted is null_element:
         return null_element
+    elif isinstance(restricted, finat.EnrichedElement):
+        return finat.enriched.distribute_over_sum(type(element), restricted)
     else:
-        if isinstance(restricted, finat.EnrichedElement):
-            return finat.EnrichedElement(finat.HCurlElement(e)
-                                         for e in restricted.elements)
-        else:
-            return finat.HCurlElement(restricted)
-
-
-@restrict.register(finat.HDivElement)
-def restrict_hdiv(element, domain, take_closure):
-    restricted = restrict(element.wrappee, domain, take_closure)
-    if restricted is null_element:
-        return null_element
-    else:
-        if isinstance(restricted, finat.EnrichedElement):
-            return finat.EnrichedElement(finat.HDivElement(e)
-                                         for e in restricted.elements)
-        else:
-            return finat.HDivElement(restricted)
+        return type(element)(restricted)
 
 
 @restrict.register(finat.mixed.MixedSubElement)
@@ -204,7 +234,7 @@ def restrict_tpe(element, domain, take_closure):
         if all(f is not null_element for f in new_factors):
             elements.append(finat.TensorProductElement(new_factors))
     if elements:
-        return finat.EnrichedElement(elements)
+        return finat.EnrichedElement(elements, is_nodal_enriched=True)
     else:
         return null_element
 

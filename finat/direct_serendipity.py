@@ -136,12 +136,14 @@ def xysub(x, y):
 def ds1_sym(ct, *, vs=None, sp=symbolics):
     """Constructs lowest-order case of Arbogast's directly defined C^0 serendipity
     elements, which are a special case.
-    :param ct: The cell topology of the reference quadrilateral.
-    :param vs: (Optional) coordinates of cell on which to construct the basis.
-               If it is None, this function constructs symbols for the vertices.
+
+    :arg ct: The cell topology of the reference quadrilateral.
+    :kwarg vs: (Optional) coordinates of cell on which to construct the basis.
+        If it is None, this function constructs symbols for the vertices.
+
     :returns: a 3-tuple containing symbols for the physical cell coordinates and the
-              physical cell independent variables (e.g. "x" and "y") and a list
-              of the four basis functions.
+        physical cell independent variables (e.g. "x" and "y") and a list
+        of the four basis functions.
     """
     if vs is None:
         vs = numpy.asarray(list(zip(sp.symbols('x:4'),
@@ -255,12 +257,14 @@ def dsr_sym(ct, r, *, vs=None, sp=symbolics):
     """Constructs higher-order (>= 2) case of Arbogast's directly defined C^0 serendipity
     elements, which include all polynomials of degree r plus a couple of rational
     functions.
-    :param ct: The cell topology of the reference quadrilateral.
-    :param vs: (Optional) coordinates of cell on which to construct the basis.
-               If it is None, this function constructs symbols for the vertices.
+
+    :arg ct: The cell topology of the reference quadrilateral.
+    :kwarg vs: (Optional) coordinates of cell on which to construct the basis.
+        If it is None, this function constructs symbols for the vertices.
+
     :returns: a 3-tuple containing symbols for the physical cell coordinates and the
-              physical cell independent variables (e.g. "x" and "y") and a list
-              of the four basis functions.
+        physical cell independent variables (e.g. "x" and "y") and a list
+        of the four basis functions.
     """
     if vs is None:  # do vertices symbolically
         vs = numpy.asarray(list(zip(sp.symbols('x:4'),
@@ -477,12 +481,14 @@ def dsr_sym(ct, r, *, vs=None, sp=symbolics):
 def ds_sym(ct, r, *, vs=None, sp=symbolics):
     """Symbolically Constructs Arbogast's directly defined C^0 serendipity elements,
     which include all polynomials of degree r plus a couple of rational functions.
-    :param ct: The cell topology of the reference quadrilateral.
-    :param vs: (Optional) coordinates of cell on which to construct the basis.
-               If it is None, this function constructs symbols for the vertices.
+
+    :arg ct: The cell topology of the reference quadrilateral.
+    :kwarg vs: (Optional) coordinates of cell on which to construct the basis.
+        If it is None, this function constructs symbols for the vertices.
+
     :returns: a 3-tuple containing symbols for the physical cell coordinates and the
-              physical cell independent variables (e.g. "x" and "y") and a list
-              of the four basis functions.
+        physical cell independent variables (e.g. "x" and "y") and a list
+        of the four basis functions.
     """
     if r == 1:
         return ds1_sym(ct, vs=vs, sp=sp)

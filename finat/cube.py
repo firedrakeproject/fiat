@@ -99,3 +99,6 @@ class FlattenedDimensions(FiniteElementBase):
     @property
     def mapping(self):
         return self.product.mapping
+
+    def dual_evaluation(self, argument, coordinate_mapping=None):
+        return self.product.dual_evaluation(argument, coordinate_mapping)

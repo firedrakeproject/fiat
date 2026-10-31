@@ -12,7 +12,7 @@
 from FIAT import finite_element, dual_set, polynomial_set, expansions
 from FIAT.check_format_variant import parse_quadrature_scheme
 from FIAT.functional import ComponentPointEvaluation, FrobeniusIntegralMoment
-from FIAT.hierarchical import make_dual_bubbles
+from FIAT.hierarchical import make_projected_bubble_moments
 from FIAT.quadrature import FacetQuadratureRule
 
 import numpy
@@ -71,21 +71,19 @@ class BernardiRaugelDualSet(dual_set.DualSet):
 
         if order < sd:
             # Face moments of normal component against constant
-            # Face moments of tangential components against dual bubbles
+            # Face moments of tangential components against projected bubbles
             ref_facet = ref_complex.construct_subcomplex(sd-1)
             ref_area = ref_facet.volume()
-
             # Quadrature and weight function for tangential constraints
             codim = sd-1 if degree == 1 and ref_facet.is_macrocell() else 0
-            Qt_ref, phis = make_dual_bubbles(ref_facet, degree, codim=codim, scale=1)
+            Qt_ref, phis = make_projected_bubble_moments(ref_facet, degree, codim=codim)
             ft_at_qpts = phis[-1]
             if codim == 0:
-                scale = (-1)**(sd-1) * 0.5 * ref_area
-            else:
-                scale = ref_area / numpy.dot(ft_at_qpts, Qt_ref.get_weights())
-            ft_at_qpts *= scale
-            if codim != 0:
-                ft_at_qpts -= numpy.dot(ft_at_qpts, Qt_ref.get_weights()) / ref_area
+                bf_at_qpts = ref_facet.compute_bubble(Qt_ref.get_points())
+                bf_wts = numpy.multiply(bf_at_qpts, Qt_ref.get_weights())
+                scale = numpy.sum(bf_wts) / numpy.dot(ft_at_qpts, bf_wts)
+                scale /= ref_area
+                ft_at_qpts *= scale
 
             interior_facets = ref_el.get_interior_facets(sd-1) or ()
             facets = list(set(top[sd-1]) - set(interior_facets))
@@ -106,20 +104,24 @@ class BernardiRaugelDualSet(dual_set.DualSet):
             for i in range(ndir):
                 for f in sorted(facets):
                     cur = len(nodes)
+                    nhat = perp(*thats[f])
                     if i == 0:
-                        # normal DoF
+                        # Normal DoF: face moment against n \phi_n
                         Q = Qn[f]
                         phi = fn_at_qpts
-                        udir = perp(*thats[f])
+                        comp = nhat
                     else:
-                        # tangential constraint
+                        # Tangential constraint
                         Q = Qt[f]
                         phi = ft_at_qpts
-                        udir = thats[f][i-1]
-                        if sd == 3:
-                            udir = numpy.cross(perp(*thats[f]), udir)
+                        if sd == 2:
+                            # Face moment against t \phi_t
+                            comp = thats[f][i-1]
+                        else:
+                            # Face moment against (n x t_j) \phi_t
+                            comp = perp(nhat, thats[f][i-1])
 
-                    nodes.append(FrobeniusIntegralMoment(ref_el, Q, numpy.outer(udir, phi)))
+                    nodes.append(FrobeniusIntegralMoment(ref_el, Q, numpy.outer(comp, phi)))
                     entity_ids[sd-1][f].extend(range(cur, len(nodes)))
         super().__init__(nodes, ref_el, entity_ids)
 
