@@ -87,10 +87,12 @@ class PhysicallyMappedFunctional:
 
     :attr:`pullback_mappings` assigns a mapping to each group of axes of
     :attr:`weights`: ``affine``, ``covariant piola``, ``contravariant
-    piola``, or ``L2 piola`` for a contravariant axis paired with a
-    covariant axis through the identity.  These mappings act on Cartesian
-    components if :attr:`frame` is None, and on components in the frame of
-    the entity :attr:`frame` otherwise.
+    piola``, ``L2 piola`` for a contravariant axis paired with a covariant
+    axis through the identity, or ``contravariant inner product`` and
+    ``covariant inner product`` for an axis paired with a test function that
+    maps in the same way.  These mappings act on Cartesian components if
+    :attr:`frame` is None, and on components in the frame of the entity
+    :attr:`frame` otherwise.
 
     :arg node: The FIAT node.
     :arg cell: The reference cell.
@@ -101,9 +103,11 @@ class PhysicallyMappedFunctional:
         integral over its entity instead of an average.
     :arg tol: Relative tolerance for the range tests on the weights, and
         below which entries of the Riesz representation are dropped.
+    :arg test_mapping: The FIAT mapping of the test function of the node, or
+        None if the dual set does not declare it.
     """
 
-    def __init__(self, node, cell, dim, entity, mapping, avg, tol):
+    def __init__(self, node, cell, dim, entity, mapping, avg, tol, test_mapping=None):
         self.node = node
         self.cell = cell
         self.dim = dim
@@ -111,6 +115,7 @@ class PhysicallyMappedFunctional:
         self.mapping = mapping
         self.avg = avg
         self.tol = tol
+        self.test_mapping = test_mapping
 
     @cached_property
     def weights(self):
@@ -125,16 +130,18 @@ class PhysicallyMappedFunctional:
     def axis_mappings(self):
         """The mapping of each value and derivative axis of the weights."""
         rank = len(self.node.target_shape)
-        words = self.mapping.split()
-        if words == ["affine"]:
-            value_mappings = (self.mapping,) * rank
-        elif words[0] == "double":
-            value_mappings = (f"{words[1]} piola",) * 2
-        else:
-            value_mappings = tuple(f"{word} piola" for word in words[:-1])
-        if len(value_mappings) != rank:
-            raise ValueError(f"A {self.mapping} functional must have rank {len(value_mappings)}, not {rank}.")
-        return value_mappings + ("covariant piola",) * self.node.max_deriv_order
+        mappings = value_mappings(self.mapping, rank)
+        if len(mappings) != rank:
+            raise ValueError(f"A {self.mapping} functional must have rank {len(mappings)}, not {rank}.")
+        return mappings + ("covariant piola",) * self.node.max_deriv_order
+
+    @cached_property
+    def inner_product_axes(self):
+        """The leading axes of the weights that pair with a test function that maps in the same way."""
+        if self.test_mapping is None:
+            return ()
+        tests = value_mappings(self.test_mapping, len(self.node.target_shape))
+        return tuple(k for k, test in enumerate(tests) if "piola" in test and test == self.axis_mappings[k])
 
     @cached_property
     def frame(self):
@@ -168,9 +175,14 @@ class PhysicallyMappedFunctional:
         # the order of this dict.
         sd = self.cell.get_spatial_dimension()
         W = self.weights
-        axis_mappings = self.axis_mappings
-        # Interior moments map every axis as affine.
-        if self.dim == sd and isinstance(self.node, IntegralMoment):
+        # An axis paired with a test function that maps in the same way is an inner product.
+        inner_products = {"contravariant piola": "contravariant inner product",
+                          "covariant piola": "covariant inner product"}
+        axis_mappings = list(self.axis_mappings)
+        for k in self.inner_product_axes:
+            axis_mappings[k] = inner_products[axis_mappings[k]]
+        # Other interior moments map every axis as affine.
+        if self.dim == sd and isinstance(self.node, IntegralMoment) and not self.inner_product_axes:
             return {(k,): "affine" for k in range(len(axis_mappings))}
         # In a frame, each axis keeps its own mapping.
         if self.frame is not None:
@@ -211,12 +223,17 @@ class PhysicallyMappedFunctional:
         """
         sd = self.cell.get_spatial_dimension()
         if self.frame is None:
-            exponents = {"covariant piola": 1, "contravariant piola": sd - 1, "L2 piola": sd}
+            exponents = {"covariant piola": 1, "contravariant piola": sd - 1, "L2 piola": sd,
+                         "covariant inner product": 2, "contravariant inner product": 2 * sd - 2}
             return sum(exponents.get(mapping, 0) for mapping in self.pullback_mappings.values())
         exponent = 0
         for axes, mapping in self.pullback_mappings.items():
             if mapping == "covariant piola":
                 exponent += 1
+            elif mapping == "covariant inner product":
+                exponent += 2
+            elif mapping == "contravariant inner product":
+                exponent += 2 * sd - 2
             elif mapping == "contravariant piola" and not in_range_of(
                     self.weights, facet_normal_projector(self.cell, self.entity), axes, self.tol):
                 # Tangential components of a contravariant axis
@@ -244,20 +261,22 @@ class PhysicallyMappedFunctional:
             pullbacks = cartesian_pullbacks(J, adjJ, detJ)
         else:
             pullbacks = frame_pullbacks(self.cell, self.frame, metric, adj_metric, detJ)
+        pullbacks.update(inner_product_pullbacks(metric, adj_metric, detJ))
         mappings = self.pullback_mappings.values()
         unit = LinearCombination([one], [numpy.eye(1)])
         forward = reduce(LinearCombination.kron, (pullbacks[mapping].forward for mapping in mappings), unit)
         inverse = reduce(LinearCombination.kron, (pullbacks[mapping].inverse for mapping in mappings), unit)
         return Pullback(forward, inverse)
 
-    def to_riesz(self, G, D):
-        r"""The Riesz representation :math:`(GW):D_j` of the node on a basis, where :math:`W` are the :attr:`weights`.
+    def to_riesz(self, G, W, D):
+        r"""The Riesz representation :math:`(GW):D_j` of weights W on a basis.
 
         For the :meth:`pullback` G and the reference basis, this is the row of
         :math:`B_0`, and for its inverse and the basis of the entity of the
         node, the row of the inverse of the diagonal block.
 
         :arg G: The pullback of the weights, a :class:`LinearCombination` on their axes.
+        :arg W: Weights with the shape of the :attr:`weights`.
         :arg D: The derivatives of the basis at the points of the node, with
             the basis followed by the axes of the weights.
         :returns: An object array of GEM scalars, one for each basis function.
@@ -266,9 +285,9 @@ class PhysicallyMappedFunctional:
         # the axes of the groups as in the Kronecker product
         axes = list(chain.from_iterable(self.pullback_mappings))
         rank = len(axes)
-        A = numpy.tensordot(self.weights, D, axes=(-1, -1))
+        A = numpy.tensordot(W, D, axes=(-1, -1))
         A = A.transpose(*(rank + 1 + k for k in axes), *axes, rank)
-        n = self.weights.size // self.weights.shape[-1]
+        n = W.size // W.shape[-1]
         return G.contract(A.reshape(n, n, -1), self.tol)
 
     def scaling(self, J, h):
@@ -372,13 +391,55 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         """The physical counterpart of each node of the FIAT dual set."""
         dual = self._element.get_dual_set()
         mappings = self._element.mapping()
+        test_mappings = dual.get_mapping() or [None] * len(dual.nodes)
         functionals = [None] * len(dual.nodes)
         for dim, entities in dual.get_entity_ids().items():
             for entity, dofs in entities.items():
                 for i in dofs:
                     functionals[i] = PhysicallyMappedFunctional(dual.nodes[i], self.cell, dim, entity,
-                                                                mappings[i], self.avg, self.tol)
+                                                                mappings[i], self.avg, self.tol, test_mappings[i])
         return tuple(functionals)
+
+    @cached_property
+    def _complements(self):
+        r"""The complement of the weights of the inner product nodes of each entity.
+
+        On their inner product axis, the weights of these nodes span a subspace
+        of their closure :math:`V=\mathbb{R}^d\otimes Z` under the linear maps
+        of the axis, where Z spans their slices on the other axes.  The
+        complement R spans the rest of V.
+
+        :returns: A dict from each entity ``(dim, entity)`` with inner product
+            nodes to R, with the weights of R stacked on a leading axis.
+        """
+        sd = self.cell.get_spatial_dimension()
+        functionals = self._physical_functionals
+        complements = {}
+        for dim, entities in self._element.entity_dofs().items():
+            for entity, dofs in entities.items():
+                block = [functionals[i] for i in dofs if functionals[i].inner_product_axes]
+                if not block:
+                    continue
+                points = {functional.node.get_order_tensors(functional.node.orders[0])[0] for functional in block}
+                axes = {functional.inner_product_axes for functional in block}
+                if len(points) != 1 or len(axes) != 1 or len(next(iter(axes))) != 1:
+                    raise NotImplementedError("The inner product nodes of an entity must share their points and their inner product axis.")
+                k, = axes.pop()
+                W = numpy.array([functional.weights for functional in block])
+                # Orthonormal basis Z for the slices on the other axes
+                slices = numpy.moveaxis(W, k + 1, 1)
+                shape = slices.shape[2:]
+                _, s, Z = numpy.linalg.svd(slices.reshape(-1, numpy.prod(shape)), full_matrices=False)
+                Z = Z[s > self.tol * s[0]]
+                V = numpy.array([numpy.moveaxis(numpy.multiply.outer(e, z.reshape(shape)), 0, k)
+                                 for e in numpy.eye(sd) for z in Z])
+                # Orthonormal basis R for the complement of the weights in V
+                V = V.reshape(len(V), -1)
+                W = W.reshape(len(W), -1)
+                _, s, R = numpy.linalg.svd(V - V @ numpy.linalg.pinv(W) @ W, full_matrices=False)
+                R = R[s > self.tol]
+                complements[dim, entity] = R.reshape(-1, *block[0].weights.shape)
+        return complements
 
     @cached_property
     def _reference_tabulation(self):
@@ -456,7 +517,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
             D = D[..., [point_index[x] for x in points]]
 
             # Get the row and the row scale
-            row = functional.to_riesz(pullback.forward, D)
+            row = functional.to_riesz(pullback.forward, functional.weights, D)
             scale = functional.scaling(J, h)
 
             nonzeros = [j for j, entry in enumerate(row) if not isinstance(entry, gem.Zero)]
@@ -471,9 +532,20 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
                 raise NotImplementedError(f"The pullback of dof {i} on entity {(functional.dim, functional.entity)} "
                                           f"needs dofs {outside} outside its closure, so it is not local to the entity.")
 
-            # Get the row of the inverse of the diagonal block
-            block = entity_dofs[functional.dim][functional.entity]
-            inverse = functional.to_riesz(pullback.inverse, D[block])
+            # Get the row of the inverse of the diagonal block, where the inner
+            # product nodes of the entity follow its other nodes
+            inner = bool(functional.inner_product_axes)
+            block = [j for j in entity_dofs[functional.dim][functional.entity]
+                     if bool(self._physical_functionals[j].inner_product_axes) == inner]
+            inverse = functional.to_riesz(pullback.inverse, functional.weights, D[block])
+            R = self._complements.get((functional.dim, functional.entity), ()) if inner else ()
+            if len(R):
+                # The inverse pullback G of the weights must lie in their span,
+                # so it is G(W - Rc) with R^T G(W - Rc) = 0
+                N = numpy.array([functional.to_riesz(pullback.inverse, r, R) for r in R]).T
+                b = functional.to_riesz(pullback.inverse, functional.weights, R)
+                c = adjugate(N) @ b / determinant(N)
+                inverse = inverse - sum(functional.to_riesz(pullback.inverse, r, D[block]) * ci for r, ci in zip(R, c))
             rows[i] = VandermondeRow(row, inverse, scale)
         return rows
 
@@ -505,18 +577,24 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         V = identity(self._element.space_dimension())
         for dim, entities in sorted(closure_dofs.items()):
             for entity in entities:
-                block = entity_dofs[dim][entity]
-                if not any(i in rows for i in block):
-                    continue
-                closure = [j for j in closure_dofs[dim][entity] if j not in block]
-                inverse = identity(len(block))
-                offdiag = numpy.full((len(block), len(closure)), zero, dtype=object)
-                for k, i in enumerate(block):
-                    if i in rows:
-                        inverse[k] = rows[i].inverse
-                        offdiag[k] = rows[i].entries[closure]
-                rhs = I[block] - sparse_matmul(offdiag, V[closure])
-                V[block] = sparse_matmul(inverse, rhs)
+                # The inner product nodes of the entity follow its other nodes
+                dofs = entity_dofs[dim][entity]
+                inner = [i for i in dofs if self._physical_functionals[i].inner_product_axes]
+                other = [i for i in dofs if i not in inner]
+                for block, later in ((other, inner), (inner, [])):
+                    if not any(i in rows for i in block):
+                        continue
+                    if any(not isinstance(rows[i].entries[j], gem.Zero) for i in block if i in rows for j in later):
+                        raise NotImplementedError(f"The dofs on entity {(dim, entity)} couple to its inner product nodes.")
+                    closure = [j for j in closure_dofs[dim][entity] if j not in block and j not in later]
+                    inverse = identity(len(block))
+                    offdiag = numpy.full((len(block), len(closure)), zero, dtype=object)
+                    for k, i in enumerate(block):
+                        if i in rows:
+                            inverse[k] = rows[i].inverse
+                            offdiag[k] = rows[i].entries[closure]
+                    rhs = I[block] - sparse_matmul(offdiag, V[closure])
+                    V[block] = sparse_matmul(inverse, rhs)
         for i, row in rows.items():
             V[:, i] = V[:, i] / row.scale
         return self._recombine(V)
@@ -610,6 +688,16 @@ class PhysicalGeometry(metaclass=ABCMeta):
 
         :returns: a GEM expression for the physical vertices, shape
                 (gdim, )."""
+
+
+def value_mappings(mapping, rank):
+    """The mapping of each value axis for a FIAT mapping of the given rank."""
+    words = mapping.split()
+    if words == ["affine"]:
+        return (mapping,) * rank
+    if words[0] == "double":
+        return (f"{words[1]} piola",) * 2
+    return tuple(f"{word} piola" for word in words[:-1])
 
 
 def identity(*shape):
@@ -779,6 +867,21 @@ def cartesian_pullbacks(J, adjJ, detJ):
             "contravariant piola": Pullback(contravariant, contravariant_inverse),
             "covariant piola": Pullback(covariant, covariant_inverse),
             "L2 piola": Pullback(pairing, pairing_inverse)}
+
+
+def inner_product_pullbacks(metric, adj_metric, detJ):
+    r"""The :class:`Pullback` of each mapping of an axis paired with a test function that maps in the same way.
+
+    For the Piola map F, the pair pulls back as :math:`F^TF`, which is
+    :math:`G/\det J^2` for the contravariant map and :math:`G^{-1}` for
+    the covariant map, with the metric :math:`G=J^TJ`.
+    """
+    contravariant = LinearCombination.from_matrix(metric / detJ**2)
+    contravariant_inverse = LinearCombination.from_matrix(adj_metric)
+    covariant = LinearCombination.from_matrix(adj_metric / detJ**2)
+    covariant_inverse = LinearCombination.from_matrix(metric)
+    return {"contravariant inner product": Pullback(contravariant, contravariant_inverse),
+            "covariant inner product": Pullback(covariant, covariant_inverse)}
 
 
 def frame_pullbacks(cell, frame, metric, adj_metric, detJ):

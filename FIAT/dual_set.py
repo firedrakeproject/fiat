@@ -36,19 +36,29 @@ class DualSet:
         Matrix defining linear combinations of the functionals. Its rows give
         the coefficients for the recombined functionals, and its columns
         correspond to ``nodes``.
+    mapping : sequence of str or None, optional
+        The mapping of the test function of each functional in ``nodes``,
+        with None where it is not declared.
 
     Raises
     ------
     ValueError
-        If ``coeffs`` does not have one column per functional.
+        If ``coeffs`` does not have one column per functional, or
+        ``mapping`` does not have one entry per functional.
     """
 
     def __init__(self, nodes, ref_el, entity_ids, entity_permutations=None,
-                 coeffs=None):
+                 coeffs=None, mapping=None):
         if ref_el.get_dimension() != max(entity_ids):
             entity_ids = unflatten_entity_ids(ref_el, entity_ids)
+        if mapping is not None and len(mapping) != len(nodes):
+            raise ValueError("The mapping must have one entry per functional")
+        # The merge may reorder the nodes, so follow each node with its mapping
+        node_mappings = dict(zip(nodes, mapping or ()))
         nodes, ref_el, entity_ids, entity_permutations, macro_entity_ids = merge_entities(
             nodes, ref_el, entity_ids, entity_permutations)
+        if mapping is not None:
+            mapping = [node_mappings[node] for node in nodes]
         if coeffs is not None:
             coeffs = numpy.asarray(coeffs)
             if coeffs.ndim != 2 or coeffs.shape[1] != len(nodes):
@@ -56,6 +66,7 @@ class DualSet:
 
         self.nodes = nodes
         self.coeffs = coeffs
+        self.mapping = mapping
         self.ref_el = ref_el
         self.entity_ids = entity_ids
         # The entity ids on the simplicial complex, numbered by the merged node ordering
@@ -88,6 +99,10 @@ class DualSet:
         """Return the recombination coefficients of the dual set."""
         return self.coeffs
 
+    def get_mapping(self):
+        """Return the mapping of the test function of each node, or None if it is not declared."""
+        return self.mapping
+
     def recombine(self, coefficients):
         """Return a dual set with an additional node recombination.
 
@@ -100,7 +115,7 @@ class DualSet:
         if self.coeffs is not None:
             coefficients = numpy.dot(coefficients, self.coeffs)
         return DualSet(self.nodes, self.ref_el, self.entity_ids,
-                       self.entity_permutations, coeffs=coefficients)
+                       self.entity_permutations, coeffs=coefficients, mapping=self.mapping)
 
     def get_entity_closure_ids(self):
         return self.entity_closure_ids

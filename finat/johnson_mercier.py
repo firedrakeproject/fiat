@@ -16,7 +16,7 @@ class ReducedJohnsonMercier(PhysicallyMappedElement, FiatElement):  # symmetric 
         cite("Gopalakrishnan2024")
         super().__init__(FIAT.ReducedJohnsonMercier(cell, degree, variant=variant, quad_scheme=quad_scheme))
         # FIAT gives the normal-normal moments against P1 and the normal-tangential
-        # moments against n x RT0 on each facet, followed by the constraint nodes
+        # moments against RM(F) on each facet, followed by the constraint nodes
         # used in the transformation.
         sd = self.cell.get_spatial_dimension()
         self._space_dimension = (sd + 1) * (sd + (sd * (sd - 1)) // 2)
