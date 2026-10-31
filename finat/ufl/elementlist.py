@@ -22,7 +22,7 @@ import warnings
 from numpy import asarray
 
 from ufl.cell import Cell, TensorProductCell
-from ufl.sobolevspace import H1, H2, H3, L2, HCurl, HDiv, HDivDiv, HCurlDiv, HEin, HInf
+from ufl.sobolevspace import H1, H1Curl, H2, H3, L2, HCurl, HDiv, HDivDiv, HCurlDiv, HEin, HInf
 from ufl.utils.formatting import istr
 
 # List of valid elements
@@ -129,6 +129,7 @@ register_element("QuadraticPowellSabin12", "PS12", 0, H2, "custom", (2, 2), ("tr
 register_element("Hsieh-Clough-Tocher", "HCT", 0, H2, "custom", (3, None), ("triangle",))
 register_element("Reduced-Hsieh-Clough-Tocher", "HCT-red", 0, H2, "custom", (3, 3), ("triangle",))
 register_element("Johnson-Mercier", "JM", 2, HDiv, "double contravariant Piola", (1, 1), simplices[1:])
+register_element("Reduced-Fu-Guzman-Neilan H1(curl)", "FGN-red", 1, H1Curl, "covariant Piola", (4, 4), ("tetrahedron",))
 register_element("Walkington", "WALK", 0, H2, "custom", (5, 5), ("tetrahedron",))
 register_element("Reduced-Walkington", "WALK-red", 0, H2, "custom", (5, 5), ("tetrahedron",))
 register_element("Alfeld C2", "ALF-C2", 0, H3, "custom", (5, None), ("triangle",))
@@ -482,6 +483,8 @@ def canonical_element_description(family, cell, order, form_degree):
         embedded_degree += bump
     elif family == "Mardal-Tai-Winther":
         embedded_degree = tdim + 1
+    elif family == "Reduced-Fu-Guzman-Neilan H1(curl)":
+        embedded_degree = 4
     elif any(bubble in family for bubble in ("Guzman-Neilan", "Bernardi-Raugel")):
         embedded_degree = tdim
 

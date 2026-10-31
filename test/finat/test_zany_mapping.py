@@ -418,3 +418,15 @@ def test_entity_closure_sparsity(sd, element, degree):
     assert M.shape == (ndof, element._element.space_dimension())
     assert np.array_equal([[isinstance(entry, gem.Zero) for entry in row] for row in M],
                           [[isinstance(entry, gem.Zero) for entry in row] for row in V[:, :ndof].T])
+
+
+def test_h1curl_mapping(ref_to_phys):
+    check_zany_mapping(finat.ReducedFuGuzmanNeilanH1curl, ref_to_phys[3])
+
+
+def test_h1curl_registration():
+    from ufl.sobolevspace import H1Curl
+    element = finat.ufl.FiniteElement("FGN-red", "tetrahedron", 4)
+    assert element.sobolev_space == H1Curl
+    assert element.embedded_superdegree == 4
+    assert finat.element_factory.create_element(element).space_dimension() == 54
