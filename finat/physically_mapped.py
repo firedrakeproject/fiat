@@ -318,6 +318,115 @@ class PhysicallyMappedFunctional:
         return measure * dilation
 
 
+class EntityPullback:
+    r"""The pullback of an entity's nodes and the inverse of its diagonal block.
+
+    Nodes with the same inner product mapping use the Schur complement of
+    the inverse pullback on their weights and an automatically tabulated
+    completion.  The other nodes may have different mappings.  Their rows
+    are inverted first, then the coupling to them is included in the
+    inverse of the whole entity block.
+
+    :arg functionals: A dict from the entity's dofs to their physical functionals.
+    :arg tabulation: The reference tabulation, indexed by derivative order.
+    :arg closure: The dofs on the closure of the entity.
+    """
+
+    def __init__(self, functionals, tabulation, closure):
+        self.functionals = functionals
+        self.dofs = list(functionals)
+        self.inner = [i for i, functional in functionals.items() if functional.inner_product_axes]
+        self.closure = closure
+        self.tol = next(iter(functionals.values())).tol
+        self.tabulation = {}
+        for i, functional in functionals.items():
+            order = functional.node.max_deriv_order
+            points = functional.node.get_order_tensors(order)[0]
+            point_index = tabulation[order][0]
+            D = tabulation[order][1]
+            self.tabulation[i] = D[..., [point_index[x] for x in points]]
+
+    @cached_property
+    def completion(self):
+        r"""Directions in :math:`\ker c` for the inner product nodes, indexed by closure dofs."""
+        if not self.inner:
+            return {}
+        others = [j for j in self.closure if j not in self.inner]
+        if not others:
+            return {}
+        candidates = []
+        for i in self.inner:
+            functional = self.functionals[i]
+            k, = functional.inner_product_axes
+            sd = functional.cell.get_spatial_dimension()
+            D = self.tabulation[i]
+            for A in numpy.eye(sd * sd).reshape(sd * sd, sd, sd):
+                E = numpy.moveaxis(numpy.tensordot(A, functional.weights, axes=(1, k)), 0, k)
+                candidates.append((i, A, numpy.tensordot(D[self.closure], E, axes=E.ndim)))
+        rows = numpy.array([row for _, _, row in candidates])
+        rows = rows[:, [self.closure.index(j) for j in others]]
+        tol = self.tol * numpy.abs(rows).max()
+        basis = {}
+        completion = {}
+        # Elimination selects independent directions and coordinates together.
+        for m, (i, A, c) in enumerate(candidates):
+            row = rows[m].copy()
+            for j, direction in basis.items():
+                row -= row[j] * direction
+            j = numpy.abs(row).argmax()
+            if abs(row[j]) > tol:
+                basis[j] = row / row[j]
+                completion[others[j]] = (i, A, c[[self.closure.index(k) for k in self.inner]])
+        return completion
+
+    def __call__(self, pullbacks):
+        r"""Tabulate the forward rows and :math:`B_{ee}^{-1}`."""
+        forward = []
+        inverse = numpy.full((len(self.dofs), len(self.dofs)), zero, dtype=object)
+        for k, (i, functional) in enumerate(self.functionals.items()):
+            pullback = pullbacks[functional.pullback_key]
+            D = self.tabulation[i]
+            forward.append(functional.to_riesz(pullback.forward, D))
+            if i not in self.inner:
+                inverse[k] = functional.to_riesz(pullback.inverse, D[self.dofs])
+        forward = numpy.array(forward)
+        if not self.inner:
+            return Pullback(forward, inverse)
+
+        indices = [self.dofs.index(i) for i in self.inner]
+        if any(not isinstance(forward[k, j], gem.Zero)
+               for k, i in enumerate(self.dofs) if i not in self.inner for j in self.inner):
+            raise NotImplementedError("The other nodes of an entity couple to its inner product nodes.")
+        columns = self.inner + list(self.completion)
+        weights = {}
+        for i in self.inner:
+            functional = self.functionals[i]
+            H = pullbacks[functional.pullback_key].inverse
+            weights[i] = functional.to_riesz(H, self.tabulation[i][columns])
+        kernel = []
+        for i, A, c in self.completion.values():
+            functional = self.functionals[i]
+            H = pullbacks[functional.pullback_key].inverse
+            factors = [A if axes == functional.inner_product_axes else numpy.eye(numpy.prod([len(A)] * len(axes)))
+                       for axes in functional.pullback_mappings]
+            HA = LinearCombination(H.coefficients, H.matrices @ reduce(numpy.kron, factors))
+            row = functional.to_riesz(HA, self.tabulation[i][columns])
+            kernel.append(row - sum(weights[j] * cj for j, cj in zip(self.inner, c)))
+        weights = numpy.array([weights[i] for i in self.inner])
+        n = len(self.inner)
+        diagonal = weights[:, :n]
+        if kernel:
+            # The inverse on these nodes is H_ww - H_wk H_kk^{-1} H_kw.
+            kernel = numpy.array(kernel)
+            H_wk = weights[:, n:]
+            H_kw = kernel[:, :n]
+            H_kk = kernel[:, n:]
+            diagonal -= sparse_matmul(H_wk, sparse_matmul(adjugate(H_kk), H_kw)) / determinant(H_kk)
+        rhs = identity(len(self.dofs))[indices] - sparse_matmul(forward[indices][:, self.dofs], inverse)
+        inverse[indices] = sparse_matmul(diagonal, rhs)
+        return Pullback(forward, inverse)
+
+
 class PhysicallyMappedElement(NeedsCoordinateMappingElement):
     """A mixin that applies a "physical" transformation to tabulated
     basis functions."""
@@ -401,60 +510,13 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         return tuple(functionals)
 
     @cached_property
-    def _kernels(self):
-        r"""A basis of :math:`\ker c` for the inner product nodes of each entity.
-
-        The pullback of these nodes maps their weights :math:`\hat W_k` into
-        the span V of the directions :math:`A\hat W_k`, for the linear maps A
-        of their inner product axis.  Here c is the coordinates on the basis
-        functions of these nodes, so :math:`\ker c\cap V` is spanned by the
-        directions :math:`E - \sum_k c(E)_k \hat W_k`, which are only seen by
-        the other dofs of the closure.  We keep r independent directions, and
-        r of these dofs as their coordinates d.
-
-        :returns: A dict from each entity ``(dim, entity)`` with inner product
-            nodes to a tuple of the directions, as a list of tuples of the
-            node, A and :math:`c(E)`, and the dofs of d.
-        """
-        sd = self.cell.get_spatial_dimension()
-        functionals = self._physical_functionals
+    def _entity_pullbacks(self):
+        """The reference data for each entity's pullback."""
         closure_dofs = self._element.entity_closure_dofs()
-        tabulation = self._reference_tabulation
-        kernels = {}
-        for dim, entities in self._element.entity_dofs().items():
-            for entity, dofs in entities.items():
-                block = [i for i in dofs if functionals[i].inner_product_axes]
-                if not block:
-                    continue
-                closure = closure_dofs[dim][entity]
-                others = [j for j in closure if j not in block]
-                candidates = []
-                for i in block:
-                    functional = functionals[i]
-                    k, = functional.inner_product_axes
-                    order = functional.node.max_deriv_order
-                    points, _ = functional.node.get_order_tensors(order)
-                    point_index, D = tabulation[order]
-                    D = D[..., [point_index[x] for x in points]]
-                    for A in numpy.eye(sd * sd).reshape(sd * sd, sd, sd):
-                        E = numpy.moveaxis(numpy.tensordot(A, functional.weights, axes=(1, k)), 0, k)
-                        candidates.append((i, A, numpy.tensordot(D[closure], E, axes=E.ndim)))
-                # The directions are only seen by the other dofs through ker c
-                rows = numpy.array([row for _, _, row in candidates])
-                rows = rows[:, [closure.index(j) for j in others]]
-                tol = self.tol * numpy.abs(rows).max()
-                selected = []
-                for m in range(len(candidates)):
-                    if numpy.linalg.matrix_rank(rows[selected + [m]], tol) == len(selected) + 1:
-                        selected.append(m)
-                columns = []
-                for j in range(len(others)):
-                    if numpy.linalg.matrix_rank(rows[selected][:, columns + [j]], tol) == len(columns) + 1:
-                        columns.append(j)
-                directions = [(i, A, row[[closure.index(j) for j in block]])
-                              for i, A, row in (candidates[m] for m in selected)]
-                kernels[dim, entity] = (directions, [others[j] for j in columns])
-        return kernels
+        return {(dim, entity): EntityPullback({i: self._physical_functionals[i] for i in dofs},
+                                              self._reference_tabulation, closure_dofs[dim][entity])
+                for dim, entities in self._element.entity_dofs().items()
+                for entity, dofs in entities.items() if dofs}
 
     @cached_property
     def _reference_tabulation(self):
@@ -514,81 +576,28 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         metric, adj_metric = metric_and_adjugate(J)
         h = coordinate_mapping.cell_size()
 
-        closure_dofs = self._element.entity_closure_dofs()
-        entity_dofs = self._element.entity_dofs()
-        tabulation = self._reference_tabulation
         pullbacks = {}
-        tabulations = {}
-        rows = {}
-        for i, functional in enumerate(self._physical_functionals):
-            # Assemble each row by applying the pulled-back functional to the reference basis
+        for functional in self._physical_functionals:
             key = functional.pullback_key
             if key not in pullbacks:
                 pullbacks[key] = functional.pullback(J, adjJ, detJ, metric, adj_metric)
-            pullback = pullbacks[key]
 
-            order = functional.node.max_deriv_order
-            points, _ = functional.node.get_order_tensors(order)
-            point_index, D = tabulation[order]
-            D = D[..., [point_index[x] for x in points]]
-            tabulations[i] = D
+        rows = {}
+        for entity_pullback in self._entity_pullbacks.values():
+            pullback = entity_pullback(pullbacks)
+            for k, (i, functional) in enumerate(entity_pullback.functionals.items()):
+                row = pullback.forward[k]
+                scale = functional.scaling(J, h)
+                nonzeros = [j for j, entry in enumerate(row) if not isinstance(entry, gem.Zero)]
+                if nonzeros == [i] and row[i] == one and scale == one:
+                    continue
 
-            # Get the row and the row scale
-            row = functional.to_riesz(pullback.forward, D)
-            scale = functional.scaling(J, h)
-
-            nonzeros = [j for j, entry in enumerate(row) if not isinstance(entry, gem.Zero)]
-            if nonzeros == [i] and row[i] == one and scale == one:
-                # Skip identity row
-                continue
-
-            # The row may only couple to the dofs in the closure of its entity
-            closure = closure_dofs[functional.dim][functional.entity]
-            outside = [j for j in nonzeros if j not in closure]
-            if outside:
-                raise NotImplementedError(f"The pullback of dof {i} on entity {(functional.dim, functional.entity)} "
-                                          f"needs dofs {outside} outside its closure, so it is not local to the entity.")
-
-            # Get the row of the inverse of the diagonal block, where the inner
-            # product nodes of the entity follow its other nodes
-            inner = bool(functional.inner_product_axes)
-            block = [j for j in entity_dofs[functional.dim][functional.entity]
-                     if bool(self._physical_functionals[j].inner_product_axes) == inner]
-            inverse = functional.to_riesz(pullback.inverse, D[block])
-            rows[i] = VandermondeRow(row, inverse, scale)
-
-        # The inverse pullback H of the inner product nodes of an entity need not
-        # map ker c into itself.  In the basis of their weights and of ker c, with
-        # the coordinates (c, d), the inverse of their diagonal block is the
-        # Schur complement H_ww - H_wk H_kk^{-1} H_kw.
-        for (dim, entity), (directions, coordinates) in self._kernels.items():
-            block = [i for i in entity_dofs[dim][entity] if self._physical_functionals[i].inner_product_axes]
-            columns = block + coordinates
-            weights = {}
-            for i in block:
-                functional = self._physical_functionals[i]
-                H = pullbacks[functional.pullback_key].inverse
-                weights[i] = functional.to_riesz(H, tabulations[i][columns])
-            kernel = []
-            for i, A, c in directions:
-                functional = self._physical_functionals[i]
-                H = pullbacks[functional.pullback_key].inverse
-                # HA, with A on the inner product axis of the Kronecker product
-                factors = [A if axes == functional.inner_product_axes else numpy.eye(numpy.prod([len(A)] * len(axes)))
-                           for axes in functional.pullback_mappings]
-                HA = LinearCombination(H.coefficients, H.matrices @ reduce(numpy.kron, factors))
-                row = functional.to_riesz(HA, tabulations[i][columns])
-                kernel.append(row - sum(weights[j] * cj for j, cj in zip(block, c)))
-            weights = numpy.array([weights[i] for i in block])
-            kernel = numpy.array(kernel)
-            n = len(block)
-            H_ww = weights[:, :n]
-            H_wk = weights[:, n:]
-            H_kw = kernel[:, :n]
-            H_kk = kernel[:, n:]
-            inverse = H_ww - sparse_matmul(H_wk, sparse_matmul(adjugate(H_kk), H_kw)) / determinant(H_kk)
-            for i, row in zip(block, inverse):
-                rows[i] = rows[i]._replace(inverse=row)
+                # The row may only couple to the dofs in the closure of its entity
+                outside = [j for j in nonzeros if j not in entity_pullback.closure]
+                if outside:
+                    raise NotImplementedError(f"The pullback of dof {i} on entity {(functional.dim, functional.entity)} "
+                                              f"needs dofs {outside} outside its closure, so it is not local to the entity.")
+                rows[i] = VandermondeRow(row, pullback.inverse[k], scale)
         return rows
 
     def _recombine(self, A):
@@ -619,24 +628,18 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         V = identity(self._element.space_dimension())
         for dim, entities in sorted(closure_dofs.items()):
             for entity in entities:
-                # The inner product nodes of the entity follow its other nodes
-                dofs = entity_dofs[dim][entity]
-                inner = [i for i in dofs if self._physical_functionals[i].inner_product_axes]
-                other = [i for i in dofs if i not in inner]
-                for block, later in ((other, inner), (inner, [])):
-                    if not any(i in rows for i in block):
-                        continue
-                    if any(not isinstance(rows[i].entries[j], gem.Zero) for i in block if i in rows for j in later):
-                        raise NotImplementedError(f"The dofs on entity {(dim, entity)} couple to its inner product nodes.")
-                    closure = [j for j in closure_dofs[dim][entity] if j not in block and j not in later]
-                    inverse = identity(len(block))
-                    offdiag = numpy.full((len(block), len(closure)), zero, dtype=object)
-                    for k, i in enumerate(block):
-                        if i in rows:
-                            inverse[k] = rows[i].inverse
-                            offdiag[k] = rows[i].entries[closure]
-                    rhs = I[block] - sparse_matmul(offdiag, V[closure])
-                    V[block] = sparse_matmul(inverse, rhs)
+                block = entity_dofs[dim][entity]
+                if not any(i in rows for i in block):
+                    continue
+                closure = [j for j in closure_dofs[dim][entity] if j not in block]
+                inverse = identity(len(block))
+                offdiag = numpy.full((len(block), len(closure)), zero, dtype=object)
+                for k, i in enumerate(block):
+                    if i in rows:
+                        inverse[k] = rows[i].inverse
+                        offdiag[k] = rows[i].entries[closure]
+                rhs = I[block] - sparse_matmul(offdiag, V[closure])
+                V[block] = sparse_matmul(inverse, rhs)
         for i, row in rows.items():
             V[:, i] = V[:, i] / row.scale
         return self._recombine(V)
