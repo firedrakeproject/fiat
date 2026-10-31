@@ -88,12 +88,11 @@ class MardalTaiWintherDual(dual_set.DualSet):
             # For 2D just take the constant
             RT_at_qpts = P1_at_qpts[:1, None, :]
         else:
-            # Basis for lowest-order RT [(1, 0), (0, 1), (x, y)]
+            # Basis for lowest-order RT [(1, 0), (0, 1), x - c], with c the facet barycenter
             RT_at_qpts = numpy.zeros((3, sd-1, P1_at_qpts.shape[-1]))
             RT_at_qpts[0, 0, :] = P1_at_qpts[0, None, :]
             RT_at_qpts[1, 1, :] = P1_at_qpts[0, None, :]
-            RT_at_qpts[2, 0, :] = P1_at_qpts[1, None, :]
-            RT_at_qpts[2, 1, :] = P1_at_qpts[2, None, :]
+            RT_at_qpts[2] = (Q.get_points() - numpy.mean(ref_facet.get_vertices(), axis=0)).T
 
         for f in sorted(top[sd-1]):
             cur = len(nodes)
