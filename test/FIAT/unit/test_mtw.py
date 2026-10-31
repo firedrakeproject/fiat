@@ -1,5 +1,7 @@
 import numpy as np
-from FIAT import ufc_simplex, MardalTaiWinther, expansions
+import pytest
+from FIAT import ufc_simplex, MardalTaiWinther, Nedelec, expansions, polynomial_set
+from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 
 
@@ -43,3 +45,39 @@ def test_dofs():
         right = np.zeros(9)
         right[3*ed+2] = 1.0
         assert np.allclose(tangent_moments, right)
+
+
+@pytest.mark.parametrize("deform", (False, True))
+def test_tai_winther_facet_dofs(deform):
+    # The Tai-Winther facet functionals are the moments of v.n against P1(f)
+    # and of the tangential component v_t against the rigid motions RM(f).
+    # They must only see the dofs of the facet f.
+    K = ufc_simplex(3)
+    if deform:
+        K.vertices = ((0, 0, 0), (1., 0.1, -0.37), (0.01, 0.987, -.23), (-0.1, -0.2, 1.38))
+    sd = K.get_spatial_dimension()
+    tol = 1E-10
+    MTW = MardalTaiWinther(K, 1)
+
+    ref_facet = K.construct_subelement(sd-1)
+    Qref = create_quadrature(ref_facet, MTW.degree() + 1)
+    P1 = polynomial_set.ONPolynomialSet(ref_facet, 1)
+    P1_at_qpts = P1.tabulate(Qref.get_points())[(0,) * (sd-1)]
+    N1 = Nedelec(K, 1)
+
+    for f, dofs in MTW.entity_dofs()[sd-1].items():
+        Qf = FacetQuadratureRule(K, sd-1, f, Qref)
+        qpts, qwts = Qf.get_points(), Qf.get_weights()
+        n = K.compute_scaled_normal(f)
+
+        # The traces of RM(T) span n P1(f) + RM(f)
+        rbms = N1.tabulate(0, qpts)[(0,) * sd]
+        n_P1 = n[None, :, None] * P1_at_qpts[:, None, :]
+        test_functions = np.concatenate((n_P1, rbms))
+
+        vals = MTW.tabulate(0, qpts)[(0,) * sd]
+        moments = np.tensordot(vals * qwts, test_functions, axes=((1, 2), (1, 2)))
+
+        others = [i for i in range(MTW.space_dimension()) if i not in dofs]
+        assert np.allclose(moments[others], 0, atol=tol)
+        assert np.linalg.matrix_rank(moments[dofs], tol=tol) == len(dofs)
