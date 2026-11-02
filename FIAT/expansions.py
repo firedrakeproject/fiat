@@ -45,10 +45,11 @@ def pad_coordinates(ref_pts, embedded_dim):
     return tuple(ref_pts) + (-1.0, )*(embedded_dim - len(ref_pts))
 
 
-def pad_jacobian(A, embedded_dim):
-    """Pad coordinate mapping Jacobian by appending zero rows."""
+def pad_jacobian(A, embedded_dim, num_axes=1):
+    """Pad coordinate mapping Jacobian by appending zero rows, with singleton
+    axes that broadcast against the axes of the points."""
     A = numpy.pad(A, [(0, embedded_dim - A.shape[0]), (0, 0)])
-    return tuple(row[..., None] for row in A)
+    return tuple(row.reshape(-1, *(1,) * num_axes) for row in A)
 
 
 def jacobi_factors(x, y, z, dx, dy, dz):
@@ -179,7 +180,7 @@ def dubiner_recurrence(dim: int,
     num_members = math.comb(n + dim, dim)
 
     pad_dim = dim + 2
-    dX = pad_jacobian(Jinv, pad_dim)
+    dX = pad_jacobian(Jinv, pad_dim, max(numpy.ndim(ref_pts) - 1, 1))
 
     phi0 = numpy.array([sum((ref_pts[i] - ref_pts[i] for i in range(dim)), 0.0)])
     dtype = phi0.dtype
@@ -422,7 +423,7 @@ class ExpansionSet(object):
         from FIAT.polynomial_set import mis
         lorder = min(order, self.recurrence_order)
         A, b = self.affine_mappings[cell]
-        ref_pts = numpy.add(numpy.dot(pts, A.T), b).T
+        ref_pts = numpy.moveaxis(numpy.add(numpy.dot(pts, A.T), b), -1, 0)
         Jinv = A if direction is None else numpy.dot(A, direction)[:, None]
         sd = self.ref_el.get_spatial_dimension()
         scale = self.get_scale(n, cell=cell)
@@ -450,12 +451,13 @@ class ExpansionSet(object):
                 vals = result[base_alpha]
                 for dmat, start, end in zip(dmats, base_alpha, alpha):
                     for j in range(start, end):
-                        vals = numpy.dot(dmat.T, vals)
+                        vals = numpy.tensordot(dmat.T, vals, axes=(-1, 0))
                 result[alpha] = vals
         return result
 
     def _tabulate(self, n, pts, order=0):
-        """A version of tabulate() that also works for a single point."""
+        """A version of tabulate() that also works for a single point, or for
+        points with extra axes, which become the trailing axes of the result."""
         pts = numpy.asarray(pts)
         unique = self.continuity is not None and order == 0
         cell_point_map = compute_cell_point_map(self.ref_el, pts, unique=unique)
@@ -480,10 +482,10 @@ class ExpansionSet(object):
             for cell, ipts in cell_point_map.items():
                 phi = phis[cell]
                 for alpha in phi:
-                    phi[alpha] /= mult[None, ipts]
+                    phi[alpha] /= mult[ipts]
 
         # Insert subcell tabulations into the corresponding submatrices
-        idx = lambda *args: args if args[-1] is Ellipsis else numpy.ix_(*args)
+        idx = lambda ibfs, ipts: (ibfs, ipts) if ipts is Ellipsis else (ibfs[:, None], *ipts)
         num_phis = self.get_num_members(n)
         cell_node_map = self.get_cell_node_map(n)
         result = {}
@@ -530,7 +532,7 @@ class ExpansionSet(object):
                 for _ in range(r):
                     vr = numpy.tensordot(normal, vr, axes=(0, 0))
 
-                indices = numpy.ix_(ibfs, ipts)
+                indices = (ibfs[:, None], *ipts)
                 if r % 2 == 0 and side < 0:
                     results[r][indices] -= vr
                 else:
@@ -558,7 +560,7 @@ class ExpansionSet(object):
         for facet in self.ref_el.get_interior_facets(sd-1):
             try:
                 cells = self.ref_el.connectivity[(sd-1, sd)][facet]
-                ipts = list(set.intersection(*(set(cell_point_map[c]) for c in cells)))
+                ipts = list(set.intersection(*(set(cell_point_map[c][0]) for c in cells)))
                 if ipts != ():
                     facet_point_map[facet] = ipts
                     num_jumps += len(ipts)
@@ -654,7 +656,7 @@ class PointExpansionSet(ExpansionSet):
         """Returns a dict of tabulations such that
         tabulations[alpha][i, j] = D^alpha phi_i(pts[j])."""
         assert n == 0 and order == 0
-        return {(): numpy.ones((1, len(pts)))}
+        return {(): numpy.ones((1, *numpy.shape(pts)[:-1]))}
 
 
 class LineExpansionSet(ExpansionSet):
@@ -786,7 +788,8 @@ def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
     :arg pts: an iterable of physical points on the complex.
     :kwarg unique: Are we assigning a unique cell to points on facets?
     :kwarg tol: the absolute tolerance.
-    :returns: a dict mapping cell id to the point ids nearest to that cell.
+    :returns: a dict mapping cell id to the indices of the points nearest to that
+        cell, with one index array per axis of the points.
     """
     top = ref_el.get_topology()
     sd = ref_el.get_spatial_dimension()
@@ -815,8 +818,8 @@ def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
             if unique:
                 for other in cell_point_map.values():
                     pts_near_cell[other] = False
-            ipts = numpy.where(pts_near_cell)[0]
-            if len(ipts) > 0:
+            ipts = numpy.nonzero(pts_near_cell)
+            if ipts[0].size > 0:
                 cell_point_map[cell] = ipts
     return cell_point_map
 
