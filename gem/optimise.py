@@ -101,6 +101,7 @@ replace_indices.register(gem.gem.Literal)(reuse_if_untouched_arg)
 replace_indices.register(gem.gem.Variable)(reuse_if_untouched_arg)
 replace_indices.register(gem.gem.ListTensor)(reuse_if_untouched_arg)
 replace_indices.register(gem.gem.MathFunction)(reuse_if_untouched_arg)
+replace_indices.register(gem.gem.Identity)(reuse_if_untouched_arg)
 
 
 @replace_indices.register(Index)
