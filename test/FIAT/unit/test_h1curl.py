@@ -43,7 +43,8 @@ def test_reduced_complex(cell, order, dimension, reduced_dimension, scalar_dimen
     points = create_quadrature(space.ref_el, 8).get_points()
     table = space.tabulate(points, 1)
     values = table[(0, 0, 0)]
-    contains(values, ONPolynomialSet(cell, order, shape=(3,)).tabulate(points)[(0, 0, 0)])
+    polynomials = ONPolynomialSet(cell, order, shape=(3,))
+    contains(values, polynomials.tabulate(points)[(0, 0, 0)])
 
     scalar = Walkington(cell, reduced=order == 2).get_nodal_basis().take(list(range(scalar_dimension)))
     scalar_table = scalar.tabulate(points, 1)
@@ -73,13 +74,16 @@ def test_reduced_complex(cell, order, dimension, reduced_dimension, scalar_dimen
 
 def test_poincare_space_grad_curl(cell):
     """The lowest order H(grad curl) space has dimension 3 + 15."""
+    P = ONPolynomialSet(cell, 1)
     gn = GuzmanNeilanSpace(cell, 1, reduced=True)
-    space = PoincareSpace(ONPolynomialSet(cell, 1), gn, ONPolynomialSet(cell, 0), 4)
+    pressure = ONPolynomialSet(cell, 0)
+    space = PoincareSpace(P, gn, pressure, 4)
     assert len(space) == 18
 
     points = create_quadrature(space.ref_el, 8).get_points()
     table = space.tabulate(points, 1)
-    contains(table[(0, 0, 0)], ONPolynomialSet(cell, 0, shape=(3,)).tabulate(points)[(0, 0, 0)])
+    constants = ONPolynomialSet(cell, 0, shape=(3,))
+    contains(table[(0, 0, 0)], constants.tabulate(points)[(0, 0, 0)])
     curls = curl(table)
     contains(gn.tabulate(points)[(0, 0, 0)], curls)
     assert numpy.linalg.matrix_rank(curls.reshape(18, -1), tol=1e-8) == 15
@@ -96,7 +100,8 @@ def test_hgradcurl_complex(cell, k, dimension, reduced_dimension, curl_rank):
     values = table[(0, 0, 0)]
 
     # The space contains P_{k-1}, the rotations, and the gradients of P_k
-    contains(values, ONPolynomialSet(cell, k - 1, shape=(3,)).tabulate(points)[(0, 0, 0)])
+    polynomials = ONPolynomialSet(cell, k - 1, shape=(3,))
+    contains(values, polynomials.tabulate(points)[(0, 0, 0)])
     x = points - numpy.mean(cell.get_vertices(), axis=0)
     contains(values, numpy.stack([numpy.cross(e, x).T for e in numpy.eye(3)]))
     scalar_table = ONPolynomialSet(cell, k).tabulate(points, 1)
@@ -125,7 +130,8 @@ def test_hgradcurl_complex(cell, k, dimension, reduced_dimension, curl_rank):
     for e in cell.get_topology()[1]:
         edge_points = FacetQuadratureRule(cell, 1, e, line).get_points()
         t = cell.compute_edge_tangent(e)
-        contains(moments, numpy.tensordot(space.tabulate(edge_points)[(0, 0, 0)], t, axes=((1,), (0,))))
+        edge_values = space.tabulate(edge_points)[(0, 0, 0)]
+        contains(moments, numpy.tensordot(edge_values, t, axes=((1,), (0,))))
 
     # Nodal unisolvence includes all auxiliary constraints used by FInAT
     riesz = element.dual.to_riesz(element.get_nodal_basis())

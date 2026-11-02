@@ -66,24 +66,39 @@ def corrected_poincare_curl(V, points):
     entity_ids = polynomial_entity_ids(ref_el, degree, continuity="C0")
     bubbles = [i for dim in range(1, sd + 1) for entity in sorted(top[dim]) for i in entity_ids[dim][entity]]
 
-    lhs = []
-    rhs = []
+    rules = []
+    metrics = []
+    dofs = []
     for dim in range(1, sd + 1):
         ref_entity = ref_complex if dim == sd else ref_el.construct_subelement(dim)
         rule = create_quadrature(ref_entity, 2 * degree - 2)
         for entity in sorted(top[dim]):
-            Q = rule if dim == sd else FacetQuadratureRule(ref_el, dim, entity, rule)
-            qpts, qwts = Q.get_points(), Q.get_weights()
             z = vertices[list(top[dim][entity])]
             z = z - numpy.mean(z, axis=0)
-            dP = grad(P.tabulate(qpts, 1))
-            test = (z.T @ z) @ dP[entity_ids[dim][entity]]
-            lhs.append(inner(test, dP[bubbles], qwts))
-            rhs.append(inner(test, poincare_curl(V, qpts), qwts))
+            rules.append(rule if dim == sd else FacetQuadratureRule(ref_el, dim, entity, rule))
+            metrics.append(z.T @ z)
+            dofs.append(entity_ids[dim][entity])
 
-    coeffs = numpy.linalg.solve(numpy.concatenate(lhs), numpy.concatenate(rhs))
-    correction = numpy.tensordot(coeffs.T, grad(P.tabulate(points, 1))[bubbles], axes=1)
-    return poincare_curl(V, points) - correction
+    qpts = numpy.concatenate([Q.get_points() for Q in rules])
+    qwts = numpy.concatenate([Q.get_weights() for Q in rules])
+    dP = grad(P.tabulate(qpts, 1))
+
+    # Each bubble only tests on the points of its entity
+    tests = []
+    start = 0
+    for Q, metric, ids in zip(rules, metrics, dofs):
+        stop = start + len(Q.get_weights())
+        test = numpy.zeros_like(dP[ids])
+        test[..., start:stop] = metric @ dP[ids][..., start:stop]
+        tests.append(test)
+        start = stop
+    test = numpy.concatenate(tests)
+
+    A = inner(test, dP[bubbles], qwts)
+    b = inner(test, poincare_curl(V, qpts), qwts)
+    coeffs = numpy.linalg.solve(A, b)
+    dP = grad(P.tabulate(points, 1))
+    return poincare_curl(V, points) - numpy.tensordot(coeffs.T, dP[bubbles], axes=1)
 
 
 def HuZhangZhangSpace(ref_el, k=1):
@@ -113,9 +128,10 @@ def HuZhangZhangSpace(ref_el, k=1):
     """
     if ref_el.get_shape() != TETRAHEDRON:
         raise ValueError("H(grad curl) is only defined on tetrahedra")
+    P = ONPolynomialSet(ref_el, k)
     GN = GuzmanNeilanSpace(ref_el, k)
-    return PoincareSpace(ONPolynomialSet(ref_el, k), GN, ONPolynomialSet(ref_el, k - 1), GN.degree + 1,
-                         poincare=corrected_poincare_curl)
+    pressure = ONPolynomialSet(ref_el, k - 1)
+    return PoincareSpace(P, GN, pressure, GN.degree + 1, poincare=corrected_poincare_curl)
 
 
 class HuZhangZhangDualSet(DualSet):
@@ -165,7 +181,8 @@ class HuZhangZhangDualSet(DualSet):
             cur = len(nodes)
             # Skip the normal moment, which comes first
             for i in gn.entity_ids[2][face][1:]:
-                nodes.append(IntegralMomentOfCurl(ref_el, gn.nodes[i].Q, gn.nodes[i].f_at_qpts))
+                node = gn.nodes[i]
+                nodes.append(IntegralMomentOfCurl(ref_el, node.Q, node.f_at_qpts))
             entity_ids[2][face].extend(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)

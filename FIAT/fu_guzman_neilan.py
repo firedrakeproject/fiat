@@ -101,8 +101,11 @@ def PoincareSpace(V0, V2, V3, degree, d0=grad, d2=div, poincare=poincare_curl):
     rule = create_quadrature(ref_complex, 2 * degree)
     qpts, qwts = rule.get_points(), rule.get_weights()
 
-    kernel = spanning_basis(inner(V3.tabulate(qpts)[(0,) * sd], d2(V2.tabulate(qpts, 1)), qwts), nullspace=True)
-    f = numpy.concatenate([d0(V0.tabulate(qpts, 1)), poincare(V2.recombine(kernel), qpts)])
+    q = V3.tabulate(qpts)[(0,) * sd]
+    dV2 = d2(V2.tabulate(qpts, 1))
+    kernel = V2.recombine(spanning_basis(inner(q, dV2, qwts), nullspace=True))
+    dV0 = d0(V0.tabulate(qpts, 1))
+    f = numpy.concatenate([dV0, poincare(kernel, qpts)])
 
     # The L2 projection is exact, and any zero image of d0 drops out of the span
     P = ONPolynomialSet(ref_complex, degree, shape=f.shape[1:-1], variant="bubble")
@@ -234,7 +237,8 @@ class ReducedFuGuzmanNeilanH1curlDualSet(DualSet):
             cur = len(nodes)
             # Skip the normal moment, which comes first
             for i in gn.entity_ids[2][face][1:]:
-                nodes.append(IntegralMomentOfCurl(ref_el, gn.nodes[i].Q, gn.nodes[i].f_at_qpts))
+                node = gn.nodes[i]
+                nodes.append(IntegralMomentOfCurl(ref_el, node.Q, node.f_at_qpts))
             entity_ids[2][face].extend(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)
