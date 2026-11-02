@@ -65,6 +65,7 @@ from FIAT.hdiv_trace import HDivTrace
 from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen
 from FIAT.wuxu import WuXuH3NC, WuXuRobustH3NC
 from FIAT.fu_guzman_neilan import ReducedFuGuzmanNeilanH1curl
+from FIAT.hu_zhang_zhang import HuZhangZhang
 from FIAT.walkington import Walkington
 from FIAT.histopolation import Histopolation
 from FIAT.fdm_element import FDMLagrange, FDMDiscontinuousLagrange, FDMQuadrature, FDMBrokenH1, FDMBrokenL2, FDMHermite  # noqa: F401
@@ -127,7 +128,8 @@ supported_elements = {"Argyris": Argyris,
                       "Hu-Zhang": HuZhang,
                       "Mardal-Tai-Winther": MardalTaiWinther,
                       "Walkington": Walkington,
-                      "Reduced-Fu-Guzman-Neilan H1(curl)": ReducedFuGuzmanNeilanH1curl}
+                      "Reduced-Fu-Guzman-Neilan H1(curl)": ReducedFuGuzmanNeilanH1curl,
+                      "Hu-Zhang-Zhang": HuZhangZhang}
 
 # List of extra elements
 extra_elements = {"P0": P0}

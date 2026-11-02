@@ -32,6 +32,7 @@ from .johnson_mercier import JohnsonMercier                        # noqa: F401
 from .mtw import MardalTaiWinther                                  # noqa: F401
 from .morley import Morley                                         # noqa: F401
 from .fu_guzman_neilan import ReducedFuGuzmanNeilanH1curl          # noqa: F401
+from .hu_zhang_zhang import HuZhangZhang                           # noqa: F401
 from .walkington import ReducedWalkington, Walkington              # noqa: F401
 from .direct_serendipity import DirectSerendipity                  # noqa: F401
 from .tensorfiniteelement import TensorFiniteElement               # noqa: F401

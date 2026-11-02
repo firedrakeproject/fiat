@@ -424,3 +424,7 @@ def test_entity_closure_sparsity(sd, element, degree):
 @pytest.mark.parametrize("order", (2, 3))
 def test_h1curl_mapping(ref_to_phys, order):
     check_zany_mapping(finat.ReducedFuGuzmanNeilanH1curl, ref_to_phys[3], order)
+
+
+def test_hgradcurl_mapping(ref_to_phys):
+    check_zany_mapping(finat.HuZhangZhang, ref_to_phys[3])

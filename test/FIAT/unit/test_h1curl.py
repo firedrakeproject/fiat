@@ -3,7 +3,7 @@
 import numpy
 import pytest
 
-from FIAT import ReducedFuGuzmanNeilanH1curl, Walkington, ufc_simplex
+from FIAT import HuZhangZhang, ReducedFuGuzmanNeilanH1curl, Walkington, ufc_simplex
 from FIAT.fu_guzman_neilan import PoincareSpace
 from FIAT.guzman_neilan import GuzmanNeilanSpace
 from FIAT.polynomial_set import ONPolynomialSet, mis
@@ -83,3 +83,48 @@ def test_poincare_space_grad_curl(cell):
     curls = curl(table)
     contains(gn.tabulate(points)[(0, 0, 0)], curls)
     assert numpy.linalg.matrix_rank(curls.reshape(18, -1), tol=1e-8) == 15
+
+
+def test_hgradcurl_complex(cell):
+    element = HuZhangZhang(cell)
+    assert element.space_dimension() == 26
+    assert element.degree() == 4
+    dim = 18
+    space = element.get_nodal_basis().take(list(range(dim)))
+    points = create_quadrature(space.ref_el, 8).get_points()
+    table = space.tabulate(points, 1)
+    values = table[(0, 0, 0)]
+
+    # The space contains the lowest order Nedelec space
+    contains(values, ONPolynomialSet(cell, 0, shape=(3,)).tabulate(points)[(0, 0, 0)])
+    x = points - numpy.mean(cell.get_vertices(), axis=0)
+    contains(values, numpy.stack([numpy.cross(e, x).T for e in numpy.eye(3)]))
+
+    curls = curl(table)
+    gn = GuzmanNeilanSpace(cell, 1, reduced=True).tabulate(points)[(0, 0, 0)]
+    contains(gn, curls)
+    assert numpy.linalg.matrix_rank(curls.reshape(dim, -1), tol=1e-8) == 15
+
+    # The tangential trace of v and the trace of curl(v) depend only on the face closure dofs
+    rule = create_quadrature(cell.construct_subelement(2), 8)
+    for face, closure in element.entity_closure_dofs()[2].items():
+        other = sorted(set(range(dim)) - set(closure))
+        face_points = FacetQuadratureRule(cell, 2, face, rule).get_points()
+        face_table = space.tabulate(face_points, 1)
+        n = cell.compute_normal(face)
+        tangential = numpy.cross(face_table[(0, 0, 0)][other].transpose(0, 2, 1), n)
+        assert numpy.allclose(tangential, 0, atol=2e-9)
+        assert numpy.allclose(curl(face_table)[other], 0, atol=2e-9)
+
+    # The tangential component is constant on each edge
+    line = create_quadrature(cell.construct_subelement(1), 8)
+    for e in cell.get_topology()[1]:
+        edge_points = FacetQuadratureRule(cell, 1, e, line).get_points()
+        t = cell.compute_edge_tangent(e)
+        component = numpy.tensordot(space.tabulate(edge_points)[(0, 0, 0)], t, axes=((1,), (0,)))
+        assert numpy.allclose(component, component[:, :1], atol=2e-9)
+
+    # Nodal unisolvence includes all auxiliary constraints used by FInAT
+    riesz = element.dual.to_riesz(element.get_nodal_basis())
+    matrix = numpy.tensordot(riesz, element.get_nodal_basis().coeffs, axes=((1, 2), (1, 2)))
+    assert numpy.allclose(matrix, numpy.eye(26), atol=1e-9)
