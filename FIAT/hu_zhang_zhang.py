@@ -25,35 +25,35 @@ from FIAT.dual_set import DualSet
 from FIAT.expansions import polynomial_entity_ids
 from FIAT.finite_element import CiarletElement
 from FIAT.functional import FrobeniusIntegralMoment, IntegralMomentOfCurl, PointCurlComponent
-from FIAT.fu_guzman_neilan import PoincareSpace, grad, poincare_curl
+from FIAT.fu_guzman_neilan import PoincareSpace, grad, poincare_curl, project_tabulation
 from FIAT.guzman_neilan import GuzmanNeilanSpace, inner
+from FIAT.nedelec import Nedelec
 from FIAT.polynomial_set import ONPolynomialSet
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import TETRAHEDRON
 
 
-def corrected_poincare_curl(V, points):
-    r"""Tabulate the Poincare operator with a conforming tangential trace.
+def corrected_poincare_curl(V):
+    r"""Apply the Poincare operator with a conforming tangential trace to a space.
 
-    The operator is :math:`\tilde\kappa g = \kappa g - \nabla\varphi`, where
+    The operator is :math:`\tilde\kappa g = \kappa g - \psi`, where
     :math:`\kappa` is the Poincare operator about the barycenter, and
-    :math:`\varphi` is a sum of bubbles of one degree above :math:`\kappa g`,
-    with
+    :math:`\psi = \nabla\varphi` is the curl-free correction of Hu, Zhang, and
+    Zhang, with :math:`\varphi` a sum of bubbles of one degree above :math:`\kappa g`.
+    It is defined by the degrees of freedom of :math:`\nabla P_{m+1}`, that is
 
     .. math::
 
-        \int_S \tilde\kappa g \cdot M_S \nabla b \,\mathrm{d}S = 0,
-        \qquad M_S = \sum_{z \in S} (z - x_S) (z - x_S)^T,
+        \int_S (\tilde\kappa g - \gamma) \cdot (x - x_S)\, q \,\mathrm{d}S = 0,
+        \qquad q \in P_{m - \dim S}(S),
 
-    for all bubbles :math:`b` of the entity :math:`S` of positive dimension,
-    where :math:`z` are the vertices of :math:`S` and :math:`x_S` is its barycenter.
+    for each entity :math:`S` of positive dimension with barycenter :math:`x_S`,
+    where :math:`\gamma` is the lowest order Nedelec interpolant of :math:`\kappa g`.
 
-    The correction is curl-free.  The form is positive definite on the
-    gradients of bubbles, it is preserved by the covariant Piola map, and it
-    vanishes on the lowest order Nedelec space.  The tangential trace on
-    :math:`S` therefore only depends on the lowest order moments on its edges
-    and on the normal component of the curl on :math:`S`.
+    Since :math:`\tilde\kappa g - \gamma` has vanishing edge moments, the tangential
+    trace on :math:`S` only depends on the lowest order moments on its edges and on
+    the normal component of the curl on :math:`S`.
     """
     ref_complex = V.get_reference_element()
     ref_el = ref_complex.get_parent()
@@ -61,44 +61,40 @@ def corrected_poincare_curl(V, points):
     top = ref_el.get_topology()
     vertices = numpy.array(ref_el.get_vertices())
 
-    degree = V.degree + 2
+    kappa = poincare_curl(V)
+    degree = kappa.degree + 1
     P = ONPolynomialSet(ref_el, degree, variant="bubble")
     entity_ids = polynomial_entity_ids(ref_el, degree, continuity="C0")
     bubbles = [i for dim in range(1, sd + 1) for entity in sorted(top[dim]) for i in entity_ids[dim][entity]]
 
-    rules = []
-    metrics = []
-    dofs = []
+    # The Nedelec nodes must integrate the degree of the Poincare operator exactly
+    nedelec = Nedelec(ref_el, 1, variant=f"integral({kappa.degree})")
+    riesz = nedelec.get_dual_set().to_riesz(kappa)
+    edge_moments = numpy.tensordot(riesz, kappa.get_coeffs(), axes=((1, 2), (1, 2)))
+
+    lhs = []
+    rhs = []
     for dim in range(1, sd + 1):
-        ref_entity = ref_complex if dim == sd else ref_el.construct_subelement(dim)
-        rule = create_quadrature(ref_entity, 2 * degree - 2)
+        ref_entity = ref_el if dim == sd else ref_el.construct_subelement(dim)
+        rule = create_quadrature(ref_complex if dim == sd else ref_entity, 2 * degree - 2)
+        q = ONPolynomialSet(ref_entity, degree - 1 - dim).tabulate(rule.get_points())[(0,) * dim]
         for entity in sorted(top[dim]):
-            z = vertices[list(top[dim][entity])]
-            z = z - numpy.mean(z, axis=0)
-            rules.append(rule if dim == sd else FacetQuadratureRule(ref_el, dim, entity, rule))
-            metrics.append(z.T @ z)
-            dofs.append(entity_ids[dim][entity])
+            Q = rule if dim == sd else FacetQuadratureRule(ref_el, dim, entity, rule)
+            qpts, qwts = Q.get_points(), Q.get_weights()
+            x = qpts - numpy.mean(vertices[list(top[dim][entity])], axis=0)
+            test = q[:, None] * x.T
+            dP = grad(P.tabulate(qpts, 1))[bubbles]
+            gamma = numpy.tensordot(edge_moments.T, nedelec.tabulate(0, qpts)[(0,) * sd], axes=1)
+            lhs.append(inner(test, dP, qwts))
+            rhs.append(inner(test, kappa.tabulate(qpts)[(0,) * sd] - gamma, qwts))
 
-    qpts = numpy.concatenate([Q.get_points() for Q in rules])
-    qwts = numpy.concatenate([Q.get_weights() for Q in rules])
-    dP = grad(P.tabulate(qpts, 1))
+    coeffs = numpy.linalg.solve(numpy.concatenate(lhs), numpy.concatenate(rhs))
 
-    # Each bubble only tests on the points of its entity
-    tests = []
-    start = 0
-    for Q, metric, ids in zip(rules, metrics, dofs):
-        stop = start + len(Q.get_weights())
-        test = numpy.zeros_like(dP[ids])
-        test[..., start:stop] = metric @ dP[ids][..., start:stop]
-        tests.append(test)
-        start = stop
-    test = numpy.concatenate(tests)
-
-    A = inner(test, dP[bubbles], qwts)
-    b = inner(test, poincare_curl(V, qpts), qwts)
-    coeffs = numpy.linalg.solve(A, b)
-    dP = grad(P.tabulate(points, 1))
-    return poincare_curl(V, points) - numpy.tensordot(coeffs.T, dP[bubbles], axes=1)
+    rule = create_quadrature(ref_complex, 2 * kappa.degree)
+    qpts, qwts = rule.get_points(), rule.get_weights()
+    dP = grad(P.tabulate(qpts, 1))[bubbles]
+    f = kappa.tabulate(qpts)[(0,) * sd] - numpy.tensordot(coeffs.T, dP, axes=1)
+    return project_tabulation(ref_complex, kappa.degree, f, qpts, qwts)
 
 
 def HuZhangZhangSpace(ref_el, k=1):

@@ -20,7 +20,7 @@ from FIAT.functional import (ComponentPointEvaluation, FrobeniusIntegralMoment,
 from FIAT.guzman_neilan import GuzmanNeilanSpace, div, inner
 from FIAT.macro import AlfeldSplit
 from FIAT.polynomial_set import (ONPolynomialSet, TaylorConstrainedPolynomialSet, mis,
-                                 spanning_basis)
+                                 polynomial_set_union_normalized, spanning_basis)
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import TETRAHEDRON, UFCInterval
@@ -33,8 +33,19 @@ def grad(U):
     return numpy.stack([U[alpha] for alpha in mis(sd, 1)], axis=-2)
 
 
-def poincare_curl(V, points):
-    r"""Tabulate the Poincare operator that inverts the curl.
+def project_tabulation(ref_complex, degree, f, qpts, qwts):
+    """Compute the L2 projection of a tabulation onto piecewise polynomials.
+
+    Returns the polynomial set with one member for each function in f.
+    """
+    sd = ref_complex.get_spatial_dimension()
+    P = ONPolynomialSet(ref_complex, degree, shape=f.shape[1:-1], scale="orthonormal")
+    v = P.tabulate(qpts)[(0,) * sd]
+    return P.recombine(inner(v, f, qwts).T)
+
+
+def poincare_curl(V):
+    r"""Apply the Poincare operator that inverts the curl to a space.
 
     The operator about the barycenter :math:`x_T` is
 
@@ -45,14 +56,20 @@ def poincare_curl(V, points):
     Each subcell of an Alfeld split is a cone from :math:`x_T`, so the integrand
     is a polynomial in :math:`t`, and :math:`\kappa` raises the degree by one.
     """
-    ref_el = V.get_reference_element()
-    cell = ref_el.get_parent() or ref_el
+    ref_complex = V.get_reference_element()
+    cell = ref_complex.get_parent() or ref_complex
     sd = cell.get_spatial_dimension()
+    degree = V.degree + 1
+    rule = create_quadrature(ref_complex, 2 * degree)
+    qpts, qwts = rule.get_points(), rule.get_weights()
+
     barycenter = numpy.mean(cell.get_vertices(), axis=0)
-    x = points - barycenter
+    x = qpts - barycenter
     line = create_quadrature(UFCInterval(), V.degree + 1)
-    return sum(w * t * numpy.cross(V.tabulate(barycenter + t * x)[(0,) * sd], x.T[None], axis=1)
-               for (t,), w in zip(line.get_points(), line.get_weights()))
+    t = line.get_points()[:, 0]
+    g = V.tabulate(barycenter + t[:, None, None] * x[None, :, :])[(0,) * sd]
+    kappa = numpy.cross(numpy.tensordot(g, t * line.get_weights(), axes=(-2, 0)), x.T[None], axis=1)
+    return project_tabulation(ref_complex, degree, kappa, qpts, qwts)
 
 
 def PoincareSpace(V0, V2, V3, degree, d0=grad, d2=div, poincare=poincare_curl):
@@ -88,13 +105,13 @@ def PoincareSpace(V0, V2, V3, degree, d0=grad, d2=div, poincare=poincare_curl):
     d2 : callable, optional
         A first order operator that maps a tabulation dict to :math:`d_2`.
     poincare : callable, optional
-        Maps a polynomial set and points to the tabulation of :math:`\kappa`,
-        which encodes :math:`d_1`.
+        Maps a polynomial set to its image under :math:`\kappa`, in the same
+        order, which encodes :math:`d_1`.
 
     Returns
     -------
     PolynomialSet
-        The space :math:`V_1` in C0 piecewise polynomials of the given degree.
+        The space :math:`V_1` in piecewise polynomials of the given degree.
     """
     ref_complex = V2.get_reference_element()
     sd = ref_complex.get_spatial_dimension()
@@ -105,13 +122,10 @@ def PoincareSpace(V0, V2, V3, degree, d0=grad, d2=div, poincare=poincare_curl):
     dV2 = d2(V2.tabulate(qpts, 1))
     kernel = V2.recombine(spanning_basis(inner(q, dV2, qwts), nullspace=True))
     dV0 = d0(V0.tabulate(qpts, 1))
-    f = numpy.concatenate([dV0, poincare(kernel, qpts)])
 
-    # The L2 projection is exact, and any zero image of d0 drops out of the span
-    P = ONPolynomialSet(ref_complex, degree, shape=f.shape[1:-1], variant="bubble")
-    v = P.tabulate(qpts)[(0,) * sd]
-    coeffs = numpy.linalg.solve(inner(v, v, qwts), inner(v, f, qwts))
-    return P.recombine(spanning_basis(coeffs.T))
+    # The L2 projection is exact, and any zero image of d0 drops out of the union
+    gradients = project_tabulation(ref_complex, degree, dV0, qpts, qwts)
+    return polynomial_set_union_normalized(gradients, poincare(kernel))
 
 
 def ReducedFuGuzmanNeilanH1curlSpace(ref_el, order=2):
