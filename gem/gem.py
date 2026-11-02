@@ -1080,6 +1080,9 @@ class IndexSum(Scalar):
 
         return self
 
+    def __str__(self, /) -> str:
+        return f"isum_arr[{', '.join(map(str, self.multiindex))}]"
+
 
 class ListTensor(Node):
     __slots__ = ('array',)

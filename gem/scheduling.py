@@ -263,12 +263,34 @@ def emit_operations_new(assignments, get_indices):
             ready_to_schedule.discard(maybe_dep)
             depends_on[insn].append(maybe_dep)
 
+    # SAM CHANGE: Principal idea - Update refcount for Assignments for objects that it also writes to 
+
+    # An assignment must also come before each node that reads the variable that it
+    # writes, not only before the assignments that read it. 
+    # Otherwise a subexpression that becomes an impero.Evaluate can read the variable before it is written.
+
+    # GEM nodes are unique, so the variable is one node in the DAG, and its reference
+    # count drops to zero when the last of its readers is scheduled. An assignment that
+    # reads the variable that it writes is excluded, because it cannot wait for itself.
+    for insn in reversed(assignments):
+        variable = insn.assignee.aggregate
+        if variable in refcount and variable not in collect_refcount([insn.expression]):
+            refcount[insn] += 1
+            ready_to_schedule.discard(insn)
+            depends_on[variable].append(insn)
+
     assert ready_to_schedule, "Must have something to start with"
 
     # Callbacks executed when a reference count hits zero, push the node (either
     # GEM or Impero) onto the stack to be executed.
     def push(node):
-        if isinstance(node, gem.Node):
+        if isinstance(node, gem.Variable):
+            # A variable has no free indices, so a queued variable is only handled when
+            # the queue returns to the outermost level. The assignments that write it are
+            # released now instead, so that they can join the loop that is open.
+            for op in depends_on.get(node, ()):
+                stager.decref(op)
+        elif isinstance(node, gem.Node):
             queue.insert(get_indices(node), node)
         else:
             assert isinstance(node, impero.Node)

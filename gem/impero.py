@@ -75,6 +75,9 @@ class Initialise(Terminal):
     def loop_shape(self, free_indices):
         return free_indices(self.indexsum)
 
+    def _pretty_string(self, *, indent: int) -> str:
+        return f"{' ' * indent}initialise({self.indexsum} = 0.0)"
+
 
 class Accumulate(Terminal):
     """Accumulate terms into an :class:`gem.IndexSum`."""
@@ -88,6 +91,8 @@ class Accumulate(Terminal):
     def loop_shape(self, free_indices):
         return free_indices(self.indexsum.children[0])
 
+    def _pretty_string(self, *, indent: int) -> str:
+        return f"{' ' * indent}accumulate({self.indexsum} += {self.indexsum.children[0]})"
 
 class Noop(Terminal):
     """No-op terminal. Does not generate code, but wraps a GEM
