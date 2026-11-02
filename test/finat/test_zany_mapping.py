@@ -243,6 +243,10 @@ def test_unreduced_arnold_winther(ref_to_phys):
     (3, finat.MardalTaiWinther, 2),
     (3, finat.GuzmanNeilanFirstKindH1, 2),
     (3, finat.BernardiRaugel, 2),
+    (3, finat.ReducedFuGuzmanNeilanH1curl, 2),
+    (3, finat.ReducedFuGuzmanNeilanH1curl, 3),
+    (3, finat.HuZhangZhang, 1),
+    (3, finat.HuZhangZhang, 2),
 ])
 def test_high_order_stokes_elements(ref_to_phys, element, dimension, degree):
     check_zany_mapping(element, ref_to_phys[dimension], degree)
@@ -419,12 +423,3 @@ def test_entity_closure_sparsity(sd, element, degree):
     assert M.shape == (ndof, element._element.space_dimension())
     assert np.array_equal([[isinstance(entry, gem.Zero) for entry in row] for row in M],
                           [[isinstance(entry, gem.Zero) for entry in row] for row in V[:, :ndof].T])
-
-
-@pytest.mark.parametrize("order", (2, 3))
-def test_h1curl_mapping(ref_to_phys, order):
-    check_zany_mapping(finat.ReducedFuGuzmanNeilanH1curl, ref_to_phys[3], order)
-
-
-def test_hgradcurl_mapping(ref_to_phys):
-    check_zany_mapping(finat.HuZhangZhang, ref_to_phys[3])

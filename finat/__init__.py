@@ -26,13 +26,13 @@ from .christiansen_hu import ChristiansenHu                        # noqa: F401
 from .c2_elements import AlfeldC2, BrambleZlamalC2                 # noqa: F401
 from .alfeld_sorokina import AlfeldSorokina                        # noqa: F401
 from .guzman_neilan import GuzmanNeilanFirstKindH1, GuzmanNeilanSecondKindH1, GuzmanNeilanBubble, GuzmanNeilanH1div  # noqa: F401
+from .fu_guzman_neilan import ReducedFuGuzmanNeilanH1curl          # noqa: F401
+from .hu_zhang_zhang import HuZhangZhang                           # noqa: F401
 from .powell_sabin import QuadraticPowellSabin6, QuadraticPowellSabin12  # noqa: F401
 from .hermite import Hermite, ReducedHermite                       # noqa: F401
 from .johnson_mercier import JohnsonMercier                        # noqa: F401
 from .mtw import MardalTaiWinther                                  # noqa: F401
 from .morley import Morley                                         # noqa: F401
-from .fu_guzman_neilan import ReducedFuGuzmanNeilanH1curl          # noqa: F401
-from .hu_zhang_zhang import HuZhangZhang                           # noqa: F401
 from .walkington import ReducedWalkington, Walkington              # noqa: F401
 from .direct_serendipity import DirectSerendipity                  # noqa: F401
 from .tensorfiniteelement import TensorFiniteElement               # noqa: F401

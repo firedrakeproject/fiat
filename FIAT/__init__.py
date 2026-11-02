@@ -26,6 +26,8 @@ from FIAT.c2_elements import AlfeldC2, BrambleZlamalC2
 from FIAT.alfeld_sorokina import AlfeldSorokina
 from FIAT.arnold_qin import ArnoldQin
 from FIAT.guzman_neilan import GuzmanNeilanFirstKindH1, GuzmanNeilanSecondKindH1, GuzmanNeilanH1div
+from FIAT.fu_guzman_neilan import ReducedFuGuzmanNeilanH1curl
+from FIAT.hu_zhang_zhang import HuZhangZhang
 from FIAT.christiansen_hu import ChristiansenHu
 from FIAT.johnson_mercier import JohnsonMercier
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini
@@ -64,8 +66,6 @@ from FIAT.bubble import Bubble, FacetBubble
 from FIAT.hdiv_trace import HDivTrace
 from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen
 from FIAT.wuxu import WuXuH3NC, WuXuRobustH3NC
-from FIAT.fu_guzman_neilan import ReducedFuGuzmanNeilanH1curl
-from FIAT.hu_zhang_zhang import HuZhangZhang
 from FIAT.walkington import Walkington
 from FIAT.histopolation import Histopolation
 from FIAT.fdm_element import FDMLagrange, FDMDiscontinuousLagrange, FDMQuadrature, FDMBrokenH1, FDMBrokenL2, FDMHermite  # noqa: F401
@@ -105,6 +105,8 @@ supported_elements = {"Argyris": Argyris,
                       "Guzman-Neilan 1st kind H1": GuzmanNeilanFirstKindH1,
                       "Guzman-Neilan 2nd kind H1": GuzmanNeilanSecondKindH1,
                       "Guzman-Neilan H1(div)": GuzmanNeilanH1div,
+                      "Reduced-Fu-Guzman-Neilan H1(curl)": ReducedFuGuzmanNeilanH1curl,
+                      "Hu-Zhang-Zhang": HuZhangZhang,
                       "Johnson-Mercier": JohnsonMercier,
                       "Lagrange": Lagrange,
                       "Kong-Mulder-Veldhuizen": KongMulderVeldhuizen,
@@ -127,9 +129,7 @@ supported_elements = {"Argyris": Argyris,
                       "Nonconforming Arnold-Winther": ArnoldWintherNC,
                       "Hu-Zhang": HuZhang,
                       "Mardal-Tai-Winther": MardalTaiWinther,
-                      "Walkington": Walkington,
-                      "Reduced-Fu-Guzman-Neilan H1(curl)": ReducedFuGuzmanNeilanH1curl,
-                      "Hu-Zhang-Zhang": HuZhangZhang}
+                      "Walkington": Walkington}
 
 # List of extra elements
 extra_elements = {"P0": P0}

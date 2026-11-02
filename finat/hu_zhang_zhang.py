@@ -7,22 +7,24 @@ from finat.physically_mapped import PhysicallyMappedElement
 
 
 class HuZhangZhang(PhysicallyMappedElement, FiatElement):
-    """The lowest order Hu-Zhang-Zhang H(grad curl) Alfeld tetrahedron.
+    """The Hu-Zhang-Zhang H(grad curl) Alfeld tetrahedron.
 
     Parameters
     ----------
     cell : Cell
         A tetrahedron.
     k : int, optional
-        The degree of the complete polynomials in the curl, which must be 1.
+        The degree of the complete polynomials in the curl, which must be 1 or 2.
     """
 
     def __init__(self, cell, k=1):
         cite("HuZhangZhang2022")
         super().__init__(FIAT.HuZhangZhang(cell, k))
+        # FIAT gives an element whose last 8 nodes constrain the curl, and are used
+        # in the transformation.  We only count the curl at each vertex, and on each
+        # edge the tangential moments and the curl at interior lattice points.
+        top = cell.get_topology()
+        self._space_dimension = 3 * len(top[0]) + (k + 3 * (k - 1)) * len(top[1])
 
-    # FIAT gives a 26 DOF element whose last 8 nodes constrain the curl, and are
-    # used in the transformation.  We only count the curl at each vertex and a
-    # circulation on each edge.
     def space_dimension(self):
-        return 18
+        return self._space_dimension
