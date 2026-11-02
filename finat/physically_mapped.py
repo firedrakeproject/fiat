@@ -745,13 +745,13 @@ class LinearCombination:
         r"""The contraction :math:`G:A=g^TR` with a constant tensor, where :math:`R_t=C_t:A`.
 
         :arg A: A constant tensor whose first two axes match :math:`G`.
-        :arg tol: Tolerance relative to A and each :math:`C_t` below which
-            entries of :math:`R` are dropped.
+        :arg tol: Tolerance below which entries of :math:`R` are dropped, relative
+            to the bound :math:`|C_t:A|\le\|C_t\|_1\|A\|_\infty`.
         :returns: An object array of GEM scalars with the remaining axes of A.
         """
         R = numpy.tensordot(self.matrices, A, axes=2)
         R = R.reshape(len(R), -1)
-        cutoffs = tol * numpy.abs(A).max() * numpy.abs(self.matrices).max(axis=(1, 2))[:, None]
+        cutoffs = tol * numpy.abs(A).max() * numpy.abs(self.matrices).sum(axis=(1, 2))[:, None]
         R = round_to_int(R, cutoffs)
         nonzero = numpy.abs(R) > cutoffs
         R_gem = numpy.full(R.shape, zero, dtype=object)
