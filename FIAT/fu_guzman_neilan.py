@@ -1,10 +1,10 @@
 # Copyright (C) 2026 Pablo D. Brubeck
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
-# This is not quite the reduced Fu-Guzman-Neilan element, but is 86-dofs and
-# includes 32 extra constraint functionals.  The first 54 basis functions are
-# the reference element bfs, but the extra 32 are used in the transformation
-# theory.
+# This is not quite the reduced Fu-Guzman-Neilan element.  The extended element
+# of order 2 has 86 dofs, of which the last 32 are extra constraint functionals.
+# The extended element of order 3 has 105 dofs, of which the last 28 are extra
+# constraint functionals.  The constraints are used in the transformation theory.
 
 """H1(curl) elements on the Alfeld tetrahedron."""
 
@@ -15,18 +15,103 @@ from FIAT.bernstein import BernsteinPolynomialSet
 from FIAT.dual_set import DualSet
 from FIAT.finite_element import CiarletElement
 from FIAT.functional import (ComponentPointEvaluation, FrobeniusIntegralMoment,
-                             IntegralMomentOfDerivative, PointDirectionalDerivative)
+                             IntegralMomentOfCurl, IntegralMomentOfDerivative,
+                             PointCurlComponent, PointDirectionalDerivative)
 from FIAT.guzman_neilan import GuzmanNeilanSpace, div, inner
 from FIAT.macro import AlfeldSplit
 from FIAT.polynomial_set import (ONPolynomialSet, TaylorConstrainedPolynomialSet, mis,
                                  spanning_basis)
-from FIAT.quadrature import FacetQuadratureRule, GaussLegendreQuadratureLineRule
+from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import TETRAHEDRON, UFCInterval
 from FIAT.walkington import WalkingtonDualSet
 
 
-def ReducedFuGuzmanNeilanH1curlSpace(ref_el):
+def grad(U):
+    """Compute the gradient from tabulation dict."""
+    sd = len(next(iter(U)))
+    return numpy.stack([U[alpha] for alpha in mis(sd, 1)], axis=-2)
+
+
+def poincare_curl(V, points):
+    r"""Tabulate the Poincare operator that inverts the curl.
+
+    The operator about the barycenter :math:`x_T` is
+
+    .. math::
+
+        \kappa g(x) = \int_0^1 t\, g(x_T + t (x - x_T)) \times (x - x_T) \,\mathrm{d}t.
+
+    Each subcell of an Alfeld split is a cone from :math:`x_T`, so the integrand
+    is a polynomial in :math:`t`, and :math:`\kappa` raises the degree by one.
+    """
+    ref_el = V.get_reference_element()
+    cell = ref_el.get_parent() or ref_el
+    sd = cell.get_spatial_dimension()
+    barycenter = numpy.mean(cell.get_vertices(), axis=0)
+    x = points - barycenter
+    line = create_quadrature(UFCInterval(), V.degree + 1)
+    return sum(w * t * numpy.cross(V.tabulate(barycenter + t * x)[(0,) * sd], x.T[None], axis=1)
+               for (t,), w in zip(line.get_points(), line.get_weights()))
+
+
+def PoincareSpace(V0, V2, V3, degree, d0=grad, d2=div, poincare=poincare_curl):
+    r"""Fill in the space between two spaces of a complex.
+
+    Given the spaces :math:`V_0, V_2, V_3` of the complex
+
+    .. math::
+
+        V_0 \xrightarrow{d_0} V_1 \xrightarrow{d_1} V_2 \xrightarrow{d_2} V_3,
+
+    return
+
+    .. math::
+
+        V_1 = d_0 V_0 \oplus \kappa (V_2 \cap \ker d_2),
+
+    where :math:`\kappa` is a Poincare operator with :math:`d_1 \kappa = I` on
+    :math:`\ker d_2` and with an image that intersects :math:`\ker d_1` trivially.
+
+    Parameters
+    ----------
+    V0 : PolynomialSet
+        The space before :math:`V_1`.
+    V2 : PolynomialSet
+        The space after :math:`V_1`, on the cell or macrocell of :math:`V_1`.
+    V3 : PolynomialSet
+        A space containing :math:`d_2 V_2`.
+    degree : int
+        The polynomial degree of :math:`V_1`.
+    d0 : callable, optional
+        A first order operator that maps a tabulation dict to :math:`d_0`.
+    d2 : callable, optional
+        A first order operator that maps a tabulation dict to :math:`d_2`.
+    poincare : callable, optional
+        Maps a polynomial set and points to the tabulation of :math:`\kappa`,
+        which encodes :math:`d_1`.
+
+    Returns
+    -------
+    PolynomialSet
+        The space :math:`V_1` in C0 piecewise polynomials of the given degree.
+    """
+    ref_complex = V2.get_reference_element()
+    sd = ref_complex.get_spatial_dimension()
+    rule = create_quadrature(ref_complex, 2 * degree)
+    qpts, qwts = rule.get_points(), rule.get_weights()
+
+    kernel = spanning_basis(inner(V3.tabulate(qpts)[(0,) * sd], d2(V2.tabulate(qpts, 1)), qwts), nullspace=True)
+    f = numpy.concatenate([d0(V0.tabulate(qpts, 1)), poincare(V2.recombine(kernel), qpts)])
+
+    # The L2 projection is exact, and any zero image of d0 drops out of the span
+    P = ONPolynomialSet(ref_complex, degree, shape=f.shape[1:-1], variant="bubble")
+    v = P.tabulate(qpts)[(0,) * sd]
+    coeffs = numpy.linalg.solve(inner(v, v, qwts), inner(v, f, qwts))
+    return P.recombine(spanning_basis(coeffs.T))
+
+
+def ReducedFuGuzmanNeilanH1curlSpace(ref_el, order=2):
     r"""Build the extended quartic H1(curl) space.
 
     The space is
@@ -35,13 +120,9 @@ def ReducedFuGuzmanNeilanH1curlSpace(ref_el):
 
         \nabla W \oplus \kappa (GN \cap \ker \operatorname{div}),
 
-    where :math:`W` is the extended reduced Walkington space, :math:`GN` is
-    the extended Guzman-Neilan space, and :math:`\kappa` is the Poincaré
-    operator about the barycenter :math:`x_T`
-
-    .. math::
-
-        \kappa g(x) = \int_0^1 t\, g(x_T + t (x - x_T)) \times (x - x_T) \,\mathrm{d}t.
+    where :math:`GN` is the extended Guzman-Neilan space of order ``order - 1``,
+    :math:`W` is the extended Walkington space, which is reduced for order 2,
+    and :math:`\kappa` is the Poincare operator about the barycenter.
 
     Since :math:`(x - x_T) \cdot \kappa g = 0`, the image of :math:`\kappa`
     has no gradient part, and satisfies the barycenter supersmoothness and
@@ -51,59 +132,43 @@ def ReducedFuGuzmanNeilanH1curlSpace(ref_el):
     ----------
     ref_el : Cell
         A tetrahedron.
+    order : int, optional
+        The embedded subdegree, which must be 2 or 3.
 
     Returns
     -------
     PolynomialSet
-        The 86-dimensional extended space on the Alfeld split.
+        The extended space on the Alfeld split, with dimension 86 for order 2
+        and 105 for order 3.
     """
     if ref_el.get_shape() != TETRAHEDRON:
         raise ValueError("H1(curl) is only defined on tetrahedra")
-    sd = ref_el.get_spatial_dimension()
-    ref_complex = AlfeldSplit(ref_el)
-    rule = create_quadrature(ref_complex, 8)
-    qpts, qwts = rule.get_points(), rule.get_weights()
-
-    # Gradients of the extended reduced Walkington space
-    W = BernsteinPolynomialSet(ref_complex, 5, order=1, vorder=4)
-    W = TaylorConstrainedPolynomialSet(W, (1, 2/3, 1/3))
-    dW = W.tabulate(qpts, 1)
-    grads = numpy.stack([dW[alpha] for alpha in mis(sd, 1)], axis=1)
-
-    # The divergence of GN is constant, so its kernel has codimension one
-    GN = GuzmanNeilanSpace(ref_el, 1)
-    mean_div = numpy.dot(div(GN.tabulate(qpts, 1)), qwts)
-    GN = GN.recombine(spanning_basis(mean_div[None, :], nullspace=True))
-
-    # The Poincaré integrand is a quartic in t, so three Gauss points are exact
-    barycenter = numpy.mean(ref_el.get_vertices(), axis=0)
-    x = qpts - barycenter
-    line = GaussLegendreQuadratureLineRule(UFCInterval(), 3)
-    kappa = sum(w * t * numpy.cross(GN.tabulate(barycenter + t * x)[(0,) * sd], x.T[None], axis=1)
-                for (t,), w in zip(line.get_points(), line.get_weights()))
-
-    # The L2 projection is exact, and the gradient of the constant vanishes
-    P = ONPolynomialSet(ref_complex, 4, shape=(sd,), variant="bubble")
-    v = P.tabulate(qpts)[(0,) * sd]
-    f = numpy.concatenate([grads, kappa])
-    coeffs = numpy.linalg.solve(inner(v, v, qwts), inner(v, f, qwts))
-    return P.recombine(spanning_basis(coeffs.T))
+    GN = GuzmanNeilanSpace(ref_el, order - 1)
+    W = BernsteinPolynomialSet(GN.get_reference_element(), 5, order=1, vorder=4)
+    if order == 2:
+        W = TaylorConstrainedPolynomialSet(W, (1, 2/3, 1/3))
+    pressure = ONPolynomialSet(ref_el, order - 2)
+    return PoincareSpace(W, GN, pressure, 4)
 
 
 class ReducedFuGuzmanNeilanH1curlDualSet(DualSet):
     """Vertex jets and edge circulations, augmented by constraints.
 
-    The constraints are the reduced Walkington constraints pulled back
-    through the gradient, and the tangential Guzman-Neilan constraints
-    pulled back through the curl.
+    For order 3, the dofs also include the curl at edge midpoints, normal
+    moments on faces, and a cell moment against the position vector.  The
+    constraints are the Walkington constraints pulled back through the
+    gradient, and the tangential Guzman-Neilan constraints pulled back through
+    the curl.
 
     Parameters
     ----------
     ref_el : Cell
         A tetrahedron.
+    order : int, optional
+        The embedded subdegree, which must be 2 or 3.
     """
 
-    def __init__(self, ref_el):
+    def __init__(self, ref_el, order=2):
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
         entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
@@ -129,56 +194,70 @@ class ReducedFuGuzmanNeilanH1curlDualSet(DualSet):
             nodes.append(FrobeniusIntegralMoment(ref_el, Q, f_at_qpts))
             entity_ids[1][e].extend(range(cur, len(nodes)))
 
-        # Constraint dofs: Walkington constraints on the potential, pairing
-        # second derivatives with the symmetric gradient
-        walkington = WalkingtonDualSet(ref_el, 5, reduced=True)
-        for dim in range(1, sd+1):
-            for entity in sorted(top[dim]):
-                cur = len(nodes)
-                for i in walkington.entity_ids[dim][entity]:
-                    node = walkington.nodes[i]
-                    f_at_qpts = node.f_at_qpts
-                    if f_at_qpts.ndim == 2:
-                        nodes.append(FrobeniusIntegralMoment(ref_el, node.Q, f_at_qpts))
-                    else:
-                        f_at_qpts = (f_at_qpts + f_at_qpts.swapaxes(0, 1)) / 2
-                        nodes.append(IntegralMomentOfDerivative(ref_el, node.Q, f_at_qpts, shp=(sd,)))
-                entity_ids[dim][entity].extend(range(cur, len(nodes)))
+        # Edge dofs: curl at the interior GN lattice points
+        for e in sorted(top[1]):
+            cur = len(nodes)
+            nodes.extend(PointCurlComponent(ref_el, c, x)
+                         for x in ref_el.make_points(1, e, order - 1) for c in range(sd))
+            entity_ids[1][e].extend(range(cur, len(nodes)))
 
-        # Constraint dofs: tangential GN constraints on the curl, where
-        # f . curl v = sum_d (f x e_d) . D_d v
-        gn = BernardiRaugelDualSet(ref_el, 1, degree=3)
+        # Walkington dofs and constraints on the potential, pairing second
+        # derivatives with the symmetric gradient.  The interior dof of W, its
+        # barycenter value, becomes a cell average against the position vector,
+        # which annihilates the image of the Poincare operator and is preserved
+        # by the covariant Piola map.
+        walkington = WalkingtonDualSet(ref_el, 5, reduced=(order == 2))
+        entities = {i: (dim, entity)
+                    for dim in walkington.entity_ids
+                    for entity in walkington.entity_ids[dim]
+                    for i in walkington.entity_ids[dim][entity]}
+        Q_cell = create_quadrature(AlfeldSplit(ref_el), 5)
+        barycenter = numpy.mean(ref_el.get_vertices(), axis=0)
+        for i, node in enumerate(walkington.nodes):
+            dim, entity = entities[i]
+            if dim == 0:
+                continue
+            if dim == sd:
+                f_at_qpts = (Q_cell.get_points() - barycenter).T / ref_el.volume()
+                functional = FrobeniusIntegralMoment(ref_el, Q_cell, f_at_qpts)
+            elif node.f_at_qpts.ndim == 2:
+                functional = FrobeniusIntegralMoment(ref_el, node.Q, node.f_at_qpts)
+            else:
+                f_at_qpts = (node.f_at_qpts + node.f_at_qpts.swapaxes(0, 1)) / 2
+                functional = IntegralMomentOfDerivative(ref_el, node.Q, f_at_qpts, shp=(sd,))
+            entity_ids[dim][entity].append(len(nodes))
+            nodes.append(functional)
+
+        # Constraint dofs: tangential GN constraints on the curl
+        gn = BernardiRaugelDualSet(ref_el, order - 1, degree=3)
         for face in sorted(top[2]):
             cur = len(nodes)
             # Skip the normal moment, which comes first
             for i in gn.entity_ids[2][face][1:]:
-                node = gn.nodes[i]
-                f_at_qpts = numpy.cross(node.f_at_qpts[:, None], numpy.eye(sd)[..., None], axis=0)
-                nodes.append(IntegralMomentOfDerivative(ref_el, node.Q, f_at_qpts, shp=(sd,)))
+                nodes.append(IntegralMomentOfCurl(ref_el, gn.nodes[i].Q, gn.nodes[i].f_at_qpts))
             entity_ids[2][face].extend(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)
 
 
 class ReducedFuGuzmanNeilanH1curl(CiarletElement):
-    """Extended H1(curl) tetrahedron.
+    """Extended quartic H1(curl) tetrahedron.
 
-    The first 54 basis functions form the reduced element: twelve first-jet
-    degrees of freedom at each vertex and one circulation on each edge.
-    The remaining 32 nodes constrain the boundary traces and curl, and
-    support physical basis transformations.
+    The first basis functions form the reduced element, with 54 for order 2
+    and 77 for order 3.  The remaining nodes constrain the boundary traces and
+    curl, and support physical basis transformations.
 
     Parameters
     ----------
     ref_el : Cell
         A tetrahedron.
-    degree : int, optional
-        Polynomial degree, which must be four.
+    order : int, optional
+        The embedded subdegree, which must be 2 or 3.
     """
 
-    def __init__(self, ref_el, degree=4):
-        if degree != 4:
-            raise ValueError("H1(curl) is only implemented for degree four")
-        poly_set = ReducedFuGuzmanNeilanH1curlSpace(ref_el)
-        dual = ReducedFuGuzmanNeilanH1curlDualSet(ref_el)
-        super().__init__(poly_set, dual, degree, formdegree=1, mapping="covariant piola")
+    def __init__(self, ref_el, order=2):
+        if order not in {2, 3}:
+            raise ValueError(f"{type(self).__name__} is only implemented for order 2 or 3")
+        poly_set = ReducedFuGuzmanNeilanH1curlSpace(ref_el, order)
+        dual = ReducedFuGuzmanNeilanH1curlDualSet(ref_el, order)
+        super().__init__(poly_set, dual, 4, formdegree=1, mapping="covariant piola")

@@ -4,6 +4,7 @@ import numpy
 import pytest
 
 from FIAT import ReducedFuGuzmanNeilanH1curl, Walkington, ufc_simplex
+from FIAT.fu_guzman_neilan import PoincareSpace
 from FIAT.guzman_neilan import GuzmanNeilanSpace
 from FIAT.polynomial_set import ONPolynomialSet, mis
 from FIAT.quadrature import FacetQuadratureRule
@@ -31,31 +32,34 @@ def cell(request):
     return cell
 
 
-def test_reduced_complex(cell):
-    element = ReducedFuGuzmanNeilanH1curl(cell)
-    assert element.space_dimension() == 86
+@pytest.mark.parametrize("order, dimension, reduced_dimension, scalar_dimension, gradient_rank, curl_rank",
+                         [(2, 86, 54, 40, 39, 15), (3, 105, 77, 45, 44, 33)])
+def test_reduced_complex(cell, order, dimension, reduced_dimension, scalar_dimension, gradient_rank, curl_rank):
+    element = ReducedFuGuzmanNeilanH1curl(cell, order)
+    assert element.space_dimension() == dimension
+    assert element.degree() == 4
     assert sum(len(v) for v in element.entity_dofs()[0].values()) == 48
-    space = element.get_nodal_basis().take(list(range(54)))
+    space = element.get_nodal_basis().take(list(range(reduced_dimension)))
     points = create_quadrature(space.ref_el, 8).get_points()
     table = space.tabulate(points, 1)
     values = table[(0, 0, 0)]
-    contains(values, ONPolynomialSet(cell, 2, shape=(3,)).tabulate(points)[(0, 0, 0)])
+    contains(values, ONPolynomialSet(cell, order, shape=(3,)).tabulate(points)[(0, 0, 0)])
 
-    scalar = Walkington(cell, reduced=True).get_nodal_basis().take(list(range(40)))
+    scalar = Walkington(cell, reduced=order == 2).get_nodal_basis().take(list(range(scalar_dimension)))
     scalar_table = scalar.tabulate(points, 1)
     gradient = numpy.stack([scalar_table[alpha] for alpha in mis(3, 1)], axis=1)
     contains(values, gradient)
-    assert numpy.linalg.matrix_rank(gradient.reshape(40, -1), tol=1e-8) == 39
+    assert numpy.linalg.matrix_rank(gradient.reshape(scalar_dimension, -1), tol=1e-8) == gradient_rank
 
     curls = curl(table)
-    gn = GuzmanNeilanSpace(cell, 1, reduced=True).tabulate(points)[(0, 0, 0)]
+    gn = GuzmanNeilanSpace(cell, order - 1, reduced=True).tabulate(points)[(0, 0, 0)]
     contains(gn, curls)
-    assert numpy.linalg.matrix_rank(curls.reshape(54, -1), tol=1e-8) == 15
+    assert numpy.linalg.matrix_rank(curls.reshape(reduced_dimension, -1), tol=1e-8) == curl_rank
 
     # Face traces of both v and curl(v) depend only on face closure dofs.
     rule = create_quadrature(cell.construct_subelement(2), 8)
     for face, closure in element.entity_closure_dofs()[2].items():
-        other = sorted(set(range(54)) - set(closure))
+        other = sorted(set(range(reduced_dimension)) - set(closure))
         face_points = FacetQuadratureRule(cell, 2, face, rule).get_points()
         face_table = space.tabulate(face_points, 1)
         assert numpy.allclose(face_table[(0, 0, 0)][other], 0, atol=2e-9)
@@ -64,11 +68,18 @@ def test_reduced_complex(cell):
     # Nodal unisolvence includes all auxiliary constraints used by FInAT.
     riesz = element.dual.to_riesz(element.get_nodal_basis())
     matrix = numpy.tensordot(riesz, element.get_nodal_basis().coeffs, axes=((1, 2), (1, 2)))
-    assert numpy.allclose(matrix, numpy.eye(86), atol=1e-9)
+    assert numpy.allclose(matrix, numpy.eye(dimension), atol=1e-9)
 
 
-def test_invalid_h1curl():
-    with pytest.raises(ValueError, match="tetrahedra"):
-        ReducedFuGuzmanNeilanH1curl(ufc_simplex(2))
-    with pytest.raises(ValueError, match="degree four"):
-        ReducedFuGuzmanNeilanH1curl(ufc_simplex(3), 3)
+def test_poincare_space_grad_curl(cell):
+    """The lowest order H(grad curl) space has dimension 3 + 15."""
+    gn = GuzmanNeilanSpace(cell, 1, reduced=True)
+    space = PoincareSpace(ONPolynomialSet(cell, 1), gn, ONPolynomialSet(cell, 0), 4)
+    assert len(space) == 18
+
+    points = create_quadrature(space.ref_el, 8).get_points()
+    table = space.tabulate(points, 1)
+    contains(table[(0, 0, 0)], ONPolynomialSet(cell, 0, shape=(3,)).tabulate(points)[(0, 0, 0)])
+    curls = curl(table)
+    contains(gn.tabulate(points)[(0, 0, 0)], curls)
+    assert numpy.linalg.matrix_rank(curls.reshape(18, -1), tol=1e-8) == 15

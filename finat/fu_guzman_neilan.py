@@ -6,21 +6,25 @@ from finat.physically_mapped import PhysicallyMappedElement
 
 
 class ReducedFuGuzmanNeilanH1curl(PhysicallyMappedElement, FiatElement):
-    """The 54-dimensional quartic H1(curl) Alfeld tetrahedron.
+    """The quartic H1(curl) Alfeld tetrahedron.
 
     Parameters
     ----------
     cell : Cell
         A tetrahedron.
-    degree : int, optional
-        Polynomial degree, which must be four.
+    order : int, optional
+        The embedded subdegree, which must be 2 or 3.
     """
 
-    def __init__(self, cell, degree=4):
-        super().__init__(FIAT.ReducedFuGuzmanNeilanH1curl(cell, degree))
+    def __init__(self, cell, order=2):
+        super().__init__(FIAT.ReducedFuGuzmanNeilanH1curl(cell, order))
+        # FIAT gives an element whose last nodes constrain the boundary traces and
+        # curl, and are used in the transformation.  We only count the dofs: a first
+        # order jet per vertex, and a circulation per edge.  Order 3 adds the curl at
+        # each edge midpoint, a normal moment per face, and a cell average.
+        top = cell.get_topology()
+        k = order - 2
+        self._space_dimension = 12 * len(top[0]) + (1 + 3 * k) * len(top[1]) + k * len(top[2]) + k * len(top[3])
 
-    # FIAT gives an 86 DOF element whose last 32 nodes constrain the
-    # boundary traces and curl, and are used in the transformation.
-    # However, we only have a 54 DOF element.
     def space_dimension(self):
-        return 54
+        return self._space_dimension

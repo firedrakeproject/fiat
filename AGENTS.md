@@ -94,6 +94,10 @@ When writing Python code for FIAT, maintain the ecosystem's structural and styli
 * Boolean attributes must be used to record initialization intent and state instead of probing for the presence of state built by an initialization function.
 * New code must include type hints on all function and method signatures.
 * Public-facing APIs must include properly formatted `numpydoc`-style docstrings.
+* Express degrees of freedom through `Functional` subclasses. Reuse an existing subclass, or add a
+  new one to `FIAT/functional.py` when none fits, instead of assembling raw weights inline in a dual set.
+* Do not dig into functional internals such as `pt_dict` in element definitions. Get points from the
+  reference cell or the quadrature rule that defines the degree of freedom.
 * Lint before finishing a change: `make srclint` runs `flake8`, `make doclint` runs `pydocstyle`
   (see the `[flake8]` and `[pydocstyle]` sections of `setup.cfg` for the active ignore lists), and
   `make lint` runs both. CI runs the same targets, and a clean `srclint` pass does not imply a clean
