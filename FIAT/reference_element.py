@@ -351,8 +351,7 @@ class Cell:
         """
         raise NotImplementedError("Should be implemented in a subclass.")
 
-    @property
-    def facet_orientation_coord_maps(self):
+    def _facet_orientation_coord_maps(self):
         """Return the affine transformation that maps, for every possible facet orientation `o`, the facet-local reference coordinates
         to the facet-local coordinates expressed in the canonical orientation.
 
@@ -374,8 +373,7 @@ class Cell:
         o_coord_maps = facet.get_orientation_coord_maps()
         return o_coord_maps
 
-    @property
-    def facet_embedding_coord_maps(self):
+    def _facet_embedding_coord_maps(self):
         """Return the affine transformation that maps the reference coordinates of a point on each facet
         to the reference coordinates of the cell.
 
@@ -408,13 +406,13 @@ class Cell:
         A_inv = numpy.linalg.pinv(A)
         return A, b, A_inv
 
-    @property
     def facet_neighbour_coord_maps(self):
-        """Return the affine transformation that maps between the reference coordinates of two adjacent cells sharing a facet.
+        """Return the affine maps that take the reference coordinates of a point on a facet from one cell to the cell on the other side of that facet.
 
         Example:
-        Suppose a cell has local facet ``lf_from`` with orientation ``o_from`` corresponding to local facet ``lf_to``, with orientation `o_to`
-        in the other cell across that facet. Then a point with reference coordinates ``X`` in the first cell has reference coordinates in the neighbouring cell:
+        Suppose a cell has local facet ``lf_from`` with orientation ``o_from`` corresponding to local facet ``lf_to`` with orientation `o_to` in the other cell across that facet.
+
+        Then a point in the first cell, lying on the local facet ``lf_from`` with reference coordinates ``X``, has reference coordinates in the neighbouring cell:
 
             X' = A[lf_from, lf_to, o_from, o_to] @ X + b[lf_from, lf_to, o_from, o_to]
 
@@ -428,8 +426,8 @@ class Cell:
             ``(num_facets, num_facets, num_orientations, num_orientations, dim)``.
         """
 
-        A_f, b_f, A_f_inv = self.facet_embedding_coord_maps
-        o_coord_maps = self.facet_orientation_coord_maps
+        A_f, b_f, A_f_inv = self._facet_embedding_coord_maps()
+        o_coord_maps = self._facet_orientation_coord_maps()
         Q = numpy.stack([o_coord_maps[o][0] for o in range(len(o_coord_maps))])
         t = numpy.stack([o_coord_maps[o][1] for o in range(len(o_coord_maps))])
         Q_inv = numpy.linalg.inv(Q)
@@ -1339,12 +1337,10 @@ class TensorProductCell(Cell):
         return [slice(delimiter[i], delimiter[i+1])
                 for i in range(n)]
 
-    @property
-    def facet_embedding_coord_maps(self):
+    def _facet_embedding_coord_maps(self):
         raise NotImplementedError("Facet maps are not yet implemented for general tensor product cells.")
 
-    @property
-    def facet_orientation_coord_maps(self):
+    def _facet_orientation_coord_maps(self):
         raise NotImplementedError("Facet maps are not yet implemented for general tensor product cells.")
 
     def get_dimension(self):
@@ -1634,9 +1630,9 @@ class Hypercube(Cell):
         o_p_maps = flatten_permutations({tuple(factor_dims): {0: tp_maps}})[self.get_spatial_dimension()][0]
         # Convert each vertex permutation into an affine map
         o_coord_maps = {}
+        # vertex subset: vertex 0 and its neighbour along each axis are linearly independent
+        subset = [0, *(2**i for i in range(self.get_spatial_dimension()))]
         for o, p in o_p_maps.items():
-            # vertex subset: vertex 0 and its neighbour along each axis are linearly independent
-            subset = [0, *(2**i for i in range(self.get_spatial_dimension()))]
             permuted_verts = verts[p]
             Q, t = make_affine_mapping(verts[subset], permuted_verts[subset])
             o_coord_maps[o] = (Q, t)
