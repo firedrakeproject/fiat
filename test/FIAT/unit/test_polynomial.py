@@ -20,6 +20,7 @@ import numpy
 import sympy
 
 from FIAT import expansions, polynomial_set, reference_element
+from FIAT.macro import AlfeldSplit
 from FIAT.quadrature_schemes import create_quadrature
 from itertools import chain
 
@@ -222,3 +223,21 @@ def test_union_of_polysets(cell, degree):
     same_vals = same_deg.tabulate(Qpts)[(0,) * sd]
     diff_vals = different_deg.tabulate(Qpts)[(0,) * sd]
     assert numpy.allclose(same_vals - diff_vals, 0)
+
+
+@pytest.mark.parametrize("sd", (1, 2, 3))
+@pytest.mark.parametrize("macro", (False, True))
+@pytest.mark.parametrize("variant, shape", [(None, ()), (None, (2,)), ("bubble", ())])
+@pytest.mark.parametrize("order", (0, 1, 4))
+def test_tabulate_points_with_extra_axes(sd, macro, variant, shape, order):
+    """The axes of the points become the trailing axes of the tabulation."""
+    cell = reference_element.ufc_simplex(sd)
+    if macro:
+        cell = AlfeldSplit(cell)
+    poly_set = polynomial_set.ONPolynomialSet(cell, 3, shape=shape, variant=variant)
+    points = numpy.random.default_rng(0).random((4, 5, sd)) / (sd + 1)
+    table = poly_set.tabulate(points, order)
+    flat_table = poly_set.tabulate(points.reshape(-1, sd), order)
+    for alpha in flat_table:
+        assert table[alpha].shape == (*flat_table[alpha].shape[:-1], 4, 5)
+        assert numpy.allclose(table[alpha].reshape(flat_table[alpha].shape), flat_table[alpha])

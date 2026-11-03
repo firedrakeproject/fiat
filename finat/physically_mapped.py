@@ -195,9 +195,8 @@ class PhysicallyMappedFunctional:
                 continue
             if on_edge and mapping == "covariant piola":
                 Q = tangential_projector(self.cell.compute_tangents(self.dim, self.entity))
-                if not in_range_of(W, Q, (k,), self.tol):
-                    raise NotImplementedError(f"Cannot map derivatives normal to an edge of {type(self.node).__name__}.")
-                mapping = "affine"
+                if in_range_of(W, Q, (k,), self.tol):
+                    mapping = "affine"
             groups[k,] = mapping
         return groups
 
@@ -735,21 +734,24 @@ class LinearCombination:
         return LinearCombination([*self.coefficients, *other.coefficients], [*self.matrices, *other.matrices])
 
     def kron(self, other):
-        """The Kronecker product."""
-        return LinearCombination(numpy.multiply.outer(self.coefficients, other.coefficients).ravel(),
-                                 [numpy.kron(C, D) for C, D in product(self.matrices, other.matrices)])
+        """The Kronecker product, with the terms of equal coefficients collected."""
+        terms = {}
+        for (g, C), (h, D) in product(zip(self.coefficients, self.matrices), zip(other.coefficients, other.matrices)):
+            coefficient, matrix = terms.get(frozenset((g, h)), (g * h, 0))
+            terms[frozenset((g, h))] = (coefficient, matrix + numpy.kron(C, D))
+        return LinearCombination(*zip(*terms.values()))
 
     def contract(self, A, tol):
         r"""The contraction :math:`G:A=g^TR` with a constant tensor, where :math:`R_t=C_t:A`.
 
         :arg A: A constant tensor whose first two axes match :math:`G`.
-        :arg tol: Tolerance relative to A and each :math:`C_t` below which
-            entries of :math:`R` are dropped.
+        :arg tol: Tolerance below which entries of :math:`R` are dropped, relative
+            to the bound :math:`|C_t:A|\le\|C_t\|_1\|A\|_\infty`.
         :returns: An object array of GEM scalars with the remaining axes of A.
         """
         R = numpy.tensordot(self.matrices, A, axes=2)
         R = R.reshape(len(R), -1)
-        cutoffs = tol * numpy.abs(A).max() * numpy.abs(self.matrices).max(axis=(1, 2))[:, None]
+        cutoffs = tol * numpy.abs(A).max() * numpy.abs(self.matrices).sum(axis=(1, 2))[:, None]
         R = round_to_int(R, cutoffs)
         nonzero = numpy.abs(R) > cutoffs
         R_gem = numpy.full(R.shape, zero, dtype=object)

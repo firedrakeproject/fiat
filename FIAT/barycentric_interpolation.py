@@ -64,7 +64,8 @@ class LagrangeLineExpansionSet(expansions.LineExpansionSet):
     def __init__(self, ref_el, pts):
         self.points = pts
         self.x = numpy.array(pts, dtype="d").flatten()
-        self.cell_node_map = expansions.compute_cell_point_map(ref_el, pts, unique=False)
+        cell_point_map = expansions.compute_cell_point_map(ref_el, pts, unique=False)
+        self.cell_node_map = {cell: ipts if ipts is Ellipsis else ipts[0] for cell, ipts in cell_point_map.items()}
         self.dmats = [None for _ in self.cell_node_map]
         self.weights = [None for _ in self.cell_node_map]
         self.nodes = [None for _ in self.cell_node_map]

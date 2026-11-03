@@ -212,9 +212,38 @@ def test_gn_dofs(element, sd, quad_scheme):
     assert numpy.allclose(div_moments, expected)
 
 
-@pytest.mark.parametrize("sd", (2, 3))
-def test_gn_trace(sd):
-    degree = 1
+@pytest.mark.parametrize("element", (GuzmanNeilanFirstKindH1, BernardiRaugel))
+@pytest.mark.parametrize("cell", (S, symmetric_simplex(3)))
+def test_interior_bubbles(element, cell):
+    # Test that the interior bubbles control the gradient of DG_{k-1}
+    sd = cell.get_spatial_dimension()
+    order = 2
+    fe = element(cell, order)
+    reduced_dim = fe.space_dimension() - (sd-1)*(sd+1)
+    assert reduced_dim == 37
+
+    # Test unisolvence using the public dual and polynomial basis APIs.
+    basis = fe.get_nodal_basis()
+    dual = fe.get_dual_set().to_riesz(basis)
+    vandermonde = numpy.tensordot(dual, basis.get_coeffs(), axes=((1, 2), (1, 2)))
+    assert numpy.allclose(vandermonde, numpy.eye(fe.space_dimension()))
+
+    ref_complex = fe.get_reference_complex()
+    Q = create_quadrature(ref_complex, 2*fe.degree())
+    qpts, qwts = Q.get_points(), Q.get_weights()
+    tab = fe.tabulate(1, qpts)
+
+    # The divergence of the interior bubbles against the mean-free DG_{k-1} is nonsingular
+    P = ONPolynomialSet(cell, order-1).tabulate(qpts)[(0,)*sd]
+    P = P[1:] - numpy.dot(P[1:], qwts)[:, None] / sum(qwts)
+    ids = fe.entity_dofs()[sd][0]
+    assert len(ids) == len(P)
+    B = inner(div(tab)[ids], P, qwts)
+    assert numpy.linalg.matrix_rank(B) == len(P)
+
+
+@pytest.mark.parametrize("sd, degree", ((2, 1), (3, 1), (3, 2)))
+def test_gn_trace(sd, degree):
     cell = symmetric_simplex(sd)
 
     gn = GuzmanNeilanFirstKindH1(cell, degree)
@@ -222,7 +251,7 @@ def test_gn_trace(sd):
 
     sd = cell.get_spatial_dimension()
     ref_face = cell.construct_subelement(sd-1)
-    Q_face = create_quadrature(ref_face, 2*degree)
+    Q_face = create_quadrature(ref_face, 2*max(gn.degree(), br.degree()))
 
     Phis = ONPolynomialSet(ref_face, degree)
     phis_at_qpts = Phis.tabulate(Q_face.get_points())[(0,)*(sd-1)]
