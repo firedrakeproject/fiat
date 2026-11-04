@@ -23,10 +23,11 @@ import math
 def GuzmanNeilanSpace(ref_el, order, kind=1, reduced=False):
     r"""Return a basis for the (extended) Guzman-Neilan H1 space.
 
-    Project the extended Bernardi-Raugel space (Pk + FacetBubble + InteriorBubble P_{k-2})^d
-    into C0 Pk(Alfeld)^d with P_{k-1} divergence, preserving its trace.
-    For kind = 1, the interior bubble is the hat function associated with the
-    barycenter of the Alfeld split, so that the space does not increase its degree.
+    Project the extended Bernardi-Raugel space (Pk + FacetBubble)^d into
+    C0 Pd(Alfeld)^d, correcting the facet bubbles with interior bubbles so that
+    they have constant divergence, while preserving their trace.
+    For kind = 1 and k > 1, the union with the interior bubbles that invert the
+    divergence from P_{k-1} / P0 gives the P_{k-1} divergence.
     For kind = 2, C0 Pk(Alfeld) already contains interior bubbles.
 
     Parameters
@@ -53,35 +54,32 @@ def GuzmanNeilanSpace(ref_el, order, kind=1, reduced=False):
         B = modified_bubble_subspace(B)
 
     K = ref_complex if kind == 2 else ref_el
-    BR = BernardiRaugelSpace(K, order)
-    interior = None
-    if kind == 1 and order > 1:
-        # Use the Alfeld hat in place of the unsplit cell bubble.
-        interior = take_interior_bubbles(C0, degree=order-1)
-        BR = BR.take(list(range(len(BR) - len(interior))))
-
-    # The bubbles are numbered after the Pk^d basis
     top = K.get_topology()
+    facets = sorted(set(top[sd-1]) - set(K.get_interior_facets(sd-1) or ()))
+
+    # The facet bubbles are numbered after the Pk^d basis
     dimPk = sd * sum(math.comb(order-1, dim) * len(top[dim]) for dim in range(order))
+    num_bubbles = sd * len(facets)
+    BR = BernardiRaugelSpace(K, order, interior=False)
     if reduced:
         # Keep only the normal component of the facet bubbles
-        facets = sorted(set(top[sd-1]) - set(K.get_interior_facets(sd-1) or ()))
         coeffs = BR.get_coeffs()
-        ids = slice(dimPk, dimPk + sd * len(facets))
-        facet_bubbles = []
-        for i, f in enumerate(facets):
-            normal = K.compute_normal(f)
-            bubbles = coeffs[dimPk + sd*i:dimPk + sd*(i+1)]
-            facet_bubbles.append(sum(n * bubble for n, bubble in zip(normal, bubbles)))
-        coeffs = numpy.concatenate([coeffs[:ids.start], facet_bubbles, coeffs[ids.stop:]])
+        bubbles = coeffs[dimPk:].reshape(len(facets), sd, *coeffs.shape[1:])
+        normal_bubbles = [numpy.tensordot(K.compute_normal(f), bubble, axes=(0, 0))
+                          for f, bubble in zip(facets, bubbles)]
+        coeffs = numpy.concatenate([coeffs[:dimPk], normal_bubbles])
+        num_bubbles = len(facets)
         BR = polynomial_set.PolynomialSet(BR.get_reference_element(), BR.degree, BR.embedded_degree,
                                           BR.get_expansion_set(), coeffs)
-    num_bubbles = len(BR) - dimPk + (len(interior) if interior is not None else 0)
 
-    # The divergence of the bubbles is projected onto P_{k-1}(ref_el),
-    # this includes the constants as the facet bubbles have nonzero flux
-    pressure = polynomial_set.ONPolynomialSet(ref_el, max(order-1, 0), scale="orthonormal")
-    return divergence_projection(BR, C0, B, num_bubbles, pressure, interior=interior)
+    GN = constant_div_projection(BR, C0, B, num_bubbles)
+    if kind == 1 and order > 1:
+        # Add the interior bubbles with divergence in P_{k-1} / P0
+        Q = polynomial_set.ONPolynomialSet(ref_el, order-1)
+        Q = Q.take(list(range(1, Q.get_num_members())))
+        interior = invert_divergence(B, lambda pts: Q.tabulate(pts)[(0,)*sd])
+        GN = polynomial_set.polynomial_set_union_normalized(GN, interior)
+    return GN
 
 
 class GuzmanNeilanH1(finite_element.CiarletElement):
@@ -103,7 +101,8 @@ class GuzmanNeilanFirstKindH1(GuzmanNeilanH1):
     """The Guzman-Neilan H1-conforming (extended) macroelement of the first kind.
 
     Reference element: a simplex of any dimension.
-    Function space: Pk^d + facet and interior bubbles with div in P_{k-1}, 1 <= k < dim.
+    Function space: Pk^d + facet bubbles with div in P0
+                    + interior bubbles with div in P_{k-1} / P0, 1 <= k < dim.
     Degrees of freedom: evaluation at Pk lattice points, normal moments on faces,
     and cell moments for k >= 2.
 
@@ -117,7 +116,7 @@ class GuzmanNeilanSecondKindH1(GuzmanNeilanH1):
     """The Guzman-Neilan H1-conforming (extended) macroelement of the second kind.
 
     Reference element: a simplex of any dimension.
-    Function space: C0 Pk^d(Alfeld) + facet bubbles with div in P_{k-1}, 1 <= k < dim.
+    Function space: C0 Pk^d(Alfeld) + facet bubbles with div in P0, 1 <= k < dim.
     Degrees of freedom: evaluation at Pk(Alfeld) lattice points, and normal moments on faces.
 
     This element belongs to a Stokes complex, and is paired with DG_{k-1}(Alfeld).
@@ -159,8 +158,8 @@ def div(U):
     return sum(U[k][:, k.index(1), :] for k in U if sum(k) == 1)
 
 
-def take_interior_bubbles(P, degree=None):
-    """Extract the interior bubbles up to the given degree from a complete PolynomialSet."""
+def take_interior_bubbles(P):
+    """Extract the interior bubbles from a complete PolynomialSet."""
     ref_complex = P.get_reference_element()
     ncomp = numpy.prod(P.get_shape())
     dimPk = P.expansion_set.get_num_members(P.degree)
@@ -168,15 +167,10 @@ def take_interior_bubbles(P, degree=None):
     continuity = P.expansion_set.continuity
     entity_ids = expansions.polynomial_entity_ids(ref_complex, P.degree,
                                                   continuity=continuity)
-    if degree is None or degree >= P.degree:
-        slices = {dim: slice(None) for dim in entity_ids}
-    else:
-        slices = {dim: slice(math.comb(degree-1, dim)) for dim in entity_ids}
-
     ids = [i + j * dimPk
-           for dim in slices
+           for dim in entity_ids
            for f in sorted(ref_complex.get_interior_facets(dim))
-           for i in entity_ids[dim][f][slices[dim]]
+           for i in entity_ids[dim][f]
            for j in range(ncomp)]
     return P.take(ids)
 
@@ -215,11 +209,43 @@ def modified_bubble_subspace(B):
     return M
 
 
-def divergence_projection(BR, C0, M, num_bubbles, pressure, interior=None):
-    """Project the BR space into C0 Pk(Alfeld)^d with divergence in the pressure space.
+def invert_divergence(M, f):
+    """Return the interior bubbles whose divergence is given modulo constants.
 
-    The divergence of the BR bubbles is corrected with the modified bubbles M,
-    so that it becomes its L2 projection onto the pressure space.
+    Parameters
+    ----------
+    M : FIAT.polynomial_set.PolynomialSet
+        Interior bubbles whose divergences span mean-zero piecewise P_{d-1}.
+    f : callable
+        Tabulates the target divergences at an array of points, with shape
+        (number of targets, number of points).
+
+    Returns
+    -------
+    FIAT.polynomial_set.PolynomialSet
+        A subset of the span of M, with one member per target.
+    """
+    ref_complex = M.get_reference_element()
+    sd = ref_complex.get_spatial_dimension()
+    rule = create_quadrature(ref_complex, 2*M.degree)
+    qpts, qwts = rule.get_points(), rule.get_weights()
+
+    # Take the test space for the divergence in L2 \ R
+    Q = polynomial_set.ONPolynomialSet(ref_complex, M.degree-1)
+    Q = Q.take(list(range(1, Q.get_num_members())))
+    P = Q.tabulate(qpts)[(0,)*sd]
+    P -= numpy.dot(P, qwts)[:, None] / sum(qwts)
+
+    B = inner(P, div(M.tabulate(qpts, 1)), qwts)
+    g = inner(P, f(qpts), qwts)
+    w = numpy.linalg.solve(B, g)
+    coeffs = numpy.tensordot(w, M.get_coeffs(), axes=(0, 0))
+    return polynomial_set.PolynomialSet(ref_complex, M.degree, M.degree,
+                                        M.get_expansion_set(), coeffs)
+
+
+def constant_div_projection(BR, C0, M, num_bubbles):
+    """Project the BR space into C0 Pk(Alfeld)^d with constant divergence on the bubbles.
 
     Parameters
     ----------
@@ -230,11 +256,7 @@ def divergence_projection(BR, C0, M, num_bubbles, pressure, interior=None):
     M : FIAT.polynomial_set.PolynomialSet
         Interior bubbles whose divergences span mean-zero piecewise P_{d-1}.
     num_bubbles : int
-        Number of basis functions to correct, including interior.
-    pressure : FIAT.polynomial_set.PolynomialSet
-        An L2-orthonormal basis for the target divergence space on the unsplit simplex.
-    interior : FIAT.polynomial_set.PolynomialSet, optional
-        Interior bubbles to append to BR before correcting the divergence.
+        Number of BR bubbles to correct.
 
     Returns
     -------
@@ -247,31 +269,12 @@ def divergence_projection(BR, C0, M, num_bubbles, pressure, interior=None):
     rule = create_quadrature(ref_complex, 2*degree)
     qpts, qwts = rule.get_points(), rule.get_weights()
 
-    # Take the test space for the divergence in L2 \ R
-    Q = polynomial_set.ONPolynomialSet(ref_complex, degree-1)
-    Q = Q.take(list(range(1, Q.get_num_members())))
-    P = Q.tabulate(qpts)[(0,)*sd]
-    P -= numpy.dot(P, qwts)[:, None] / sum(qwts)
-
-    U = M.tabulate(qpts, 1)
-    X = BR.tabulate(qpts, 1)
-    if interior is not None:
-        Y = interior.tabulate(qpts, 1)
-        X = {alpha: numpy.concatenate([X[alpha], Y[alpha]]) for alpha in X}
-    # Remove the L2 projection onto the pressure space from the divergence of the bubbles
-    R = pressure.tabulate(qpts)[(0,)*sd]
-    divX = div(X)[-num_bubbles:]
-    divX -= inner(divX, R, qwts) @ R
-    # Invert the divergence
-    B = inner(P, div(U), qwts)
-    g = inner(P, divX, qwts)
-    w = numpy.linalg.solve(B, g)
-
     # Add correction to BR bubbles
+    corrections = invert_divergence(M, lambda pts: div(BR.tabulate(pts, 1))[-num_bubbles:])
     v = C0.tabulate(qpts)[(0,)*sd]
-    coeffs = numpy.linalg.solve(inner(v, v, qwts), inner(v, X[(0,)*sd], qwts))
-    coeffs = coeffs.T.reshape(-1, sd, C0.get_coeffs().shape[-1])
-    coeffs[-num_bubbles:] -= numpy.tensordot(w, M.get_coeffs(), axes=(0, 0))
-    GN = polynomial_set.PolynomialSet(ref_complex, degree, degree,
-                                      C0.get_expansion_set(), coeffs)
-    return GN
+    x = BR.tabulate(qpts)[(0,)*sd]
+    coeffs = numpy.linalg.solve(inner(v, v, qwts), inner(v, x, qwts))
+    coeffs = coeffs.T.reshape(BR.get_num_members(), sd, -1)
+    coeffs[-num_bubbles:] -= corrections.get_coeffs()
+    return polynomial_set.PolynomialSet(ref_complex, degree, degree,
+                                        C0.get_expansion_set(), coeffs)
