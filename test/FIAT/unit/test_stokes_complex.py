@@ -2,7 +2,8 @@ import pytest
 import numpy
 from math import factorial
 
-from FIAT import (HsiehCloughTocher as HCT,
+from FIAT import (BrezziDouglasMarini as BDM,
+                  HsiehCloughTocher as HCT,
                   AlfeldSorokina as AS,
                   ArnoldQin as AQ,
                   Lagrange as CG,
@@ -42,9 +43,10 @@ def rAQ(cell):
 
 def span_greater_equal(A, B):
     # span(A) >= span(B)
-    _, residual, *_ = numpy.linalg.lstsq(A.reshape(A.shape[0], -1).T,
-                                         B.reshape(B.shape[0], -1).T)
-    return numpy.allclose(residual, 0)
+    A = A.reshape(A.shape[0], -1).T
+    B = B.reshape(B.shape[0], -1).T
+    x, *_ = numpy.linalg.lstsq(A, B)
+    return numpy.allclose(A @ x, B)
 
 
 def span_equal(A, B):
@@ -212,9 +214,109 @@ def test_gn_dofs(element, sd, quad_scheme):
     assert numpy.allclose(div_moments, expected)
 
 
-@pytest.mark.parametrize("sd", (2, 3))
-def test_gn_trace(sd):
-    degree = 1
+@pytest.mark.parametrize("element", (GuzmanNeilanFirstKindH1, BernardiRaugel))
+@pytest.mark.parametrize("cell", (S, symmetric_simplex(3)))
+def test_interior_bubbles(element, cell):
+    # Test that the interior bubbles control the gradient of DG_{k-1}
+    sd = cell.get_spatial_dimension()
+    order = 2
+    fe = element(cell, order)
+    reduced_dim = fe.space_dimension() - (sd-1)*(sd+1)
+    assert reduced_dim == 37
+
+    # Test unisolvence using the public dual and polynomial basis APIs.
+    basis = fe.get_nodal_basis()
+    dual = fe.get_dual_set().to_riesz(basis)
+    vandermonde = numpy.tensordot(dual, basis.get_coeffs(), axes=((1, 2), (1, 2)))
+    assert numpy.allclose(vandermonde, numpy.eye(fe.space_dimension()))
+
+    ref_complex = fe.get_reference_complex()
+    Q = create_quadrature(ref_complex, 2*fe.degree())
+    qpts, qwts = Q.get_points(), Q.get_weights()
+    tab = fe.tabulate(1, qpts)
+
+    # The divergence of the interior bubbles against the mean-free DG_{k-1} is nonsingular
+    P = ONPolynomialSet(cell, order-1).tabulate(qpts)[(0,)*sd]
+    P = P[1:] - numpy.dot(P[1:], qwts)[:, None] / sum(qwts)
+    ids = fe.entity_dofs()[sd][0]
+    assert len(ids) == len(P)
+    B = inner(div(tab)[ids], P, qwts)
+    assert numpy.linalg.matrix_rank(B) == len(P)
+
+
+def modified_bubbles(cell, pts):
+    """Tabulate M_d(K^r) = hat^d P0^d + sum_k hat^(d-k) BDM_k(facet) from (Guzman and Neilan, 2019)."""
+    sd = cell.get_spatial_dimension()
+    z = (0,)*sd
+    CG1 = CG(cell, 1, variant="alfeld")
+    barycenter = CG1.entity_dofs()[sd][0][0]
+    hat = CG1.tabulate(0, pts)[z][barycenter]
+    bubbles = [numpy.eye(sd)[:, :, None] * hat ** sd]
+    for k in range(1, sd):
+        fe = BDM(cell, k)
+        facet_ids = [i for f in fe.entity_dofs()[sd-1].values() for i in f]
+        bubbles.append(fe.tabulate(0, pts)[z][facet_ids] * hat ** (sd-k))
+    return numpy.concatenate(bubbles)
+
+
+@pytest.mark.parametrize("cell", (S, symmetric_simplex(3)))
+def test_gn_interior_bubbles(cell):
+    # Test that the interior bubbles vanish on the boundary, lie in the modified
+    # bubble space, and invert the divergence from P1 / P0
+    sd = cell.get_spatial_dimension()
+    order = 2
+    fe = GuzmanNeilanFirstKindH1(cell, order)
+    ids = fe.entity_dofs()[sd][0]
+    z = (0,)*sd
+
+    for f in cell.get_topology()[sd-1]:
+        pts = cell.make_points(sd-1, f, fe.degree()+sd)
+        assert numpy.allclose(fe.tabulate(0, pts)[z][ids], 0)
+
+    Q = create_quadrature(fe.get_reference_complex(), 2*fe.degree())
+    qpts, qwts = Q.get_points(), Q.get_weights()
+    tab = fe.tabulate(1, qpts)
+    M = modified_bubbles(cell, qpts)
+    assert numpy.linalg.matrix_rank(M.reshape(len(M), -1)) == len(M) == 39
+    assert span_greater_equal(M, tab[z][ids])
+
+    P = ONPolynomialSet(cell, order-1).tabulate(qpts)[z]
+    P = P[1:] - numpy.dot(P[1:], qwts)[:, None] / sum(qwts)
+    assert span_equal(P, div(tab)[ids])
+
+
+@pytest.mark.parametrize("reduced", (False, True), ids=("full", "reduced"))
+def test_gn_facet_bubbles(reduced):
+    # Test that the facet bubbles, which are numbered last, have constant divergence
+    sd = S.get_spatial_dimension()
+    V = GuzmanNeilanSpace(S, 2, kind=2, reduced=reduced)
+    num_facets = len(S.get_topology()[sd-1])
+    num_bubbles = num_facets if reduced else sd * num_facets
+
+    pts = make_points(V.get_reference_element(), 4)
+    divV = div(V.tabulate(pts, 1))[-num_bubbles:]
+    assert numpy.allclose(divV, divV[:, :1])
+
+
+@pytest.mark.parametrize("reduced", (False, True), ids=("full", "reduced"))
+@pytest.mark.parametrize("kind", (1, 2))
+def test_gn_nested(kind, reduced):
+    # Test that the lowest-order space, with constant divergence, is strictly contained in the next order
+    V1 = GuzmanNeilanSpace(S, 1, kind=kind, reduced=reduced)
+    V2 = GuzmanNeilanSpace(S, 2, kind=kind, reduced=reduced)
+    Q = create_quadrature(V2.get_reference_element(), 2*V2.degree)
+    z = (0,)*S.get_spatial_dimension()
+    V1_tab = V1.tabulate(Q.get_points())[z]
+    V2_tab = V2.tabulate(Q.get_points())[z]
+    assert numpy.linalg.matrix_rank(V1_tab.reshape(len(V1_tab), -1)) == len(V1_tab)
+    assert numpy.linalg.matrix_rank(V2_tab.reshape(len(V2_tab), -1)) == len(V2_tab)
+    assert len(V1_tab) < len(V2_tab)
+    assert span_greater_equal(V2_tab, V1_tab)
+    assert not span_greater_equal(V1_tab, V2_tab)
+
+
+@pytest.mark.parametrize("sd, degree", ((2, 1), (3, 1), (3, 2)))
+def test_gn_trace(sd, degree):
     cell = symmetric_simplex(sd)
 
     gn = GuzmanNeilanFirstKindH1(cell, degree)
@@ -222,7 +324,7 @@ def test_gn_trace(sd):
 
     sd = cell.get_spatial_dimension()
     ref_face = cell.construct_subelement(sd-1)
-    Q_face = create_quadrature(ref_face, 2*degree)
+    Q_face = create_quadrature(ref_face, max(gn.degree(), br.degree()) + degree)
 
     Phis = ONPolynomialSet(ref_face, degree)
     phis_at_qpts = Phis.tabulate(Q_face.get_points())[(0,)*(sd-1)]
@@ -245,20 +347,18 @@ def test_gn_trace(sd):
             assert numpy.allclose(tangential_moments, 0)
 
 
-@pytest.mark.parametrize("cell", (T, S))
-@pytest.mark.parametrize("family", ("AQ", "CH", "GN", "GN2"))
-def test_minimal_stokes_space(cell, family):
+@pytest.mark.parametrize("cell, family, degree",
+                         [(cell, family, 1) for cell in (T, S) for family in ("AQ", "CH", "GN", "GN2")]
+                         + [(S, "GN", 2), (S, "GN2", 2)])
+def test_minimal_stokes_space(cell, family, degree):
     # Test that the C0 Stokes space is spanned by a C0 basis
-    # Also test that its divergence is constant
+    # Also test that its divergence is P_{k-1}
     sd = cell.get_spatial_dimension()
     if family == "GN":
-        degree = 1
         space = GuzmanNeilanSpace
     elif family == "GN2":
-        degree = 1
         space = lambda *args, **kwargs: GuzmanNeilanSpace(*args, kind=2, **kwargs)
     elif family == "CH":
-        degree = 1
         space = ChristiansenHuSpace
     elif family == "AQ":
         if sd != 2:
@@ -286,17 +386,16 @@ def test_minimal_stokes_space(cell, family):
 
         # Test that the space is C0
         for k in range(sd):
-            _, residual, *_ = numpy.linalg.lstsq(C0_tab[z].T, Xtab[z][:, k, :].T)
-            assert numpy.allclose(residual, 0)
+            assert span_greater_equal(C0_tab[z], Xtab[z][:, k, :])
 
-        # Test that divergence is in P0
+        # Test the divergence
         divX = div(Xtab)[:Vdim]
         if family in {"GN", "GN2"}:
-            # Test that div(GN2) is in P0(Alfeld)
+            # Test that div(GN) = P_{k-1} and div(GN2) = P_{k-1}(Alfeld)
             ref_el = K if family == "GN2" else K.get_parent()
-            P0 = ONPolynomialSet(ref_el, degree-1)
-            P0_tab = P0.tabulate(pts)[z]
-            assert span_equal(divX, P0_tab)
+            pressure = ONPolynomialSet(ref_el, degree-1)
+            pressure_tab = pressure.tabulate(pts)[z]
+            assert span_equal(divX, pressure_tab)
         else:
             assert numpy.allclose(divX, divX[:, 0][:, None])
 
