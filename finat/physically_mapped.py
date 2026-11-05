@@ -486,7 +486,7 @@ class PhysicallyMappedDualSet:
 #: as a :class:`LinearCombination` of constant matrices, their rows of the
 #: inverse of the diagonal block of :math:`B_0` on the entity, as an object
 #: array of GEM scalars, and the scaling of each row of :math:`B=SB_0`.
-RowGroup = namedtuple("RowGroup", ["nodes", "entries", "inverse", "scales"])
+BlockRow = namedtuple("BlockRow", ["nodes", "entries", "inverse", "scales"])
 
 
 class VandermondeMatrix:
@@ -495,7 +495,7 @@ class VandermondeMatrix:
     The rows of :math:`B_0` of the nodes of an entity that share a pullback
     are :math:`\sum_t g_tR_t`, with the same GEM scalars :math:`g_t` from the
     geometry, and constant matrices :math:`R_t` from the reference cell, see
-    :class:`RowGroup`.  The blocks of the back-substitution in
+    :class:`BlockRow`.  The blocks of the back-substitution in
     :meth:`transpose_solve`, :attr:`off_diagonal_blocks` and
     :attr:`inverses`, are expanded one time from the
     :meth:`~LinearCombination.collect_terms`.  Their entries do not depend
@@ -516,7 +516,7 @@ class VandermondeMatrix:
 
     @cached_property
     def groups(self):
-        """A dict mapping each dimension and entity to the :class:`RowGroup` objects of the entity.
+        """A dict mapping each dimension and entity to the :class:`BlockRow` objects of the entity.
 
         :raises NotImplementedError: If a row couples to a dof outside the
             closure of the entity of the node.
@@ -558,7 +558,7 @@ class VandermondeMatrix:
 
                     inverse = dual.to_riesz(nodes, pullback.inverse, self.tabulation, diag).collect_terms().expand()
                     scales = [dual.functionals[i].scaling(h) for i in nodes]
-                    groups[dim][entity].append(RowGroup(nodes, entries, inverse, scales))
+                    groups[dim][entity].append(BlockRow(nodes, entries, inverse, scales))
         return groups
 
     @cached_property
@@ -809,7 +809,7 @@ def adjugate_and_determinant(J):
     if gdim == tdim:
         return (adjugate(J), determinant(J))
     JTJ = J.T @ J
-    detJ = sqrt(determinant(JTJ))
+    detJ = gem.sqrt(determinant(JTJ))
     return (adjugate(JTJ) @ J.T / detJ, detJ)
 
 
@@ -821,14 +821,6 @@ def metric_and_adjugate(J):
     """
     G = symmetric(J.T @ J)
     return (G, symmetric(adjugate(G)))
-
-
-def sqrt(x):
-    """The square root of a GEM scalar, which compiles to a call of sqrt instead of pow."""
-    x = gem.as_gem(x)
-    if isinstance(x, gem.gem.Constant):
-        return gem.Literal(numpy.sqrt(x.value))
-    return gem.MathFunction("sqrt", x)
 
 
 def symmetric(A):
@@ -934,15 +926,15 @@ class LinearCombination:
 
         :arg A: A constant tensor whose first two axes match :math:`G`,
             followed by an axis of nodes and an axis of basis functions.
-        :arg tol: Tolerance relative to each node of A and each :math:`C_t`
-            below which entries of :math:`R` are set to zero.
+        :arg tol: Tolerance below which entries of :math:`R` are set to zero,
+            relative to the bound :math:`|C_t:A|\le\|C_t\|_1\|A\|_\infty`.
         :returns: The :class:`LinearCombination` of the :math:`R_t`, with
             the axes of nodes and basis functions.
         """
         R = numpy.tensordot(self.matrices, A, axes=2)
-        cutoffs = tol * numpy.abs(self.matrices).max(axis=(1, 2))[:, None, None] * numpy.abs(A).max(axis=(0, 1, 3))[:, None]
-        R = round_to_int(R, cutoffs)
-        R[numpy.abs(R) <= cutoffs] = 0
+        cutoffs = tol * numpy.abs(A).max() * numpy.abs(self.matrices).sum(axis=(1, 2))
+        R = round_to_int(R, cutoffs[:, None, None])
+        R[numpy.abs(R) <= cutoffs[:, None, None]] = 0
         return LinearCombination(self.coefficients, R)
 
     def expand(self):
@@ -1042,7 +1034,7 @@ def facet_pullbacks(cell, facet, metric, adj_metric, detJ, avg=True):
     # w = adj(G) nu / detJ and |x|^2 = nu^T adj(G) nu.
     z = adj_metric @ nu
     xx = z @ nu
-    norm = sqrt(xx)
+    norm = gem.sqrt(xx)
     measure = one
     if not avg:
         # The measure is |f| = |f_ref| |x| / |nu|, so the unit normal x / |x|
@@ -1083,8 +1075,8 @@ def edge_pullbacks(cell, edge, metric, avg=True):
     w = [numpy.cross(Gt, nu) for nu in nus]
     measure = one
     if not avg:
-        measure = cell.volume_of_subcomplex(1, edge) * sqrt(t @ Gt) / numpy.linalg.norm(t)
-    norms = [sqrt(wi @ metric @ wi) / measure for wi in w]
+        measure = cell.volume_of_subcomplex(1, edge) * gem.sqrt(t @ Gt) / numpy.linalg.norm(t)
+    norms = [gem.sqrt(wi @ metric @ wi) / measure for wi in w]
     covariant = covariant_frame_pullback(metric, t[None], [numpy.cross(t, nu) for nu in nus], w, norms, measure)
     return {"covariant piola": covariant}, measure
 

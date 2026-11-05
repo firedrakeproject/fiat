@@ -35,7 +35,7 @@ __all__ = ['Node', 'Identity', 'Literal', 'Zero', 'Failure',
            'Index', 'VariableIndex', 'Indexed', 'ComponentTensor',
            'IndexSum', 'ListTensor', 'Concatenate', 'Delta', 'OrientationVariableIndex',
            'index_sum', 'partial_indexed', 'reshape', 'view',
-           'indices', 'as_gem', 'FlexiblyIndexed',
+           'indices', 'as_gem', 'sqrt', 'FlexiblyIndexed',
            'Inverse', 'Solve', 'extract_type', 'uint_type', 'Piecewise']
 
 
@@ -1364,6 +1364,14 @@ def as_gem(expr, dtype=None):
             return Literal(expr)
     else:
         raise ValueError("Do not know how to convert %r to GEM" % expr)
+
+
+def sqrt(x):
+    """The square root of a GEM scalar, which compiles to a call of sqrt instead of pow."""
+    x = as_gem(x)
+    if isinstance(x, Constant):
+        return Literal(numpy.sqrt(x.value))
+    return MathFunction("sqrt", x)
 
 
 def as_gem_uint(expr):
