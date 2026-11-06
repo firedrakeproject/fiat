@@ -72,6 +72,7 @@
     <span class="n">make_cell_orientation_reflection_map_simplex</span><span class="p">,</span>
     <span class="n">make_cell_orientation_reflection_map_tensorproduct</span><span class="p">,</span>
     <span class="n">make_entity_permutations_simplex</span><span class="p">,</span>
+    <span class="n">make_entity_permutations_tensorproduct</span>
 <span class="p">)</span>
 
 <span class="n">POINT</span> <span class="o">=</span> <span class="mi">0</span>
@@ -347,6 +348,35 @@
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"Should be implemented in a subclass."</span><span class="p">)</span></div>
 
 
+<div class="viewcode-block" id="Cell.get_orientation_coord_maps">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell.get_orientation_coord_maps">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_orientation_coord_maps</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Returns an affine map that changes the reference coordinates of this cell</span>
+<span class="sd">        from each orientation to the canonical orientation.</span>
+
+<span class="sd">        An orientation ``o`` describes how the vertices of this cell are ordered</span>
+<span class="sd">        relative to its canonical vertex order. For each orientation ``o``, the map is</span>
+
+<span class="sd">            X_can = Q[o] @ X_o + t[o],</span>
+
+<span class="sd">        where ``X_o`` are the reference coordinates of a point when the cell has</span>
+<span class="sd">        orientation ``o``, and ``X_can`` are the reference coordinates of the same</span>
+<span class="sd">        point in the canonical orientation.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        dict</span>
+<span class="sd">            Maps each orientation ``o`` (an integer) to the tuple ``(Q[o], t[o])``.</span>
+<span class="sd">            ``Q[o]`` has shape ``(dim, dim)`` and ``t[o]`` has shape ``(dim,)``.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        Each map is built from the vertex permutation ``p`` of orientation ``o``,</span>
+<span class="sd">        which takes vertex ``i`` of the cell to vertex ``p[i]``.</span>
+<span class="sd">        """</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"Should be implemented in a subclass."</span><span class="p">)</span></div>
+
+
 <div class="viewcode-block" id="Cell.point_entity_ids">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell.point_entity_ids">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">point_entity_ids</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="mf">1E-10</span><span class="p">):</span>
@@ -420,6 +450,104 @@
 
 <span class="sd">        """</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"Should be implemented in a subclass."</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_facet_orientation_coord_maps</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Return the affine transformation that maps, for every possible facet orientation `o`, the facet-local reference coordinates</span>
+<span class="sd">        to the facet-local coordinates expressed in the canonical orientation.</span>
+
+<span class="sd">        For each facet orientation `o`, the map is</span>
+
+<span class="sd">            X_f_can = Q_o @ X_f_o + t_o,</span>
+
+<span class="sd">        where X_f_can defines the facet-local coordinates in the facet's canonical orientation and</span>
+<span class="sd">        X_f_o defines the facet-local coordinates of the same point when the facet is in orientation `o`.</span>
+
+<span class="sd">        A vertex permutation is first obtained for each possible facet permutation and is then used to construct the corresponding coordinate map.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        dict</span>
+<span class="sd">            Maps each facet orientation integer o to an affine map (Q_o, t_o) acting on facet-local coordinates.</span>
+<span class="sd">        """</span>
+        <span class="n">facet</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">o_coord_maps</span> <span class="o">=</span> <span class="n">facet</span><span class="o">.</span><span class="n">get_orientation_coord_maps</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">o_coord_maps</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_facet_embedding_coord_maps</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Return the affine transformation that maps the reference coordinates of a point on each facet</span>
+<span class="sd">        to the reference coordinates of the cell.</span>
+
+<span class="sd">        For each local facet `lf`, the map is</span>
+
+<span class="sd">            X = A[lf] @ X_f + b[lf],</span>
+
+<span class="sd">        where ``X_f`` are the reference coordinates of a point on the facet and ``X``</span>
+<span class="sd">        are the reference coordinates of the same point in the cell.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        A : numpy.ndarray</span>
+<span class="sd">            The matrix of each map, with shape ``(num_facets, dim, dim - 1)``.</span>
+<span class="sd">        b : numpy.ndarray</span>
+<span class="sd">            The translation vector of each map, with shape ``(num_facets, dim)``.</span>
+<span class="sd">        A_inv : numpy.ndarray</span>
+<span class="sd">            The pseudo-inverse of each matrix, with shape ``(num_facets, dim - 1, dim)``.</span>
+<span class="sd">            ``A_inv[lf] @ (X - b[lf])`` gives the facet coordinates of a point ``X``</span>
+<span class="sd">            that lies on facet ``lf``.</span>
+<span class="sd">        """</span>
+        <span class="n">facet_dim</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="n">num_facets</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()[</span><span class="n">facet_dim</span><span class="p">])</span>
+
+        <span class="c1"># Extract the coefficients of the facet embedding map by evaluating the entity transform at the facet origin and unit vectors</span>
+        <span class="n">facet_points</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">vstack</span><span class="p">([</span><span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">facet_dim</span><span class="p">),</span> <span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">facet_dim</span><span class="p">)])</span>
+        <span class="n">mapped</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="n">facet_dim</span><span class="p">,</span> <span class="n">lf</span><span class="p">)(</span><span class="n">facet_points</span><span class="p">)</span> <span class="k">for</span> <span class="n">lf</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_facets</span><span class="p">)])</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="n">mapped</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span>
+        <span class="n">A</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">swapaxes</span><span class="p">(</span><span class="n">mapped</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">:]</span> <span class="o">-</span> <span class="n">b</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">],</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="n">A_inv</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">pinv</span><span class="p">(</span><span class="n">A</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">A</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">A_inv</span>
+
+<div class="viewcode-block" id="Cell.facet_neighbour_coord_maps">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell.facet_neighbour_coord_maps">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">facet_neighbour_coord_maps</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Return the affine transformation that maps the reference coordinates of facet points between the two cells sharing that facet.</span>
+
+<span class="sd">        Example:</span>
+<span class="sd">        Suppose a cell has local facet ``lf_from`` with orientation ``o_from`` corresponding to local facet ``lf_to`` with orientation `o_to` in the other cell across that facet.</span>
+
+<span class="sd">        Then a point in the first cell, lying on the local facet ``lf_from`` with reference coordinates ``X``, has reference coordinates in the neighbouring cell:</span>
+
+<span class="sd">            X' = A[lf_from, lf_to, o_from, o_to] @ X + b[lf_from, lf_to, o_from, o_to]</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        A : numpy.ndarray</span>
+<span class="sd">            The matrix of each map, with shape</span>
+<span class="sd">            ``(num_facets, num_facets, num_orientations, num_orientations, dim, dim)``.</span>
+<span class="sd">        b : numpy.ndarray</span>
+<span class="sd">            The translation vector of each map, with shape</span>
+<span class="sd">            ``(num_facets, num_facets, num_orientations, num_orientations, dim)``.</span>
+<span class="sd">        """</span>
+
+        <span class="n">A_f</span><span class="p">,</span> <span class="n">b_f</span><span class="p">,</span> <span class="n">A_f_inv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_facet_embedding_coord_maps</span><span class="p">()</span>
+        <span class="n">o_coord_maps</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_facet_orientation_coord_maps</span><span class="p">()</span>
+        <span class="n">Q</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">o_coord_maps</span><span class="p">[</span><span class="n">o</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">o_coord_maps</span><span class="p">))])</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">o_coord_maps</span><span class="p">[</span><span class="n">o</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">o_coord_maps</span><span class="p">))])</span>
+        <span class="n">Q_inv</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">inv</span><span class="p">(</span><span class="n">Q</span><span class="p">)</span>
+
+        <span class="c1"># List all possible combinations of facets and orientations</span>
+        <span class="n">nf</span><span class="p">,</span> <span class="n">no</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">A_f</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">Q</span><span class="p">)</span>  <span class="c1"># number of local facets, number of facet orientations</span>
+        <span class="n">lf_from</span><span class="p">,</span> <span class="n">lf_to</span><span class="p">,</span> <span class="n">o_from</span><span class="p">,</span> <span class="n">o_to</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">meshgrid</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">nf</span><span class="p">),</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">nf</span><span class="p">),</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">no</span><span class="p">),</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">no</span><span class="p">),</span> <span class="n">indexing</span><span class="o">=</span><span class="s2">"ij"</span><span class="p">)</span>
+
+        <span class="c1"># Changes the facet coordinates from orientation o_from to orientation o_to.</span>
+        <span class="n">Q_to</span> <span class="o">=</span> <span class="n">Q_inv</span><span class="p">[</span><span class="n">o_to</span><span class="p">]</span> <span class="o">@</span> <span class="n">Q</span><span class="p">[</span><span class="n">o_from</span><span class="p">]</span>
+        <span class="n">t_to</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s2">"...ij, ...j -&gt; ...i"</span><span class="p">,</span> <span class="n">Q_inv</span><span class="p">[</span><span class="n">o_to</span><span class="p">],</span> <span class="n">t</span><span class="p">[</span><span class="n">o_from</span><span class="p">]</span> <span class="o">-</span> <span class="n">t</span><span class="p">[</span><span class="n">o_to</span><span class="p">])</span>
+
+        <span class="c1"># Maps the cell coordinates to facet coordinates, changes the orientation,</span>
+        <span class="c1"># and then maps the facet coordinates into the neighbouring cell.</span>
+        <span class="n">A</span> <span class="o">=</span> <span class="n">A_f</span><span class="p">[</span><span class="n">lf_to</span><span class="p">]</span> <span class="o">@</span> <span class="n">Q_to</span> <span class="o">@</span> <span class="n">A_f_inv</span><span class="p">[</span><span class="n">lf_from</span><span class="p">]</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="p">(</span><span class="n">b_f</span><span class="p">[</span><span class="n">lf_to</span><span class="p">]</span> <span class="o">+</span> <span class="n">numpy</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s2">"...ij, ...j -&gt; ...i"</span><span class="p">,</span> <span class="n">A_f</span><span class="p">[</span><span class="n">lf_to</span><span class="p">],</span> <span class="n">t_to</span><span class="p">)</span> <span class="o">-</span> <span class="n">numpy</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s2">"...ij, ...j -&gt; ...i"</span><span class="p">,</span> <span class="n">A</span><span class="p">,</span> <span class="n">b_f</span><span class="p">[</span><span class="n">lf_from</span><span class="p">]))</span>
+        <span class="k">return</span> <span class="n">A</span><span class="p">,</span> <span class="n">b</span></div>
+
 
 <div class="viewcode-block" id="Cell.is_simplex">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell.is_simplex">[docs]</a>
@@ -1119,6 +1247,28 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">get_facet_element</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">dimension</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">dimension</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Simplex.get_orientation_coord_maps">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Simplex.get_orientation_coord_maps">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_orientation_coord_maps</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Returns the orientation maps of this simplex, as described in</span>
+<span class="sd">        :meth:`Cell.get_orientation_coord_maps`.</span>
+
+<span class="sd">        The orientations are the vertex permutations from</span>
+<span class="sd">        :func:`make_entity_permutations_simplex`.</span>
+<span class="sd">        """</span>
+        <span class="c1"># Build the map orientation -&gt; vertex permutation</span>
+        <span class="n">dim</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">verts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">())</span>
+        <span class="n">o_p_maps</span> <span class="o">=</span> <span class="n">make_entity_permutations_simplex</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="n">dim</span><span class="p">,</span> <span class="n">npoints</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+        <span class="c1"># Convert each vertex permutation into an affine map between coordinates</span>
+        <span class="n">o_coord_maps</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">o</span><span class="p">,</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">o_p_maps</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">permuted_verts</span> <span class="o">=</span> <span class="n">verts</span><span class="p">[</span><span class="n">p</span><span class="p">]</span>
+            <span class="n">Q</span><span class="p">,</span> <span class="n">t</span> <span class="o">=</span> <span class="n">make_affine_mapping</span><span class="p">(</span><span class="n">verts</span><span class="p">,</span> <span class="n">permuted_verts</span><span class="p">)</span>
+            <span class="n">o_coord_maps</span><span class="p">[</span><span class="n">o</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">Q</span><span class="p">,</span> <span class="n">t</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">o_coord_maps</span></div>
 </div>
 
 
@@ -1458,6 +1608,12 @@
         <span class="k">return</span> <span class="p">[</span><span class="nb">slice</span><span class="p">(</span><span class="n">delimiter</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">delimiter</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">])</span>
                 <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">)]</span>
 
+    <span class="k">def</span><span class="w"> </span><span class="nf">_facet_embedding_coord_maps</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"Facet maps are not yet implemented for general tensor product cells."</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_facet_orientation_coord_maps</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"Facet maps are not yet implemented for general tensor product cells."</span><span class="p">)</span>
+
 <div class="viewcode-block" id="TensorProductCell.get_dimension">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.TensorProductCell.get_dimension">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -1781,6 +1937,36 @@
 <span class="sd">        """</span>
         <span class="n">d</span><span class="p">,</span> <span class="n">e</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">unflattening_map</span><span class="p">[(</span><span class="n">dim</span><span class="p">,</span> <span class="n">entity_i</span><span class="p">)]</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Hypercube.get_orientation_coord_maps">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Hypercube.get_orientation_coord_maps">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_orientation_coord_maps</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Returns the orientation maps of this hypercube, as described in</span>
+<span class="sd">        :meth:`Cell.get_orientation_coord_maps`.</span>
+
+<span class="sd">        The orientations are the integer encodings of the vertex permutations</span>
+<span class="sd">        that :func:`make_entity_permutations_tensorproduct` builds from the</span>
+<span class="sd">        interval factors of the hypercube.</span>
+<span class="sd">        """</span>
+        <span class="n">verts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">())</span>
+        <span class="c1"># Build the map orientation -&gt; vertex permutation</span>
+        <span class="n">factors</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">cells</span>
+        <span class="n">factor_dims</span> <span class="o">=</span> <span class="p">[</span><span class="n">f</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">factors</span><span class="p">]</span>
+        <span class="c1"># Build the vertex permutations of a hypercube out of the vertex permutations of its factors</span>
+        <span class="n">tp_maps</span> <span class="o">=</span> <span class="n">make_entity_permutations_tensorproduct</span><span class="p">(</span><span class="n">factors</span><span class="p">,</span> <span class="n">factor_dims</span><span class="p">,</span> <span class="p">[</span><span class="n">make_entity_permutations_simplex</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">factor_dims</span><span class="p">])</span>
+        <span class="c1"># Convert the tuple keys (e0, io_0, io_1...) into FIAT's integer orientations.</span>
+        <span class="c1"># pass the nested dictionary { dimension tuple : { entity number : { orientation tuple : permutation } } } to flatten_permutations</span>
+        <span class="n">o_p_maps</span> <span class="o">=</span> <span class="n">flatten_permutations</span><span class="p">({</span><span class="nb">tuple</span><span class="p">(</span><span class="n">factor_dims</span><span class="p">):</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="n">tp_maps</span><span class="p">}})[</span><span class="bp">self</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="c1"># Convert each vertex permutation into an affine map</span>
+        <span class="n">o_coord_maps</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="c1"># vertex subset: vertex 0 and its neighbour along each axis are linearly independent</span>
+        <span class="n">subset</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="o">*</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()))]</span>
+        <span class="k">for</span> <span class="n">o</span><span class="p">,</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">o_p_maps</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">permuted_verts</span> <span class="o">=</span> <span class="n">verts</span><span class="p">[</span><span class="n">p</span><span class="p">]</span>
+            <span class="n">Q</span><span class="p">,</span> <span class="n">t</span> <span class="o">=</span> <span class="n">make_affine_mapping</span><span class="p">(</span><span class="n">verts</span><span class="p">[</span><span class="n">subset</span><span class="p">],</span> <span class="n">permuted_verts</span><span class="p">[</span><span class="n">subset</span><span class="p">])</span>
+            <span class="n">o_coord_maps</span><span class="p">[</span><span class="n">o</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">Q</span><span class="p">,</span> <span class="n">t</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">o_coord_maps</span></div>
 
 
 <div class="viewcode-block" id="Hypercube.volume">

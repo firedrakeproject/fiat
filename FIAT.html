@@ -4943,6 +4943,29 @@ eo (extrinsic orientation).</p>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="FIAT.reference_element.Cell.facet_neighbour_coord_maps">
+<span class="sig-name descname"><span class="pre">facet_neighbour_coord_maps</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#Cell.facet_neighbour_coord_maps"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.Cell.facet_neighbour_coord_maps" title="Link to this definition">¶</a></dt>
+<dd><p>Return the affine transformation that maps the reference coordinates of facet points between the two cells sharing that facet.</p>
+<p>Example:
+Suppose a cell has local facet <code class="docutils literal notranslate"><span class="pre">lf_from</span></code> with orientation <code class="docutils literal notranslate"><span class="pre">o_from</span></code> corresponding to local facet <code class="docutils literal notranslate"><span class="pre">lf_to</span></code> with orientation <cite>o_to</cite> in the other cell across that facet.</p>
+<p>Then a point in the first cell, lying on the local facet <code class="docutils literal notranslate"><span class="pre">lf_from</span></code> with reference coordinates <code class="docutils literal notranslate"><span class="pre">X</span></code>, has reference coordinates in the neighbouring cell:</p>
+<blockquote>
+<div><p>X’ = A[lf_from, lf_to, o_from, o_to] &#64; X + b[lf_from, lf_to, o_from, o_to]</p>
+</div></blockquote>
+<section id="id24">
+<h3>Returns<a class="headerlink" href="#id24" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>A<span class="classifier">numpy.ndarray</span></dt><dd><p>The matrix of each map, with shape
+<code class="docutils literal notranslate"><span class="pre">(num_facets,</span> <span class="pre">num_facets,</span> <span class="pre">num_orientations,</span> <span class="pre">num_orientations,</span> <span class="pre">dim,</span> <span class="pre">dim)</span></code>.</p>
+</dd>
+<dt>b<span class="classifier">numpy.ndarray</span></dt><dd><p>The translation vector of each map, with shape
+<code class="docutils literal notranslate"><span class="pre">(num_facets,</span> <span class="pre">num_facets,</span> <span class="pre">num_orientations,</span> <span class="pre">num_orientations,</span> <span class="pre">dim)</span></code>.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="FIAT.reference_element.Cell.get_connectivity">
 <span class="sig-name descname"><span class="pre">get_connectivity</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#Cell.get_connectivity"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.Cell.get_connectivity" title="Link to this definition">¶</a></dt>
 <dd><p>Returns a dictionary encoding the connectivity of the element.</p>
@@ -4979,6 +5002,34 @@ dimension.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.Cell.get_interior_facets">
 <span class="sig-name descname"><span class="pre">get_interior_facets</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dim</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#Cell.get_interior_facets"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.Cell.get_interior_facets" title="Link to this definition">¶</a></dt>
 <dd><p>Return the interior facets this cell is a split and () otherwise.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="FIAT.reference_element.Cell.get_orientation_coord_maps">
+<span class="sig-name descname"><span class="pre">get_orientation_coord_maps</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#Cell.get_orientation_coord_maps"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.Cell.get_orientation_coord_maps" title="Link to this definition">¶</a></dt>
+<dd><p>Returns an affine map that changes the reference coordinates of this cell
+from each orientation to the canonical orientation.</p>
+<p>An orientation <code class="docutils literal notranslate"><span class="pre">o</span></code> describes how the vertices of this cell are ordered
+relative to its canonical vertex order. For each orientation <code class="docutils literal notranslate"><span class="pre">o</span></code>, the map is</p>
+<blockquote>
+<div><p>X_can = Q[o] &#64; X_o + t[o],</p>
+</div></blockquote>
+<p>where <code class="docutils literal notranslate"><span class="pre">X_o</span></code> are the reference coordinates of a point when the cell has
+orientation <code class="docutils literal notranslate"><span class="pre">o</span></code>, and <code class="docutils literal notranslate"><span class="pre">X_can</span></code> are the reference coordinates of the same
+point in the canonical orientation.</p>
+<section id="id25">
+<h3>Returns<a class="headerlink" href="#id25" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>dict</dt><dd><p>Maps each orientation <code class="docutils literal notranslate"><span class="pre">o</span></code> (an integer) to the tuple <code class="docutils literal notranslate"><span class="pre">(Q[o],</span> <span class="pre">t[o])</span></code>.
+<code class="docutils literal notranslate"><span class="pre">Q[o]</span></code> has shape <code class="docutils literal notranslate"><span class="pre">(dim,</span> <span class="pre">dim)</span></code> and <code class="docutils literal notranslate"><span class="pre">t[o]</span></code> has shape <code class="docutils literal notranslate"><span class="pre">(dim,)</span></code>.</p>
+</dd>
+</dl>
+</section>
+<section id="id26">
+<h3>Notes<a class="headerlink" href="#id26" title="Link to this heading">¶</a></h3>
+<p>Each map is built from the vertex permutation <code class="docutils literal notranslate"><span class="pre">p</span></code> of orientation <code class="docutils literal notranslate"><span class="pre">o</span></code>,
+which takes vertex <code class="docutils literal notranslate"><span class="pre">i</span></code> of the cell to vertex <code class="docutils literal notranslate"><span class="pre">p[i]</span></code>.</p>
+</section>
 </dd></dl>
 
 <dl class="py method">
@@ -5134,8 +5185,8 @@ specified by subelement dimension.</p>
 <dd><p>Checks if reference cell contains given point
 (with numerical tolerance as given by the L1 distance (aka ‘manhattan’,
 ‘taxicab’ or rectilinear distance) to the cell.</p>
-<section id="id24">
-<h3>Parameters<a class="headerlink" href="#id24" title="Link to this heading">¶</a></h3>
+<section id="id27">
+<h3>Parameters<a class="headerlink" href="#id27" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>point<span class="classifier">numpy.ndarray, list or symbolic expression</span></dt><dd><p>The coordinates of the point.</p>
 </dd>
@@ -5143,8 +5194,8 @@ specified by subelement dimension.</p>
 </dd>
 </dl>
 </section>
-<section id="id25">
-<h3>Returns<a class="headerlink" href="#id25" title="Link to this heading">¶</a></h3>
+<section id="id28">
+<h3>Returns<a class="headerlink" href="#id28" title="Link to this heading">¶</a></h3>
 <p>bool : True if the point is inside the cell, False otherwise.</p>
 </section>
 </dd></dl>
@@ -5177,6 +5228,16 @@ spatial dimension.</p>
 </ul>
 </dd>
 </dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="FIAT.reference_element.Hypercube.get_orientation_coord_maps">
+<span class="sig-name descname"><span class="pre">get_orientation_coord_maps</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#Hypercube.get_orientation_coord_maps"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.Hypercube.get_orientation_coord_maps" title="Link to this definition">¶</a></dt>
+<dd><p>Returns the orientation maps of this hypercube, as described in
+<a class="reference internal" href="#FIAT.reference_element.Cell.get_orientation_coord_maps" title="FIAT.reference_element.Cell.get_orientation_coord_maps"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Cell.get_orientation_coord_maps()</span></code></a>.</p>
+<p>The orientations are the integer encodings of the vertex permutations
+that <code class="xref py py-func docutils literal notranslate"><span class="pre">make_entity_permutations_tensorproduct()</span></code> builds from the
+interval factors of the hypercube.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -5295,6 +5356,15 @@ C.index(M[2]) = 0; C.remove(M[2])</p>
 <dd></dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="FIAT.reference_element.Simplex.get_orientation_coord_maps">
+<span class="sig-name descname"><span class="pre">get_orientation_coord_maps</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#Simplex.get_orientation_coord_maps"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.Simplex.get_orientation_coord_maps" title="Link to this definition">¶</a></dt>
+<dd><p>Returns the orientation maps of this simplex, as described in
+<a class="reference internal" href="#FIAT.reference_element.Cell.get_orientation_coord_maps" title="FIAT.reference_element.Cell.get_orientation_coord_maps"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Cell.get_orientation_coord_maps()</span></code></a>.</p>
+<p>The orientations are the vertex permutations from
+<code class="xref py py-func docutils literal notranslate"><span class="pre">make_entity_permutations_simplex()</span></code>.</p>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="FIAT.reference_element.Simplex.is_simplex">
 <span class="sig-name descname"><span class="pre">is_simplex</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#Simplex.is_simplex"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.Simplex.is_simplex" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
@@ -5398,8 +5468,8 @@ These tangents are <em>NOT</em> normalized to have unit length.</p>
 <dd><p>Checks if reference cell contains given point
 (with numerical tolerance as given by the L1 distance (aka ‘manhatten’,
 ‘taxicab’ or rectilinear distance) to the cell.</p>
-<section id="id26">
-<h3>Parameters<a class="headerlink" href="#id26" title="Link to this heading">¶</a></h3>
+<section id="id29">
+<h3>Parameters<a class="headerlink" href="#id29" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>point<span class="classifier">numpy.ndarray, list or symbolic expression</span></dt><dd><p>The coordinates of the point.</p>
 </dd>
@@ -5409,8 +5479,8 @@ These tangents are <em>NOT</em> normalized to have unit length.</p>
 </dd>
 </dl>
 </section>
-<section id="id27">
-<h3>Returns<a class="headerlink" href="#id27" title="Link to this heading">¶</a></h3>
+<section id="id30">
+<h3>Returns<a class="headerlink" href="#id30" title="Link to this heading">¶</a></h3>
 <p>bool : True if the point is inside the cell, False otherwise.</p>
 </section>
 </dd></dl>
@@ -5420,8 +5490,8 @@ These tangents are <em>NOT</em> normalized to have unit length.</p>
 <span class="sig-name descname"><span class="pre">distance_to_point_l1</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">points</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rescale</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#SimplicialComplex.distance_to_point_l1"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.SimplicialComplex.distance_to_point_l1" title="Link to this definition">¶</a></dt>
 <dd><p>Get the L1 distance (aka ‘manhatten’, ‘taxicab’ or rectilinear
 distance) from an entity to a point with 0.0 if the point is inside the entity.</p>
-<section id="id28">
-<h3>Parameters<a class="headerlink" href="#id28" title="Link to this heading">¶</a></h3>
+<section id="id31">
+<h3>Parameters<a class="headerlink" href="#id31" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>points<span class="classifier">numpy.ndarray or list</span></dt><dd><p>The coordinates of the points.</p>
 </dd>
@@ -5433,8 +5503,8 @@ for points opposite to a single facet.</p>
 </dd>
 </dl>
 </section>
-<section id="id29">
-<h3>Returns<a class="headerlink" href="#id29" title="Link to this heading">¶</a></h3>
+<section id="id32">
+<h3>Returns<a class="headerlink" href="#id32" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>numpy.float64 or numpy.ndarray</dt><dd><p>The L1 distance, also known as taxicab, manhatten or rectilinear
 distance, of the cell to the point. If 0.0 the point is inside the
@@ -5442,8 +5512,8 @@ cell.</p>
 </dd>
 </dl>
 </section>
-<section id="id30">
-<h3>Notes<a class="headerlink" href="#id30" title="Link to this heading">¶</a></h3>
+<section id="id33">
+<h3>Notes<a class="headerlink" href="#id33" title="Link to this heading">¶</a></h3>
 <p>This is done with the help of barycentric coordinates where the general
 algorithm is to compute the most negative (i.e. minimum) barycentric
 coordinate then return its negative. For implementation reasons we
@@ -5493,7 +5563,7 @@ sphinx):</p>
 </pre></div>
 </div>
 <dl>
-<dt><a href="#id31"><span class="problematic" id="id32">``</span></a><a href="#id33"><span class="problematic" id="id34">`</span></a></dt><dd><blockquote>
+<dt><a href="#id34"><span class="problematic" id="id35">``</span></a><a href="#id36"><span class="problematic" id="id37">`</span></a></dt><dd><blockquote>
 <div><p>y-axis
 |
 |</p>
@@ -5529,7 +5599,7 @@ sphinx):</p>
 <p>(0,0) |         (1,0)</p>
 </dd>
 </dl>
-<p><a href="#id35"><span class="problematic" id="id36">``</span></a><a href="#id37"><span class="problematic" id="id38">`</span></a></p>
+<p><a href="#id38"><span class="problematic" id="id39">``</span></a><a href="#id40"><span class="problematic" id="id41">`</span></a></p>
 <dl class="simple">
 <dt>Barycentric coordinates are defined as</dt><dd><p><cite>X = alpha * P0 + beta * P1 + gamma * P2</cite> where
 <cite>alpha + beta + gamma = 1.0</cite>.</p>
@@ -5579,15 +5649,15 @@ actual distance to the tetrahedron.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.SimplicialComplex.extract_extrinsic_orientation">
 <span class="sig-name descname"><span class="pre">extract_extrinsic_orientation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">o</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#SimplicialComplex.extract_extrinsic_orientation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.SimplicialComplex.extract_extrinsic_orientation" title="Link to this definition">¶</a></dt>
 <dd><p>Extract extrinsic orientation.</p>
-<section id="id39">
-<h3>Parameters<a class="headerlink" href="#id39" title="Link to this heading">¶</a></h3>
+<section id="id42">
+<h3>Parameters<a class="headerlink" href="#id42" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>o<span class="classifier">Orientation</span></dt><dd><p>Total orientation.</p>
 </dd>
 </dl>
 </section>
-<section id="id40">
-<h3>Returns<a class="headerlink" href="#id40" title="Link to this heading">¶</a></h3>
+<section id="id43">
+<h3>Returns<a class="headerlink" href="#id43" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>Orientation</dt><dd><p>Extrinsic orientation.</p>
 </dd>
@@ -5599,8 +5669,8 @@ actual distance to the tetrahedron.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.SimplicialComplex.extract_intrinsic_orientation">
 <span class="sig-name descname"><span class="pre">extract_intrinsic_orientation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">axis</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#SimplicialComplex.extract_intrinsic_orientation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.SimplicialComplex.extract_intrinsic_orientation" title="Link to this definition">¶</a></dt>
 <dd><p>Extract intrinsic orientation.</p>
-<section id="id41">
-<h3>Parameters<a class="headerlink" href="#id41" title="Link to this heading">¶</a></h3>
+<section id="id44">
+<h3>Parameters<a class="headerlink" href="#id44" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>o<span class="classifier">Orientation</span></dt><dd><p>Total orientation.</p>
 </dd>
@@ -5608,8 +5678,8 @@ actual distance to the tetrahedron.</p>
 </dd>
 </dl>
 </section>
-<section id="id42">
-<h3>Returns<a class="headerlink" href="#id42" title="Link to this heading">¶</a></h3>
+<section id="id45">
+<h3>Returns<a class="headerlink" href="#id45" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>Orientation</dt><dd><p>Intrinsic orientation.</p>
 </dd>
@@ -5621,8 +5691,8 @@ actual distance to the tetrahedron.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.SimplicialComplex.extrinsic_orientation_permutation_map">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">extrinsic_orientation_permutation_map</span></span><a class="headerlink" href="#FIAT.reference_element.SimplicialComplex.extrinsic_orientation_permutation_map" title="Link to this definition">¶</a></dt>
 <dd><p>A map from extrinsic orientations to corresponding axis permutation matrices.</p>
-<section id="id43">
-<h3>Notes<a class="headerlink" href="#id43" title="Link to this heading">¶</a></h3>
+<section id="id46">
+<h3>Notes<a class="headerlink" href="#id46" title="Link to this heading">¶</a></h3>
 <p>result[eo] gives the physical axis-reference axis permutation matrix corresponding to
 eo (extrinsic orientation).</p>
 </section>
@@ -5751,8 +5821,8 @@ specified by subelement dimension.</p>
 <dd><p>Checks if reference cell contains given point
 (with numerical tolerance as given by the L1 distance (aka ‘manhattan’,
 ‘taxicab’ or rectilinear distance) to the cell.</p>
-<section id="id44">
-<h3>Parameters<a class="headerlink" href="#id44" title="Link to this heading">¶</a></h3>
+<section id="id47">
+<h3>Parameters<a class="headerlink" href="#id47" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>point<span class="classifier">numpy.ndarray, list or symbolic expression</span></dt><dd><p>The coordinates of the point.</p>
 </dd>
@@ -5760,8 +5830,8 @@ specified by subelement dimension.</p>
 </dd>
 </dl>
 </section>
-<section id="id45">
-<h3>Returns<a class="headerlink" href="#id45" title="Link to this heading">¶</a></h3>
+<section id="id48">
+<h3>Returns<a class="headerlink" href="#id48" title="Link to this heading">¶</a></h3>
 <p>bool : True if the point is inside the cell, False otherwise.</p>
 </section>
 </dd></dl>
@@ -5778,22 +5848,22 @@ distance) to a point with 0.0 if the point is inside the cell.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.TensorProductCell.extract_extrinsic_orientation">
 <span class="sig-name descname"><span class="pre">extract_extrinsic_orientation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">o</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#TensorProductCell.extract_extrinsic_orientation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.TensorProductCell.extract_extrinsic_orientation" title="Link to this definition">¶</a></dt>
 <dd><p>Extract extrinsic orientation.</p>
-<section id="id46">
-<h3>Parameters<a class="headerlink" href="#id46" title="Link to this heading">¶</a></h3>
+<section id="id49">
+<h3>Parameters<a class="headerlink" href="#id49" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>o<span class="classifier">Orientation</span></dt><dd><p>Total orientation.</p>
 </dd>
 </dl>
 </section>
-<section id="id47">
-<h3>Returns<a class="headerlink" href="#id47" title="Link to this heading">¶</a></h3>
+<section id="id50">
+<h3>Returns<a class="headerlink" href="#id50" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>Orientation</dt><dd><p>Extrinsic orientation.</p>
 </dd>
 </dl>
 </section>
-<section id="id48">
-<h3>Notes<a class="headerlink" href="#id48" title="Link to this heading">¶</a></h3>
+<section id="id51">
+<h3>Notes<a class="headerlink" href="#id51" title="Link to this heading">¶</a></h3>
 <p>The difinition of orientations used here must be consistent with
 that used in make_entity_permutations_tensorproduct.</p>
 </section>
@@ -5803,8 +5873,8 @@ that used in make_entity_permutations_tensorproduct.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.TensorProductCell.extract_intrinsic_orientation">
 <span class="sig-name descname"><span class="pre">extract_intrinsic_orientation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">axis</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#TensorProductCell.extract_intrinsic_orientation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.TensorProductCell.extract_intrinsic_orientation" title="Link to this definition">¶</a></dt>
 <dd><p>Extract intrinsic orientation.</p>
-<section id="id49">
-<h3>Parameters<a class="headerlink" href="#id49" title="Link to this heading">¶</a></h3>
+<section id="id52">
+<h3>Parameters<a class="headerlink" href="#id52" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>o<span class="classifier">Orientation</span></dt><dd><p>Total orientation. <code class="docutils literal notranslate"><span class="pre">//</span></code> and <code class="docutils literal notranslate"><span class="pre">%</span></code> must be overloaded in type(o).</p>
 </dd>
@@ -5812,15 +5882,15 @@ that used in make_entity_permutations_tensorproduct.</p>
 </dd>
 </dl>
 </section>
-<section id="id50">
-<h3>Returns<a class="headerlink" href="#id50" title="Link to this heading">¶</a></h3>
+<section id="id53">
+<h3>Returns<a class="headerlink" href="#id53" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>Orientation</dt><dd><p>Intrinsic orientation.</p>
 </dd>
 </dl>
 </section>
-<section id="id51">
-<h3>Notes<a class="headerlink" href="#id51" title="Link to this heading">¶</a></h3>
+<section id="id54">
+<h3>Notes<a class="headerlink" href="#id54" title="Link to this heading">¶</a></h3>
 <p>Must be consistent with make_entity_permutations_tensorproduct.</p>
 </section>
 </dd></dl>
@@ -5829,8 +5899,8 @@ that used in make_entity_permutations_tensorproduct.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.TensorProductCell.extrinsic_orientation_permutation_map">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">extrinsic_orientation_permutation_map</span></span><a class="headerlink" href="#FIAT.reference_element.TensorProductCell.extrinsic_orientation_permutation_map" title="Link to this definition">¶</a></dt>
 <dd><p>A map from extrinsic orientations to corresponding axis permutation matrices.</p>
-<section id="id52">
-<h3>Notes<a class="headerlink" href="#id52" title="Link to this heading">¶</a></h3>
+<section id="id55">
+<h3>Notes<a class="headerlink" href="#id55" title="Link to this heading">¶</a></h3>
 <p>result[eo] gives the physical axis-reference axis permutation matrix corresponding to
 eo (extrinsic orientation).</p>
 </section>
@@ -7252,10 +7322,12 @@ Simplices in one, two, and three dimensions are supported.</p>
 <li><a class="reference internal" href="#FIAT.reference_element.Cell.extract_extrinsic_orientation"><code class="docutils literal notranslate"><span class="pre">Cell.extract_extrinsic_orientation()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.Cell.extract_intrinsic_orientation"><code class="docutils literal notranslate"><span class="pre">Cell.extract_intrinsic_orientation()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.Cell.extrinsic_orientation_permutation_map"><code class="docutils literal notranslate"><span class="pre">Cell.extrinsic_orientation_permutation_map</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.reference_element.Cell.facet_neighbour_coord_maps"><code class="docutils literal notranslate"><span class="pre">Cell.facet_neighbour_coord_maps()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.Cell.get_connectivity"><code class="docutils literal notranslate"><span class="pre">Cell.get_connectivity()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.Cell.get_dimension"><code class="docutils literal notranslate"><span class="pre">Cell.get_dimension()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.Cell.get_entity_transform"><code class="docutils literal notranslate"><span class="pre">Cell.get_entity_transform()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.Cell.get_interior_facets"><code class="docutils literal notranslate"><span class="pre">Cell.get_interior_facets()</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.reference_element.Cell.get_orientation_coord_maps"><code class="docutils literal notranslate"><span class="pre">Cell.get_orientation_coord_maps()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.Cell.get_parent"><code class="docutils literal notranslate"><span class="pre">Cell.get_parent()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.Cell.get_parent_complex"><code class="docutils literal notranslate"><span class="pre">Cell.get_parent_complex()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.Cell.get_shape"><code class="docutils literal notranslate"><span class="pre">Cell.get_shape()</span></code></a></li>
@@ -7285,6 +7357,7 @@ Simplices in one, two, and three dimensions are supported.</p>
 <li><a class="reference internal" href="#FIAT.reference_element.Hypercube.distance_to_point_l1"><code class="docutils literal notranslate"><span class="pre">Hypercube.distance_to_point_l1()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.Hypercube.get_dimension"><code class="docutils literal notranslate"><span class="pre">Hypercube.get_dimension()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.Hypercube.get_entity_transform"><code class="docutils literal notranslate"><span class="pre">Hypercube.get_entity_transform()</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.reference_element.Hypercube.get_orientation_coord_maps"><code class="docutils literal notranslate"><span class="pre">Hypercube.get_orientation_coord_maps()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.Hypercube.point_entity_ids"><code class="docutils literal notranslate"><span class="pre">Hypercube.point_entity_ids()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.Hypercube.symmetry_group_size"><code class="docutils literal notranslate"><span class="pre">Hypercube.symmetry_group_size()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.Hypercube.volume"><code class="docutils literal notranslate"><span class="pre">Hypercube.volume()</span></code></a></li>
@@ -7306,6 +7379,7 @@ Simplices in one, two, and three dimensions are supported.</p>
 <li><a class="reference internal" href="#FIAT.reference_element.Simplex"><code class="docutils literal notranslate"><span class="pre">Simplex</span></code></a><ul>
 <li><a class="reference internal" href="#FIAT.reference_element.Simplex.cell_orientation_reflection_map"><code class="docutils literal notranslate"><span class="pre">Simplex.cell_orientation_reflection_map()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.Simplex.get_facet_element"><code class="docutils literal notranslate"><span class="pre">Simplex.get_facet_element()</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.reference_element.Simplex.get_orientation_coord_maps"><code class="docutils literal notranslate"><span class="pre">Simplex.get_orientation_coord_maps()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.Simplex.is_simplex"><code class="docutils literal notranslate"><span class="pre">Simplex.is_simplex()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.Simplex.symmetry_group_size"><code class="docutils literal notranslate"><span class="pre">Simplex.symmetry_group_size()</span></code></a></li>
 </ul>
