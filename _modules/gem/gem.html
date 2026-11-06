@@ -73,7 +73,7 @@
            <span class="s1">'Index'</span><span class="p">,</span> <span class="s1">'VariableIndex'</span><span class="p">,</span> <span class="s1">'Indexed'</span><span class="p">,</span> <span class="s1">'ComponentTensor'</span><span class="p">,</span>
            <span class="s1">'IndexSum'</span><span class="p">,</span> <span class="s1">'ListTensor'</span><span class="p">,</span> <span class="s1">'Concatenate'</span><span class="p">,</span> <span class="s1">'Delta'</span><span class="p">,</span> <span class="s1">'OrientationVariableIndex'</span><span class="p">,</span>
            <span class="s1">'index_sum'</span><span class="p">,</span> <span class="s1">'partial_indexed'</span><span class="p">,</span> <span class="s1">'reshape'</span><span class="p">,</span> <span class="s1">'view'</span><span class="p">,</span>
-           <span class="s1">'indices'</span><span class="p">,</span> <span class="s1">'as_gem'</span><span class="p">,</span> <span class="s1">'FlexiblyIndexed'</span><span class="p">,</span>
+           <span class="s1">'indices'</span><span class="p">,</span> <span class="s1">'as_gem'</span><span class="p">,</span> <span class="s1">'sqrt'</span><span class="p">,</span> <span class="s1">'FlexiblyIndexed'</span><span class="p">,</span>
            <span class="s1">'Inverse'</span><span class="p">,</span> <span class="s1">'Solve'</span><span class="p">,</span> <span class="s1">'extract_type'</span><span class="p">,</span> <span class="s1">'uint_type'</span><span class="p">,</span> <span class="s1">'Piecewise'</span><span class="p">]</span>
 
 
@@ -1493,8 +1493,11 @@
 <span class="sd">    Each expression must either have the same shape, or else be</span>
 <span class="sd">    scalar. Shaped expressions are indexed, the op is applied to the</span>
 <span class="sd">    scalar expressions and the result is wrapped up in a ComponentTensor.</span>
+<span class="sd">    If every expression is scalar, the op is applied to them directly.</span>
 
 <span class="sd">    """</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">shape</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">exprs</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">op</span><span class="p">(</span><span class="o">*</span><span class="n">exprs</span><span class="p">)</span>
     <span class="n">shapes</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">shape</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">exprs</span><span class="p">)</span>
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">shapes</span> <span class="o">-</span> <span class="p">{()})</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"expressions must have matching shape (or else be scalar)"</span><span class="p">)</span>
@@ -1545,6 +1548,17 @@
             <span class="k">return</span> <span class="n">Literal</span><span class="p">(</span><span class="n">expr</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Do not know how to convert </span><span class="si">%r</span><span class="s2"> to GEM"</span> <span class="o">%</span> <span class="n">expr</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="sqrt">
+<a class="viewcode-back" href="../../gem.html#gem.gem.sqrt">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">sqrt</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""The square root of a GEM scalar, which compiles to a call of sqrt instead of pow."""</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">Constant</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">Literal</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">value</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">MathFunction</span><span class="p">(</span><span class="s2">"sqrt"</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span></div>
 
 
 

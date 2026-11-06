@@ -2861,6 +2861,40 @@ including any Piola map.  The physical basis is <span class="math notranslate no
 where <span class="math notranslate nohighlight">\(B_{ij} = n_i(\mathcal{P}\hat\psi_j)\)</span> and <span class="math notranslate nohighlight">\(M = B^{-T}\)</span>
 (Kirby 2017, Brubeck &amp; Kirby 2025).</p>
 <dl class="py class">
+<dt class="sig sig-object py" id="finat.physically_mapped.BlockRow">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.physically_mapped.</span></span><span class="sig-name descname"><span class="pre">BlockRow</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nodes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entries</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inverse</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scales</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#finat.physically_mapped.BlockRow" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></a></p>
+<p>The rows of <span class="math notranslate nohighlight">\(B_0\)</span> of the nodes of an entity that share a pullback,
+as a <a class="reference internal" href="#finat.physically_mapped.LinearCombination" title="finat.physically_mapped.LinearCombination"><code class="xref py py-class docutils literal notranslate"><span class="pre">LinearCombination</span></code></a> of constant matrices, their rows of the
+inverse of the diagonal block of <span class="math notranslate nohighlight">\(B_0\)</span> on the entity, as an object
+array of GEM scalars, and the scaling of each row of <span class="math notranslate nohighlight">\(B=SB_0\)</span>.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="finat.physically_mapped.BlockRow.entries">
+<span class="sig-name descname"><span class="pre">entries</span></span><a class="headerlink" href="#finat.physically_mapped.BlockRow.entries" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 1</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="finat.physically_mapped.BlockRow.inverse">
+<span class="sig-name descname"><span class="pre">inverse</span></span><a class="headerlink" href="#finat.physically_mapped.BlockRow.inverse" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 2</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="finat.physically_mapped.BlockRow.nodes">
+<span class="sig-name descname"><span class="pre">nodes</span></span><a class="headerlink" href="#finat.physically_mapped.BlockRow.nodes" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 0</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="finat.physically_mapped.BlockRow.scales">
+<span class="sig-name descname"><span class="pre">scales</span></span><a class="headerlink" href="#finat.physically_mapped.BlockRow.scales" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 3</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
 <dt class="sig sig-object py" id="finat.physically_mapped.DirectlyDefinedElement">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.physically_mapped.</span></span><span class="sig-name descname"><span class="pre">DirectlyDefinedElement</span></span><a class="reference internal" href="_modules/finat/physically_mapped.html#DirectlyDefinedElement"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.DirectlyDefinedElement" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#finat.physically_mapped.NeedsCoordinateMappingElement" title="finat.physically_mapped.NeedsCoordinateMappingElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">NeedsCoordinateMappingElement</span></code></a></p>
@@ -2888,21 +2922,39 @@ serendipity that bypass a coordinate mapping.</p>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="finat.physically_mapped.LinearCombination.collect_terms">
+<span class="sig-name descname"><span class="pre">collect_terms</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#LinearCombination.collect_terms"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.LinearCombination.collect_terms" title="Link to this definition">¶</a></dt>
+<dd><p>Collect the terms with proportional <span class="math notranslate nohighlight">\(C_t\)</span> into one term, and drop the terms with <span class="math notranslate nohighlight">\(C_t=0\)</span>.</p>
+<p>The terms <span class="math notranslate nohighlight">\(g_sC_s+g_tC_t\)</span> with <span class="math notranslate nohighlight">\(C_t=\lambda C_s\)</span> collect
+into <span class="math notranslate nohighlight">\((g_s+\lambda g_t)C_s\)</span>, as in
+<a class="reference internal" href="gem.html#gem.refactorise.collect_monomials" title="gem.refactorise.collect_monomials"><code class="xref py py-func docutils literal notranslate"><span class="pre">gem.refactorise.collect_monomials()</span></code></a>.  Each collected
+<span class="math notranslate nohighlight">\(C_s\)</span> is scaled to have its first nonzero entry equal to 1.</p>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="finat.physically_mapped.LinearCombination.contract">
 <span class="sig-name descname"><span class="pre">contract</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">A</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#LinearCombination.contract"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.LinearCombination.contract" title="Link to this definition">¶</a></dt>
-<dd><p>The contraction <span class="math notranslate nohighlight">\(G:A=g^TR\)</span> with a constant tensor, where <span class="math notranslate nohighlight">\(R_t=C_t:A\)</span>.</p>
+<dd><p>The contraction <span class="math notranslate nohighlight">\(G:A=\sum_t g_tR_t\)</span> with a constant tensor, where <span class="math notranslate nohighlight">\(R_t=C_t:A\)</span>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>A</strong> – A constant tensor whose first two axes match <span class="math notranslate nohighlight">\(G\)</span>.</p></li>
-<li><p><strong>tol</strong> – Tolerance relative to A and each <span class="math notranslate nohighlight">\(C_t\)</span> below which
-entries of <span class="math notranslate nohighlight">\(R\)</span> are dropped.</p></li>
+<li><p><strong>A</strong> – A constant tensor whose first two axes match <span class="math notranslate nohighlight">\(G\)</span>,
+followed by an axis of nodes and an axis of basis functions.</p></li>
+<li><p><strong>tol</strong> – Tolerance below which entries of <span class="math notranslate nohighlight">\(R\)</span> are set to zero,
+relative to the bound <span class="math notranslate nohighlight">\(|C_t:A|\le\|C_t\|_1\|A\|_\infty\)</span>.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>An object array of GEM scalars with the remaining axes of A.</p>
+<dd class="field-even"><p>The <a class="reference internal" href="#finat.physically_mapped.LinearCombination" title="finat.physically_mapped.LinearCombination"><code class="xref py py-class docutils literal notranslate"><span class="pre">LinearCombination</span></code></a> of the <span class="math notranslate nohighlight">\(R_t\)</span>, with
+the axes of nodes and basis functions.</p>
 </dd>
 </dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="finat.physically_mapped.LinearCombination.expand">
+<span class="sig-name descname"><span class="pre">expand</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#LinearCombination.expand"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.LinearCombination.expand" title="Link to this definition">¶</a></dt>
+<dd><p>The GEM scalars <span class="math notranslate nohighlight">\(\sum_t g_tC_t\)</span>, as an object array of the shape of <span class="math notranslate nohighlight">\(C_t\)</span>.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -2923,27 +2975,29 @@ entries of <span class="math notranslate nohighlight">\(R\)</span> are dropped.<
 <dd><p>The outer product of a vector u of GEM scalars and a constant vector v.</p>
 </dd></dl>
 
+<dl class="py method">
+<dt class="sig sig-object py" id="finat.physically_mapped.LinearCombination.scaled">
+<span class="sig-name descname"><span class="pre">scaled</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">c</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#LinearCombination.scaled"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.LinearCombination.scaled" title="Link to this definition">¶</a></dt>
+<dd><p>The product with a GEM scalar.</p>
+</dd></dl>
+
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="finat.physically_mapped.MappedTabulation">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.physically_mapped.</span></span><span class="sig-name descname"><span class="pre">MappedTabulation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">M</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref_tabulation</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#MappedTabulation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.MappedTabulation" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.physically_mapped.</span></span><span class="sig-name descname"><span class="pre">MappedTabulation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">transform</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref_tabulation</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#MappedTabulation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.MappedTabulation" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Mapping</span></code></a></p>
 <p>A lazy tabulation dict that applies the basis transformation only
 on the requested derivatives.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>M</strong> – a gem.ListTensor with the basis transformation matrix.</p></li>
+<li><p><strong>transform</strong> – a callable that applies the basis transformation to a
+reference tabulation, with the basis functions as the first axis.</p></li>
 <li><p><strong>ref_tabulation</strong> – a dict of tabulations on the reference cell.</p></li>
 </ul>
 </dd>
 </dl>
-<dl class="py method">
-<dt class="sig sig-object py" id="finat.physically_mapped.MappedTabulation.matvec">
-<span class="sig-name descname"><span class="pre">matvec</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#MappedTabulation.matvec"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.MappedTabulation.matvec" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
-
 </dd></dl>
 
 <dl class="py class">
@@ -3092,11 +3146,98 @@ facet (numbered according to FIAT conventions), shape
 </dd></dl>
 
 <dl class="py class">
+<dt class="sig sig-object py" id="finat.physically_mapped.PhysicallyMappedDualSet">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.physically_mapped.</span></span><span class="sig-name descname"><span class="pre">PhysicallyMappedDualSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dual</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mappings</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">avg</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#PhysicallyMappedDualSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.PhysicallyMappedDualSet" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/functions.html#object" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>The nodes of a FIAT dual set, as <a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional" title="finat.physically_mapped.PhysicallyMappedFunctional"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhysicallyMappedFunctional</span></code></a> objects.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dual</strong> – The FIAT dual set.</p></li>
+<li><p><strong>mappings</strong> – The FIAT mapping of each node.</p></li>
+<li><p><strong>avg</strong> – If False, an integral moment with a frame is a plain
+integral over its entity instead of an average.</p></li>
+<li><p><strong>tol</strong> – Relative tolerance for the range tests on the weights, and
+below which entries of the Riesz representation are dropped.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py property">
+<dt class="sig sig-object py" id="finat.physically_mapped.PhysicallyMappedDualSet.groups">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">groups</span></span><a class="headerlink" href="#finat.physically_mapped.PhysicallyMappedDualSet.groups" title="Link to this definition">¶</a></dt>
+<dd><p>A dict mapping each dimension and entity to a dict mapping each <a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.pullback_key" title="finat.physically_mapped.PhysicallyMappedFunctional.pullback_key"><code class="xref py py-attr docutils literal notranslate"><span class="pre">pullback_key</span></code></a> to its nodes on the entity.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="finat.physically_mapped.PhysicallyMappedDualSet.tabulate">
+<span class="sig-name descname"><span class="pre">tabulate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">poly_set</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#PhysicallyMappedDualSet.tabulate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.PhysicallyMappedDualSet.tabulate" title="Link to this definition">¶</a></dt>
+<dd><p>The tabulation of a nodal basis at the points of the nodes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>poly_set</strong> – The nodal basis <span class="math notranslate nohighlight">\(\psi\)</span>, dual to the nodes.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A dict from each derivative order k to a tuple of a dict from each</p>
+</dd>
+</dl>
+<p>point <span class="math notranslate nohighlight">\(x_q\)</span> to its index q, and the tensor
+<span class="math notranslate nohighlight">\(D_{jb\gamma q}=(\partial^\gamma\psi^0_j)_b(x_q)\)</span> with k
+derivative axes <span class="math notranslate nohighlight">\(\gamma\)</span>, where <span class="math notranslate nohighlight">\(\psi^0\)</span> is the nodal
+basis of the nodes before recombination.  The basis is tabulated one
+time for each order.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="finat.physically_mapped.PhysicallyMappedDualSet.to_riesz">
+<span class="sig-name descname"><span class="pre">to_riesz</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nodes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">G</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tabulation</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">columns</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#PhysicallyMappedDualSet.to_riesz"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.PhysicallyMappedDualSet.to_riesz" title="Link to this definition">¶</a></dt>
+<dd><p>The Riesz representations <span class="math notranslate nohighlight">\((GW_i):D_j\)</span> of nodes with the same <a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.pullback_mappings" title="finat.physically_mapped.PhysicallyMappedFunctional.pullback_mappings"><code class="xref py py-attr docutils literal notranslate"><span class="pre">pullback_mappings</span></code></a>.</p>
+<p>Here <span class="math notranslate nohighlight">\(W_i\)</span> are the weights of node i and <span class="math notranslate nohighlight">\(D_j\)</span> are the
+derivatives of the basis function j at its points.  The nodes with
+the same derivative order and points contract in a single product,
+as in <a class="reference internal" href="FIAT.html#FIAT.dual_set.DualSet.to_riesz" title="FIAT.dual_set.DualSet.to_riesz"><code class="xref py py-meth docutils literal notranslate"><span class="pre">FIAT.dual_set.DualSet.to_riesz()</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>nodes</strong> – The nodes i.</p></li>
+<li><p><strong>G</strong> – The pullback of the weights, a <a class="reference internal" href="#finat.physically_mapped.LinearCombination" title="finat.physically_mapped.LinearCombination"><code class="xref py py-class docutils literal notranslate"><span class="pre">LinearCombination</span></code></a> on their axes.</p></li>
+<li><p><strong>tabulation</strong> – The <a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedDualSet.tabulate" title="finat.physically_mapped.PhysicallyMappedDualSet.tabulate"><code class="xref py py-meth docutils literal notranslate"><span class="pre">tabulate()</span></code></a> of the basis.</p></li>
+<li><p><strong>columns</strong> – The basis functions j.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A <a class="reference internal" href="#finat.physically_mapped.LinearCombination" title="finat.physically_mapped.LinearCombination"><code class="xref py py-class docutils literal notranslate"><span class="pre">LinearCombination</span></code></a> of constant matrices over
+the nodes and the basis functions.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
 <dt class="sig sig-object py" id="finat.physically_mapped.PhysicallyMappedElement">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.physically_mapped.</span></span><span class="sig-name descname"><span class="pre">PhysicallyMappedElement</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#PhysicallyMappedElement"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.PhysicallyMappedElement" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#finat.physically_mapped.NeedsCoordinateMappingElement" title="finat.physically_mapped.NeedsCoordinateMappingElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">NeedsCoordinateMappingElement</span></code></a></p>
 <p>A mixin that applies a “physical” transformation to tabulated
 basis functions.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="finat.physically_mapped.PhysicallyMappedElement.apply_transform">
+<span class="sig-name descname"><span class="pre">apply_transform</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">transform</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#PhysicallyMappedElement.apply_transform"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.PhysicallyMappedElement.apply_transform" title="Link to this definition">¶</a></dt>
+<dd><p>Apply a transformation of the reference basis to a tabulation, on the exposed dofs.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>transform</strong> – A callable that maps the GEM scalars of the reference
+basis functions to an object array of GEM scalars, one for each
+reference dof, such as <a class="reference internal" href="#finat.physically_mapped.VandermondeMatrix.transpose_solve" title="finat.physically_mapped.VandermondeMatrix.transpose_solve"><code class="xref py py-meth docutils literal notranslate"><span class="pre">VandermondeMatrix.transpose_solve()</span></code></a>.</p></li>
+<li><p><strong>table</strong> – A reference tabulation with the basis functions as the first axis.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A GEM tensor with the exposed dofs as the first axis.</p>
+</dd>
+</dl>
+</dd></dl>
+
 <dl class="py attribute">
 <dt class="sig sig-object py" id="finat.physically_mapped.PhysicallyMappedElement.avg">
 <span class="sig-name descname"><span class="pre">avg</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">True</span></span><a class="headerlink" href="#finat.physically_mapped.PhysicallyMappedElement.avg" title="Link to this definition">¶</a></dt>
@@ -3107,7 +3248,25 @@ integral over its entity instead of an average.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.physically_mapped.PhysicallyMappedElement.basis_evaluation">
 <span class="sig-name descname"><span class="pre">basis_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ps</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#PhysicallyMappedElement.basis_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.PhysicallyMappedElement.basis_evaluation" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Return code for evaluating the physical basis at known points on the reference element.</p>
+<p>The reference tabulation is transformed by <span class="math notranslate nohighlight">\(M=B^{-T}\)</span> one
+derivative at a time, when it is requested.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>order</strong> – return derivatives up to this order.</p></li>
+<li><p><strong>ps</strong> – the point set object.</p></li>
+<li><p><strong>entity</strong> – the cell entity on which to tabulate.</p></li>
+<li><p><strong>coordinate_mapping</strong> – a <a class="reference internal" href="#finat.physically_mapped.PhysicalGeometry" title="finat.physically_mapped.PhysicalGeometry"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhysicalGeometry</span></code></a> object that
+provides the physical geometry callbacks.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A <a class="reference internal" href="#finat.physically_mapped.MappedTabulation" title="finat.physically_mapped.MappedTabulation"><code class="xref py py-class docutils literal notranslate"><span class="pre">MappedTabulation</span></code></a>, a dict from each derivative
+multiindex to a GEM tensor with the exposed dofs as the first axis.</p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.physically_mapped.PhysicallyMappedElement.basis_transformation">
@@ -3147,11 +3306,6 @@ as GEM expressions.</p></li>
 </dd>
 </dl>
 </dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="finat.physically_mapped.PhysicallyMappedElement.map_tabulation">
-<span class="sig-name descname"><span class="pre">map_tabulation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_tabulation</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#PhysicallyMappedElement.map_tabulation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.PhysicallyMappedElement.map_tabulation" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="finat.physically_mapped.PhysicallyMappedElement.tol">
@@ -3207,10 +3361,18 @@ tangent <span class="math notranslate nohighlight">\(t\)</span> and the normals 
 that contain the edge.  Otherwise it is None.</p>
 </dd></dl>
 
+<dl class="py property">
+<dt class="sig sig-object py" id="finat.physically_mapped.PhysicallyMappedFunctional.plain_integral">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">plain_integral</span></span><a class="headerlink" href="#finat.physically_mapped.PhysicallyMappedFunctional.plain_integral" title="Link to this definition">¶</a></dt>
+<dd><p>Whether the node is a plain integral over the entity of its <a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.frame" title="finat.physically_mapped.PhysicallyMappedFunctional.frame"><code class="xref py py-attr docutils literal notranslate"><span class="pre">frame</span></code></a> instead of an average.</p>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.physically_mapped.PhysicallyMappedFunctional.pullback">
 <span class="sig-name descname"><span class="pre">pullback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">J</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">adjJ</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">detJ</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metric</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">adj_metric</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#PhysicallyMappedFunctional.pullback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.PhysicallyMappedFunctional.pullback" title="Link to this definition">¶</a></dt>
-<dd><p>The Kronecker product of the weight transformations of <a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.pullback_mappings" title="finat.physically_mapped.PhysicallyMappedFunctional.pullback_mappings"><code class="xref py py-attr docutils literal notranslate"><span class="pre">pullback_mappings</span></code></a>.</p>
+<dd><p>The Kronecker product of the <a class="reference internal" href="#finat.physically_mapped.Pullback" title="finat.physically_mapped.Pullback"><code class="xref py py-class docutils literal notranslate"><span class="pre">Pullback</span></code></a> of each group of <a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.pullback_mappings" title="finat.physically_mapped.PhysicallyMappedFunctional.pullback_mappings"><code class="xref py py-attr docutils literal notranslate"><span class="pre">pullback_mappings</span></code></a>.</p>
+<p>If the node is a <a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.plain_integral" title="finat.physically_mapped.PhysicallyMappedFunctional.plain_integral"><code class="xref py py-attr docutils literal notranslate"><span class="pre">plain_integral</span></code></a>, the first group also carries
+the physical measure of the entity of the <a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.frame" title="finat.physically_mapped.PhysicallyMappedFunctional.frame"><code class="xref py py-attr docutils literal notranslate"><span class="pre">frame</span></code></a>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
@@ -3230,7 +3392,7 @@ that contain the edge.  Otherwise it is None.</p>
 <dl class="py property">
 <dt class="sig sig-object py" id="finat.physically_mapped.PhysicallyMappedFunctional.pullback_key">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">pullback_key</span></span><a class="headerlink" href="#finat.physically_mapped.PhysicallyMappedFunctional.pullback_key" title="Link to this definition">¶</a></dt>
-<dd><p>The <a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.frame" title="finat.physically_mapped.PhysicallyMappedFunctional.frame"><code class="xref py py-attr docutils literal notranslate"><span class="pre">frame</span></code></a> and the <a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.pullback_mappings" title="finat.physically_mapped.PhysicallyMappedFunctional.pullback_mappings"><code class="xref py py-attr docutils literal notranslate"><span class="pre">pullback_mappings</span></code></a>.</p>
+<dd><p>The <a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.frame" title="finat.physically_mapped.PhysicallyMappedFunctional.frame"><code class="xref py py-attr docutils literal notranslate"><span class="pre">frame</span></code></a>, <a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.plain_integral" title="finat.physically_mapped.PhysicallyMappedFunctional.plain_integral"><code class="xref py py-attr docutils literal notranslate"><span class="pre">plain_integral</span></code></a>, and the <a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.pullback_mappings" title="finat.physically_mapped.PhysicallyMappedFunctional.pullback_mappings"><code class="xref py py-attr docutils literal notranslate"><span class="pre">pullback_mappings</span></code></a>.</p>
 </dd></dl>
 
 <dl class="py property">
@@ -3241,17 +3403,12 @@ that contain the edge.  Otherwise it is None.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.physically_mapped.PhysicallyMappedFunctional.scaling">
-<span class="sig-name descname"><span class="pre">scaling</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">J</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">h</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#PhysicallyMappedFunctional.scaling"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.PhysicallyMappedFunctional.scaling" title="Link to this definition">¶</a></dt>
-<dd><p>The factor <span class="math notranslate nohighlight">\(h^p\,|e|\)</span> of the row of the physical Vandermonde matrix <span class="math notranslate nohighlight">\(B=SB_0\)</span>.</p>
-<p>Here <span class="math notranslate nohighlight">\(p\)</span> is <a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.scaling_exponent" title="finat.physically_mapped.PhysicallyMappedFunctional.scaling_exponent"><code class="xref py py-attr docutils literal notranslate"><span class="pre">scaling_exponent</span></code></a>, and <span class="math notranslate nohighlight">\(|e|\)</span> is the
-physical measure of the entity if <code class="xref py py-attr docutils literal notranslate"><span class="pre">avg</span></code> is False and there is
-a <a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.frame" title="finat.physically_mapped.PhysicallyMappedFunctional.frame"><code class="xref py py-attr docutils literal notranslate"><span class="pre">frame</span></code></a>, and 1 otherwise.</p>
+<span class="sig-name descname"><span class="pre">scaling</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">h</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#PhysicallyMappedFunctional.scaling"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.PhysicallyMappedFunctional.scaling" title="Link to this definition">¶</a></dt>
+<dd><p>The factor <span class="math notranslate nohighlight">\(h^p\)</span> of the row of the physical Vandermonde matrix <span class="math notranslate nohighlight">\(B=SB_0\)</span>.</p>
+<p>Here <span class="math notranslate nohighlight">\(p\)</span> is <a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.scaling_exponent" title="finat.physically_mapped.PhysicallyMappedFunctional.scaling_exponent"><code class="xref py py-attr docutils literal notranslate"><span class="pre">scaling_exponent</span></code></a>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>J</strong> – The Jacobian as an object array of GEM scalars.</p></li>
-<li><p><strong>h</strong> – The cell size at each vertex.</p></li>
-</ul>
+<dd class="field-odd"><p><strong>h</strong> – The cell size at each vertex.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p>A GEM scalar.</p>
@@ -3268,27 +3425,6 @@ a <a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedF
 plain integral over its entity, which contributes <span class="math notranslate nohighlight">\(-dim\)</span>.</p>
 </dd></dl>
 
-<dl class="py method">
-<dt class="sig sig-object py" id="finat.physically_mapped.PhysicallyMappedFunctional.to_riesz">
-<span class="sig-name descname"><span class="pre">to_riesz</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">G</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">D</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#PhysicallyMappedFunctional.to_riesz"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.PhysicallyMappedFunctional.to_riesz" title="Link to this definition">¶</a></dt>
-<dd><p>The Riesz representation <span class="math notranslate nohighlight">\((GW):D_j\)</span> of the node on a basis, where <span class="math notranslate nohighlight">\(W\)</span> are the <a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.weights" title="finat.physically_mapped.PhysicallyMappedFunctional.weights"><code class="xref py py-attr docutils literal notranslate"><span class="pre">weights</span></code></a>.</p>
-<p>For the <a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.pullback" title="finat.physically_mapped.PhysicallyMappedFunctional.pullback"><code class="xref py py-meth docutils literal notranslate"><span class="pre">pullback()</span></code></a> G and the reference basis, this is the row of
-<span class="math notranslate nohighlight">\(B_0\)</span>, and for its inverse and the basis of the entity of the
-node, the row of the inverse of the diagonal block.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>G</strong> – The pullback of the weights, a <a class="reference internal" href="#finat.physically_mapped.LinearCombination" title="finat.physically_mapped.LinearCombination"><code class="xref py py-class docutils literal notranslate"><span class="pre">LinearCombination</span></code></a> on their axes.</p></li>
-<li><p><strong>D</strong> – The derivatives of the basis at the points of the node, with
-the basis followed by the axes of the weights.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>An object array of GEM scalars, one for each basis function.</p>
-</dd>
-</dl>
-</dd></dl>
-
 <dl class="py property">
 <dt class="sig sig-object py" id="finat.physically_mapped.PhysicallyMappedFunctional.weights">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">weights</span></span><a class="headerlink" href="#finat.physically_mapped.PhysicallyMappedFunctional.weights" title="Link to this definition">¶</a></dt>
@@ -3301,7 +3437,8 @@ the basis followed by the axes of the weights.</p></li>
 <dt class="sig sig-object py" id="finat.physically_mapped.Pullback">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.physically_mapped.</span></span><span class="sig-name descname"><span class="pre">Pullback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">forward</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inverse</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#finat.physically_mapped.Pullback" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></a></p>
-<p>A weight transformation and its inverse.</p>
+<p>The pullback of the weights of a node and its inverse, as
+<a class="reference internal" href="#finat.physically_mapped.LinearCombination" title="finat.physically_mapped.LinearCombination"><code class="xref py py-class docutils literal notranslate"><span class="pre">LinearCombination</span></code></a> objects.</p>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="finat.physically_mapped.Pullback.forward">
 <span class="sig-name descname"><span class="pre">forward</span></span><a class="headerlink" href="#finat.physically_mapped.Pullback.forward" title="Link to this definition">¶</a></dt>
@@ -3317,27 +3454,93 @@ the basis followed by the axes of the weights.</p></li>
 </dd></dl>
 
 <dl class="py class">
-<dt class="sig sig-object py" id="finat.physically_mapped.VandermondeRow">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.physically_mapped.</span></span><span class="sig-name descname"><span class="pre">VandermondeRow</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">entries</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inverse</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#finat.physically_mapped.VandermondeRow" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></a></p>
-<p>The row of <span class="math notranslate nohighlight">\(B_0\)</span> of a node, the row of the inverse of the diagonal
-block of <span class="math notranslate nohighlight">\(B_0\)</span>, and the scaling of the row of <span class="math notranslate nohighlight">\(B=SB_0\)</span>.</p>
-<dl class="py attribute">
-<dt class="sig sig-object py" id="finat.physically_mapped.VandermondeRow.entries">
-<span class="sig-name descname"><span class="pre">entries</span></span><a class="headerlink" href="#finat.physically_mapped.VandermondeRow.entries" title="Link to this definition">¶</a></dt>
-<dd><p>Alias for field number 0</p>
+<dt class="sig sig-object py" id="finat.physically_mapped.VandermondeMatrix">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.physically_mapped.</span></span><span class="sig-name descname"><span class="pre">VandermondeMatrix</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dual</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tabulation</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#VandermondeMatrix"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.VandermondeMatrix" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/functions.html#object" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>The physical Vandermonde matrix <span class="math notranslate nohighlight">\(B=SB_0\)</span> on a physical cell.</p>
+<p>The rows of <span class="math notranslate nohighlight">\(B_0\)</span> of the nodes of an entity that share a pullback
+are <span class="math notranslate nohighlight">\(\sum_t g_tR_t\)</span>, with the same GEM scalars <span class="math notranslate nohighlight">\(g_t\)</span> from the
+geometry, and constant matrices <span class="math notranslate nohighlight">\(R_t\)</span> from the reference cell, see
+<a class="reference internal" href="#finat.physically_mapped.BlockRow" title="finat.physically_mapped.BlockRow"><code class="xref py py-class docutils literal notranslate"><span class="pre">BlockRow</span></code></a>.  The blocks of the back-substitution in
+<a class="reference internal" href="#finat.physically_mapped.VandermondeMatrix.transpose_solve" title="finat.physically_mapped.VandermondeMatrix.transpose_solve"><code class="xref py py-meth docutils literal notranslate"><span class="pre">transpose_solve()</span></code></a>, <a class="reference internal" href="#finat.physically_mapped.VandermondeMatrix.off_diagonal_blocks" title="finat.physically_mapped.VandermondeMatrix.off_diagonal_blocks"><code class="xref py py-attr docutils literal notranslate"><span class="pre">off_diagonal_blocks</span></code></a> and
+<a class="reference internal" href="#finat.physically_mapped.VandermondeMatrix.inverses" title="finat.physically_mapped.VandermondeMatrix.inverses"><code class="xref py py-attr docutils literal notranslate"><span class="pre">inverses</span></code></a>, are expanded one time from the
+<a class="reference internal" href="#finat.physically_mapped.LinearCombination.collect_terms" title="finat.physically_mapped.LinearCombination.collect_terms"><code class="xref py py-meth docutils literal notranslate"><span class="pre">collect_terms()</span></code></a>.  Their entries do not depend
+on the points of a tabulation, so the back-substitution multiplies each
+entry with a tabulated value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dual</strong> – The <a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedDualSet" title="finat.physically_mapped.PhysicallyMappedDualSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhysicallyMappedDualSet</span></code></a>.</p></li>
+<li><p><strong>tabulation</strong> – The <a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedDualSet.tabulate" title="finat.physically_mapped.PhysicallyMappedDualSet.tabulate"><code class="xref py py-meth docutils literal notranslate"><span class="pre">PhysicallyMappedDualSet.tabulate()</span></code></a> of the
+reference basis.</p></li>
+<li><p><strong>coordinate_mapping</strong> – Object providing the physical geometry
+as GEM expressions.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="finat.physically_mapped.VandermondeMatrix.array">
+<span class="sig-name descname"><span class="pre">array</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#VandermondeMatrix.array"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.VandermondeMatrix.array" title="Link to this definition">¶</a></dt>
+<dd><p>The physical Vandermonde matrix <span class="math notranslate nohighlight">\(B\)</span> over all reference dofs, as an object array of GEM scalars.</p>
 </dd></dl>
 
-<dl class="py attribute">
-<dt class="sig sig-object py" id="finat.physically_mapped.VandermondeRow.inverse">
-<span class="sig-name descname"><span class="pre">inverse</span></span><a class="headerlink" href="#finat.physically_mapped.VandermondeRow.inverse" title="Link to this definition">¶</a></dt>
-<dd><p>Alias for field number 1</p>
+<dl class="py property">
+<dt class="sig sig-object py" id="finat.physically_mapped.VandermondeMatrix.groups">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">groups</span></span><a class="headerlink" href="#finat.physically_mapped.VandermondeMatrix.groups" title="Link to this definition">¶</a></dt>
+<dd><p>A dict mapping each dimension and entity to the <a class="reference internal" href="#finat.physically_mapped.BlockRow" title="finat.physically_mapped.BlockRow"><code class="xref py py-class docutils literal notranslate"><span class="pre">BlockRow</span></code></a> objects of the entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#NotImplementedError" title="(in Python v3.15)"><strong>NotImplementedError</strong></a> – If a row couples to a dof outside the
+closure of the entity of the node.</p>
+</dd>
+</dl>
 </dd></dl>
 
-<dl class="py attribute">
-<dt class="sig sig-object py" id="finat.physically_mapped.VandermondeRow.scale">
-<span class="sig-name descname"><span class="pre">scale</span></span><a class="headerlink" href="#finat.physically_mapped.VandermondeRow.scale" title="Link to this definition">¶</a></dt>
-<dd><p>Alias for field number 2</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="finat.physically_mapped.VandermondeMatrix.inverse_array">
+<span class="sig-name descname"><span class="pre">inverse_array</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#VandermondeMatrix.inverse_array"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.VandermondeMatrix.inverse_array" title="Link to this definition">¶</a></dt>
+<dd><p><span class="math notranslate nohighlight">\(B^{-1}\)</span> over all reference dofs, retaining completion functions.</p>
+<p>The row j is <span class="math notranslate nohighlight">\(B^{-T}e_j\)</span> from <a class="reference internal" href="#finat.physically_mapped.VandermondeMatrix.transpose_solve" title="finat.physically_mapped.VandermondeMatrix.transpose_solve"><code class="xref py py-meth docutils literal notranslate"><span class="pre">transpose_solve()</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="finat.physically_mapped.VandermondeMatrix.inverses">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">inverses</span></span><a class="headerlink" href="#finat.physically_mapped.VandermondeMatrix.inverses" title="Link to this definition">¶</a></dt>
+<dd><p>A dict mapping each dimension and entity e to the inverse <span class="math notranslate nohighlight">\(B_{ee}^{-1}\)</span> of its diagonal block.</p>
+<p>With <span class="math notranslate nohighlight">\(B=SB_0\)</span>, <span class="math notranslate nohighlight">\(B_{ee}^{-1}=(B_0)_{ee}^{-1}S_e^{-1}\)</span>.
+Each is an object array of GEM scalars.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="finat.physically_mapped.VandermondeMatrix.off_diagonal_blocks">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">off_diagonal_blocks</span></span><a class="headerlink" href="#finat.physically_mapped.VandermondeMatrix.off_diagonal_blocks" title="Link to this definition">¶</a></dt>
+<dd><p>A dict mapping each dimension and entity e to its off-diagonal block <span class="math notranslate nohighlight">\(-B_{ec}\)</span>.</p>
+<p>Here c is the rest of the closure of e, the only dofs that the rows
+of e couple to.  Each is an object array of GEM scalars.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="finat.physically_mapped.VandermondeMatrix.transpose_solve">
+<span class="sig-name descname"><span class="pre">transpose_solve</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">phi</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#VandermondeMatrix.transpose_solve"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.VandermondeMatrix.transpose_solve" title="Link to this definition">¶</a></dt>
+<dd><p>The GEM scalars <span class="math notranslate nohighlight">\(\chi=B^{-T}\phi\)</span>, without forming <span class="math notranslate nohighlight">\(B^{-1}\)</span>.</p>
+<p>Back-substitute <span class="math notranslate nohighlight">\(B^T\chi=\phi\)</span> over the entity blocks in
+decreasing dimension,
+<span class="math notranslate nohighlight">\(\chi_e = B_{ee}^{-T}(\phi_e - \sum_f B_{fe}^T\chi_f)\)</span> over the
+entities f whose closure contains e.  Once <span class="math notranslate nohighlight">\(\chi_e\)</span> is known,
+it is subtracted from the right-hand sides of the rest of the
+closure of e, using only the nonzero entries of <span class="math notranslate nohighlight">\(B\)</span> and of the
+inverses of its diagonal blocks.  With
+<span class="math notranslate nohighlight">\(B=SB_0\)</span>, these blocks carry the scaling <span class="math notranslate nohighlight">\(S\)</span>, so it
+multiplies entries once per cell instead of <span class="math notranslate nohighlight">\(\chi\)</span> at each
+point.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>phi</strong> – The GEM scalars <span class="math notranslate nohighlight">\(\phi\)</span>, one for each reference dof.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>An object array of GEM scalars, one for each reference dof.</p>
+</dd>
+</dl>
 </dd></dl>
 
 </dd></dl>
@@ -3374,13 +3577,14 @@ The transpose of the scaled inverse is the cofactor matrix.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="finat.physically_mapped.covariant_frame_pullback">
-<span class="sig-prename descclassname"><span class="pre">finat.physically_mapped.</span></span><span class="sig-name descname"><span class="pre">covariant_frame_pullback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">metric</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tangents</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normals</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">w</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">norms</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#covariant_frame_pullback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.covariant_frame_pullback" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">finat.physically_mapped.</span></span><span class="sig-name descname"><span class="pre">covariant_frame_pullback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">metric</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tangents</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normals</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">w</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">norms</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">measure</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">Literal(array(1.),</span> <span class="pre">dtype('float64'))</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#covariant_frame_pullback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.covariant_frame_pullback" title="Link to this definition">¶</a></dt>
 <dd><p>The <a class="reference internal" href="#finat.physically_mapped.Pullback" title="finat.physically_mapped.Pullback"><code class="xref py py-class docutils literal notranslate"><span class="pre">Pullback</span></code></a> of the covariant mapping in the frame of an entity.</p>
 <p>The frame <span class="math notranslate nohighlight">\(F\)</span> consists of the tangents of the entity and its
 normals <span class="math notranslate nohighlight">\(n_i\)</span>.  Its pullback <span class="math notranslate nohighlight">\(A\)</span> from the physical cell
 consists of the same tangents and the pullbacks <span class="math notranslate nohighlight">\(w_i|n_i|/|Jw_i|\)</span>
-of the unit physical normals, scaled by <span class="math notranslate nohighlight">\(|n_i|\)</span>.  Covariant
-weights map by <span class="math notranslate nohighlight">\(AF^{-1}\)</span>, and back by <span class="math notranslate nohighlight">\(FA^{-1}\)</span>.</p>
+of the unit physical normals, scaled by <span class="math notranslate nohighlight">\(|n_i|\)</span>, all times a
+measure <span class="math notranslate nohighlight">\(m\)</span>.  Covariant weights map by <span class="math notranslate nohighlight">\(AF^{-1}\)</span>, and back
+by <span class="math notranslate nohighlight">\(FA^{-1}\)</span>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
@@ -3389,7 +3593,8 @@ weights map by <span class="math notranslate nohighlight">\(AF^{-1}\)</span>, an
 <li><p><strong>normals</strong> – The normals <span class="math notranslate nohighlight">\(n_i\)</span>.</p></li>
 <li><p><strong>w</strong> – The pullbacks <span class="math notranslate nohighlight">\(w_i\)</span> of the physical normals, with
 <span class="math notranslate nohighlight">\(\tau^TGw_i = 0\)</span> for each tangent <span class="math notranslate nohighlight">\(\tau\)</span>.</p></li>
-<li><p><strong>norms</strong> – The lengths <span class="math notranslate nohighlight">\(|Jw_i|\)</span> of the physical normals.</p></li>
+<li><p><strong>norms</strong> – The lengths <span class="math notranslate nohighlight">\(|Jw_i|/m\)</span> of the physical normals over the measure.</p></li>
+<li><p><strong>measure</strong> – The measure <span class="math notranslate nohighlight">\(m\)</span>.</p></li>
 </ul>
 </dd>
 </dl>
@@ -3403,11 +3608,17 @@ weights map by <span class="math notranslate nohighlight">\(AF^{-1}\)</span>, an
 
 <dl class="py function">
 <dt class="sig sig-object py" id="finat.physically_mapped.edge_pullbacks">
-<span class="sig-prename descclassname"><span class="pre">finat.physically_mapped.</span></span><span class="sig-name descname"><span class="pre">edge_pullbacks</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">edge</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metric</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#edge_pullbacks"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.edge_pullbacks" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">finat.physically_mapped.</span></span><span class="sig-name descname"><span class="pre">edge_pullbacks</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">edge</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metric</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">avg</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#edge_pullbacks"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.edge_pullbacks" title="Link to this definition">¶</a></dt>
 <dd><p>The <a class="reference internal" href="#finat.physically_mapped.Pullback" title="finat.physically_mapped.Pullback"><code class="xref py py-class docutils literal notranslate"><span class="pre">Pullback</span></code></a> of the covariant mapping in the frame of an edge of a tetrahedron.</p>
 <p>The frame consists of the edge tangent <span class="math notranslate nohighlight">\(t\)</span> and the normals
 <span class="math notranslate nohighlight">\(t \times \nu_i\)</span> to <span class="math notranslate nohighlight">\(t\)</span> within the two facets that contain
 the edge, with scaled normals <span class="math notranslate nohighlight">\(\nu_i\)</span>.  The metric is <span class="math notranslate nohighlight">\(G=J^TJ\)</span>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The dict of pullbacks, and the physical measure of the edge
+if not <code class="docutils literal notranslate"><span class="pre">avg</span></code>, or 1 otherwise, which multiplies the pullbacks.</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py function">
@@ -3418,23 +3629,33 @@ the edge, with scaled normals <span class="math notranslate nohighlight">\(\nu_i
 
 <dl class="py function">
 <dt class="sig sig-object py" id="finat.physically_mapped.facet_pullbacks">
-<span class="sig-prename descclassname"><span class="pre">finat.physically_mapped.</span></span><span class="sig-name descname"><span class="pre">facet_pullbacks</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">facet</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metric</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">adj_metric</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">detJ</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#facet_pullbacks"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.facet_pullbacks" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">finat.physically_mapped.</span></span><span class="sig-name descname"><span class="pre">facet_pullbacks</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">facet</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metric</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">adj_metric</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">detJ</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">avg</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#facet_pullbacks"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.facet_pullbacks" title="Link to this definition">¶</a></dt>
 <dd><p>The <a class="reference internal" href="#finat.physically_mapped.Pullback" title="finat.physically_mapped.Pullback"><code class="xref py py-class docutils literal notranslate"><span class="pre">Pullback</span></code></a> of each Piola mapping in the frame of a facet.</p>
 <p>The frame consists of the tangents of the facet and its scaled normal
 <span class="math notranslate nohighlight">\(\nu\)</span>.  The metric is <span class="math notranslate nohighlight">\(G=J^TJ\)</span>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The dict of pullbacks, and the physical measure of the facet
+if not <code class="docutils literal notranslate"><span class="pre">avg</span></code>, or 1 otherwise, which multiplies the pullbacks.</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="finat.physically_mapped.frame_pullbacks">
-<span class="sig-prename descclassname"><span class="pre">finat.physically_mapped.</span></span><span class="sig-name descname"><span class="pre">frame_pullbacks</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metric</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">adj_metric</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">detJ</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#frame_pullbacks"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.frame_pullbacks" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">finat.physically_mapped.</span></span><span class="sig-name descname"><span class="pre">frame_pullbacks</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metric</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">adj_metric</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">detJ</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">avg</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#frame_pullbacks"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.frame_pullbacks" title="Link to this definition">¶</a></dt>
 <dd><p>The <a class="reference internal" href="#finat.physically_mapped.Pullback" title="finat.physically_mapped.Pullback"><code class="xref py py-class docutils literal notranslate"><span class="pre">Pullback</span></code></a> of each mapping in the frame of an entity.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
+<li><p><strong>cell</strong> – The reference cell.</p></li>
 <li><p><strong>frame</strong> – The entity <code class="docutils literal notranslate"><span class="pre">(dim,</span> <span class="pre">entity)</span></code>, a facet or an edge of a tetrahedron.</p></li>
 <li><p><strong>metric</strong> – The metric <span class="math notranslate nohighlight">\(J^TJ\)</span>.</p></li>
 <li><p><strong>adj_metric</strong> – The adjugate of the metric.</p></li>
 <li><p><strong>detJ</strong> – The determinant of the Jacobian.</p></li>
+<li><p><strong>avg</strong> – If False, the pullbacks are of plain integrals over the
+entity instead of averages, so they carry its physical measure, and
+the key None maps to the measure on no axes.</p></li>
 </ul>
 </dd>
 </dl>
@@ -3452,9 +3673,15 @@ the edge, with scaled normals <span class="math notranslate nohighlight">\(\nu_i
 </dd></dl>
 
 <dl class="py function">
+<dt class="sig sig-object py" id="finat.physically_mapped.literal_array">
+<span class="sig-prename descclassname"><span class="pre">finat.physically_mapped.</span></span><span class="sig-name descname"><span class="pre">literal_array</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">A</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#literal_array"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.literal_array" title="Link to this definition">¶</a></dt>
+<dd><p>The constant array A as an object array of GEM literals, with GEM zeros for its zero entries.</p>
+</dd></dl>
+
+<dl class="py function">
 <dt class="sig sig-object py" id="finat.physically_mapped.metric_and_adjugate">
 <span class="sig-prename descclassname"><span class="pre">finat.physically_mapped.</span></span><span class="sig-name descname"><span class="pre">metric_and_adjugate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">J</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#metric_and_adjugate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.metric_and_adjugate" title="Link to this definition">¶</a></dt>
-<dd><p>Return the metric <span class="math notranslate nohighlight">\(G=J^TJ\)</span> and its adjugate, which equals <span class="math notranslate nohighlight">\(\operatorname{adj}(J)\operatorname{adj}(J)^T\)</span>.</p>
+<dd><p>Return the metric <span class="math notranslate nohighlight">\(G=J^TJ\)</span> and its adjugate.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>J</strong> – Full-column-rank Jacobian as an object array of GEM scalars.</p>
@@ -3472,9 +3699,42 @@ the edge, with scaled normals <span class="math notranslate nohighlight">\(\nu_i
 </dd></dl>
 
 <dl class="py function">
+<dt class="sig sig-object py" id="finat.physically_mapped.sparse_dense_matmul">
+<span class="sig-prename descclassname"><span class="pre">finat.physically_mapped.</span></span><span class="sig-name descname"><span class="pre">sparse_dense_matmul</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">A</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#sparse_dense_matmul"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.sparse_dense_matmul" title="Link to this definition">¶</a></dt>
+<dd><p>The product of a matrix of GEM scalars and a GEM tensor, which skips the zero entries.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>A</strong> – An object array of GEM scalars.</p></li>
+<li><p><strong>table</strong> – A GEM tensor with the columns of A as its first axis.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A GEM tensor with the rows of A as its first axis.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
 <dt class="sig sig-object py" id="finat.physically_mapped.sparse_matmul">
 <span class="sig-prename descclassname"><span class="pre">finat.physically_mapped.</span></span><span class="sig-name descname"><span class="pre">sparse_matmul</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">A</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">B</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#sparse_matmul"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.sparse_matmul" title="Link to this definition">¶</a></dt>
-<dd><p>The product of matrices of GEM scalars, which skips the zero entries.</p>
+<dd><p>The product <span class="math notranslate nohighlight">\(AB\)</span> of matrices of GEM scalars, which skips the zero entries.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>An object array of GEM scalars.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="finat.physically_mapped.sparse_vecmat">
+<span class="sig-prename descclassname"><span class="pre">finat.physically_mapped.</span></span><span class="sig-name descname"><span class="pre">sparse_vecmat</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">A</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#sparse_vecmat"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.sparse_vecmat" title="Link to this definition">¶</a></dt>
+<dd><p>The product <span class="math notranslate nohighlight">\(x^TA\)</span> of a vector and a matrix of GEM scalars, which skips the zero entries.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>An object array of GEM scalars, one for each column of A.</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py function">
@@ -5555,19 +5815,26 @@ provides physical geometry callbacks (may be None).</p></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#module-finat.physically_mapped">finat.physically_mapped module</a><ul>
+<li><a class="reference internal" href="#finat.physically_mapped.BlockRow"><code class="docutils literal notranslate"><span class="pre">BlockRow</span></code></a><ul>
+<li><a class="reference internal" href="#finat.physically_mapped.BlockRow.entries"><code class="docutils literal notranslate"><span class="pre">BlockRow.entries</span></code></a></li>
+<li><a class="reference internal" href="#finat.physically_mapped.BlockRow.inverse"><code class="docutils literal notranslate"><span class="pre">BlockRow.inverse</span></code></a></li>
+<li><a class="reference internal" href="#finat.physically_mapped.BlockRow.nodes"><code class="docutils literal notranslate"><span class="pre">BlockRow.nodes</span></code></a></li>
+<li><a class="reference internal" href="#finat.physically_mapped.BlockRow.scales"><code class="docutils literal notranslate"><span class="pre">BlockRow.scales</span></code></a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#finat.physically_mapped.DirectlyDefinedElement"><code class="docutils literal notranslate"><span class="pre">DirectlyDefinedElement</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.LinearCombination"><code class="docutils literal notranslate"><span class="pre">LinearCombination</span></code></a><ul>
 <li><a class="reference internal" href="#finat.physically_mapped.LinearCombination.T"><code class="docutils literal notranslate"><span class="pre">LinearCombination.T</span></code></a></li>
+<li><a class="reference internal" href="#finat.physically_mapped.LinearCombination.collect_terms"><code class="docutils literal notranslate"><span class="pre">LinearCombination.collect_terms()</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.LinearCombination.contract"><code class="docutils literal notranslate"><span class="pre">LinearCombination.contract()</span></code></a></li>
+<li><a class="reference internal" href="#finat.physically_mapped.LinearCombination.expand"><code class="docutils literal notranslate"><span class="pre">LinearCombination.expand()</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.LinearCombination.from_matrix"><code class="docutils literal notranslate"><span class="pre">LinearCombination.from_matrix()</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.LinearCombination.kron"><code class="docutils literal notranslate"><span class="pre">LinearCombination.kron()</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.LinearCombination.outer"><code class="docutils literal notranslate"><span class="pre">LinearCombination.outer()</span></code></a></li>
+<li><a class="reference internal" href="#finat.physically_mapped.LinearCombination.scaled"><code class="docutils literal notranslate"><span class="pre">LinearCombination.scaled()</span></code></a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#finat.physically_mapped.MappedTabulation"><code class="docutils literal notranslate"><span class="pre">MappedTabulation</span></code></a><ul>
-<li><a class="reference internal" href="#finat.physically_mapped.MappedTabulation.matvec"><code class="docutils literal notranslate"><span class="pre">MappedTabulation.matvec()</span></code></a></li>
-</ul>
-</li>
+<li><a class="reference internal" href="#finat.physically_mapped.MappedTabulation"><code class="docutils literal notranslate"><span class="pre">MappedTabulation</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.NeedsCoordinateMappingElement"><code class="docutils literal notranslate"><span class="pre">NeedsCoordinateMappingElement</span></code></a><ul>
 <li><a class="reference internal" href="#finat.physically_mapped.NeedsCoordinateMappingElement.dual_transformation"><code class="docutils literal notranslate"><span class="pre">NeedsCoordinateMappingElement.dual_transformation()</span></code></a></li>
 </ul>
@@ -5584,24 +5851,30 @@ provides physical geometry callbacks (may be None).</p></li>
 <li><a class="reference internal" href="#finat.physically_mapped.PhysicalGeometry.reference_normals"><code class="docutils literal notranslate"><span class="pre">PhysicalGeometry.reference_normals()</span></code></a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedDualSet"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedDualSet</span></code></a><ul>
+<li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedDualSet.groups"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedDualSet.groups</span></code></a></li>
+<li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedDualSet.tabulate"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedDualSet.tabulate()</span></code></a></li>
+<li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedDualSet.to_riesz"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedDualSet.to_riesz()</span></code></a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedElement"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedElement</span></code></a><ul>
+<li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedElement.apply_transform"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedElement.apply_transform()</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedElement.avg"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedElement.avg</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedElement.basis_evaluation"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedElement.basis_evaluation()</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedElement.basis_transformation"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedElement.basis_transformation()</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedElement.dual_transformation"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedElement.dual_transformation()</span></code></a></li>
-<li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedElement.map_tabulation"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedElement.map_tabulation()</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedElement.tol"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedElement.tol</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedFunctional</span></code></a><ul>
 <li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.axis_mappings"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedFunctional.axis_mappings</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.frame"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedFunctional.frame</span></code></a></li>
+<li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.plain_integral"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedFunctional.plain_integral</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.pullback"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedFunctional.pullback()</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.pullback_key"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedFunctional.pullback_key</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.pullback_mappings"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedFunctional.pullback_mappings</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.scaling"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedFunctional.scaling()</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.scaling_exponent"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedFunctional.scaling_exponent</span></code></a></li>
-<li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.to_riesz"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedFunctional.to_riesz()</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedFunctional.weights"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedFunctional.weights</span></code></a></li>
 </ul>
 </li>
@@ -5610,10 +5883,13 @@ provides physical geometry callbacks (may be None).</p></li>
 <li><a class="reference internal" href="#finat.physically_mapped.Pullback.inverse"><code class="docutils literal notranslate"><span class="pre">Pullback.inverse</span></code></a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#finat.physically_mapped.VandermondeRow"><code class="docutils literal notranslate"><span class="pre">VandermondeRow</span></code></a><ul>
-<li><a class="reference internal" href="#finat.physically_mapped.VandermondeRow.entries"><code class="docutils literal notranslate"><span class="pre">VandermondeRow.entries</span></code></a></li>
-<li><a class="reference internal" href="#finat.physically_mapped.VandermondeRow.inverse"><code class="docutils literal notranslate"><span class="pre">VandermondeRow.inverse</span></code></a></li>
-<li><a class="reference internal" href="#finat.physically_mapped.VandermondeRow.scale"><code class="docutils literal notranslate"><span class="pre">VandermondeRow.scale</span></code></a></li>
+<li><a class="reference internal" href="#finat.physically_mapped.VandermondeMatrix"><code class="docutils literal notranslate"><span class="pre">VandermondeMatrix</span></code></a><ul>
+<li><a class="reference internal" href="#finat.physically_mapped.VandermondeMatrix.array"><code class="docutils literal notranslate"><span class="pre">VandermondeMatrix.array()</span></code></a></li>
+<li><a class="reference internal" href="#finat.physically_mapped.VandermondeMatrix.groups"><code class="docutils literal notranslate"><span class="pre">VandermondeMatrix.groups</span></code></a></li>
+<li><a class="reference internal" href="#finat.physically_mapped.VandermondeMatrix.inverse_array"><code class="docutils literal notranslate"><span class="pre">VandermondeMatrix.inverse_array()</span></code></a></li>
+<li><a class="reference internal" href="#finat.physically_mapped.VandermondeMatrix.inverses"><code class="docutils literal notranslate"><span class="pre">VandermondeMatrix.inverses</span></code></a></li>
+<li><a class="reference internal" href="#finat.physically_mapped.VandermondeMatrix.off_diagonal_blocks"><code class="docutils literal notranslate"><span class="pre">VandermondeMatrix.off_diagonal_blocks</span></code></a></li>
+<li><a class="reference internal" href="#finat.physically_mapped.VandermondeMatrix.transpose_solve"><code class="docutils literal notranslate"><span class="pre">VandermondeMatrix.transpose_solve()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#finat.physically_mapped.adjugate"><code class="docutils literal notranslate"><span class="pre">adjugate()</span></code></a></li>
@@ -5627,9 +5903,12 @@ provides physical geometry callbacks (may be None).</p></li>
 <li><a class="reference internal" href="#finat.physically_mapped.frame_pullbacks"><code class="docutils literal notranslate"><span class="pre">frame_pullbacks()</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.identity"><code class="docutils literal notranslate"><span class="pre">identity()</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.in_range_of"><code class="docutils literal notranslate"><span class="pre">in_range_of()</span></code></a></li>
+<li><a class="reference internal" href="#finat.physically_mapped.literal_array"><code class="docutils literal notranslate"><span class="pre">literal_array()</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.metric_and_adjugate"><code class="docutils literal notranslate"><span class="pre">metric_and_adjugate()</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.round_to_int"><code class="docutils literal notranslate"><span class="pre">round_to_int()</span></code></a></li>
+<li><a class="reference internal" href="#finat.physically_mapped.sparse_dense_matmul"><code class="docutils literal notranslate"><span class="pre">sparse_dense_matmul()</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.sparse_matmul"><code class="docutils literal notranslate"><span class="pre">sparse_matmul()</span></code></a></li>
+<li><a class="reference internal" href="#finat.physically_mapped.sparse_vecmat"><code class="docutils literal notranslate"><span class="pre">sparse_vecmat()</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.symmetric"><code class="docutils literal notranslate"><span class="pre">symmetric()</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.tangential_projector"><code class="docutils literal notranslate"><span class="pre">tangential_projector()</span></code></a></li>
 </ul>
