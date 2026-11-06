@@ -407,7 +407,7 @@ class Cell:
         return A, b, A_inv
 
     def facet_neighbour_coord_maps(self):
-        """Return the affine maps that take the reference coordinates of a point on a facet from one cell to the cell on the other side of that facet.
+        """Return the affine transformation that maps the reference coordinates of facet points between the two cells sharing that facet.
 
         Example:
         Suppose a cell has local facet ``lf_from`` with orientation ``o_from`` corresponding to local facet ``lf_to`` with orientation `o_to` in the other cell across that facet.
