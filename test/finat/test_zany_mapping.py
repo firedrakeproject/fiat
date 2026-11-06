@@ -9,7 +9,7 @@ from math import comb
 from gem.interpreter import evaluate
 from finat.fiat_elements import FiatElement
 from finat.physically_mapped import PhysicallyMappedElement
-from finat.physically_mapped import adjugate_and_determinant
+from finat.physically_mapped import adjugate_and_determinant, identity
 
 
 def test_rectangular_adjugate_and_determinant():
@@ -206,6 +206,7 @@ zany_piola_elements = {
         finat.AlfeldSorokina,
         finat.ChristiansenHu,
         finat.JohnsonMercier,
+        finat.ReducedJohnsonMercier,
         finat.GuzmanNeilanFirstKindH1,
         finat.GuzmanNeilanSecondKindH1,
         finat.GuzmanNeilanBubble,
@@ -296,6 +297,27 @@ dual_basis_elements = [e for e in zany_piola_elements[3]
 ])
 def test_dual_evaluation(ref_to_phys, element, dimension):
     check_dual_evaluation(element, ref_to_phys[dimension])
+
+
+@pytest.mark.parametrize("dimension", [2, 3])
+def test_reduced_johnson_mercier_diagonal_inverse(ref_to_phys, dimension):
+    """Each inverse row belongs to the whole entity block."""
+    element = finat.ReducedJohnsonMercier(ref_to_phys[dimension].ref_cell, 1)
+    rows = element._vandermonde_rows(ref_to_phys[dimension])
+    for entities in element._element.entity_dofs().values():
+        for dofs in entities.values():
+            if not dofs:
+                continue
+            B = identity(len(dofs))
+            V = identity(len(dofs))
+            for k, i in enumerate(dofs):
+                if i in rows:
+                    B[k] = rows[i].entries[dofs]
+                    V[k] = rows[i].inverse
+            B = evaluate([gem.ListTensor(B)])[0].arr
+            V = evaluate([gem.ListTensor(V)])[0].arr
+            assert np.allclose(B @ V, np.eye(len(dofs)))
+            assert np.allclose(V @ B, np.eye(len(dofs)))
 
 
 class SymbolicMapping:
