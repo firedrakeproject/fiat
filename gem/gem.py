@@ -35,7 +35,7 @@ __all__ = ['Node', 'Identity', 'Literal', 'Zero', 'Failure',
            'Index', 'VariableIndex', 'Indexed', 'ComponentTensor',
            'IndexSum', 'ListTensor', 'Concatenate', 'Delta', 'OrientationVariableIndex',
            'index_sum', 'partial_indexed', 'reshape', 'view',
-           'indices', 'as_gem', 'FlexiblyIndexed',
+           'indices', 'as_gem', 'sqrt', 'FlexiblyIndexed',
            'Inverse', 'Solve', 'extract_type', 'uint_type', 'Piecewise']
 
 
@@ -1311,8 +1311,11 @@ def componentwise(op, *exprs):
     Each expression must either have the same shape, or else be
     scalar. Shaped expressions are indexed, the op is applied to the
     scalar expressions and the result is wrapped up in a ComponentTensor.
+    If every expression is scalar, the op is applied to them directly.
 
     """
+    if not any(e.shape for e in exprs):
+        return op(*exprs)
     shapes = set(e.shape for e in exprs)
     if len(shapes - {()}) > 1:
         raise ValueError("expressions must have matching shape (or else be scalar)")
@@ -1361,6 +1364,14 @@ def as_gem(expr, dtype=None):
             return Literal(expr)
     else:
         raise ValueError("Do not know how to convert %r to GEM" % expr)
+
+
+def sqrt(x):
+    """The square root of a GEM scalar, which compiles to a call of sqrt instead of pow."""
+    x = as_gem(x)
+    if isinstance(x, Constant):
+        return Literal(numpy.sqrt(x.value))
+    return MathFunction("sqrt", x)
 
 
 def as_gem_uint(expr):
