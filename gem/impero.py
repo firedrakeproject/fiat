@@ -12,7 +12,7 @@ Trivia:
 
 from abc import ABCMeta, abstractmethod
 
-from gem.gem import as_gem
+from gem.gem import Index, as_gem
 from gem.node import Node as NodeBase
 
 
@@ -171,10 +171,11 @@ class For(Node):
     """For loop with an index which stores its extent, and a loop body
     expression which is usually a :class:`Block`."""
 
-    __slots__ = ('index', 'children')
+    __slots__ = ('index', 'children', 'is_parallel')
     __front__ = ('index',)
+    __back__ = ('is_parallel',)
 
-    def __new__(cls, index, statement):
+    def __new__(cls, index, statement, is_parallel=False):
         # In case of an empty loop, create a Noop instead.
         # Related: https://github.com/coneoproject/COFFEE/issues/98
         assert isinstance(statement, Block)
@@ -185,9 +186,10 @@ class For(Node):
         else:
             return super(For, cls).__new__(cls)
 
-    def __init__(self, index, statement):
+    def __init__(self, index, statement, is_parallel=False):
         self.index = index
         self.children = (statement,)
+        self.is_parallel = is_parallel
 
     @property
     def statement(self) -> Node:
@@ -198,6 +200,64 @@ class For(Node):
         body = self.statement._pretty_string(indent=indent+2)
         suffix = f"{' '*indent}}}"
         return "\n".join((prefix, body, suffix))
+
+
+class ItemBatch(Node):
+    """Node for the parallel execution of loop on a GPU 
+
+    Additional arguments:
+    batch_size: int - number of cells assigned to an iteration step
+    block_size: int - number of threads assigned to each batch 
+    """
+
+    __slots__ = ('index', 'local_index', 'batch_size', 'block_size', 'children')
+    __front__ = ('index', 'local_index', 'batch_size', 'block_size')
+
+    def __init__(self, index: Index, local_index: Index, batch_size: int, block_size: int, statement: Block) -> None:
+        self.index = index
+        self.local_index = local_index
+        self.batch_size = batch_size
+        self.block_size = block_size
+        self.children = (statement,)
+
+    @property
+    def statement(self) -> Block:
+        return self.children[0]
+
+    def _pretty_string(self, *, indent: int) -> str:
+        header = (f"item_batch ({self.index}, local={self.local_index}, "
+                  f"batch_size={self.batch_size}, block_size={self.block_size})")
+        return _pretty_scope(header, self.statement, indent)
+
+
+class ThreadLoop(Node):
+    """ Thread-based loop within an ItemBatch
+
+    Separate from `For` because the loop is executed in parallel per-thread
+    as opposed to iteratively updating index.
+
+    Assumes static extents, and assumed to only exist within an ItemBatch
+    """
+
+
+    __slots__ = ('domain', 'children')
+    __front__ = ('domain',)
+
+    def __init__(self, domain: tuple[Index, ...], statement: Block) -> None:
+        self.domain = tuple(domain)
+        self.children = (statement,)
+
+    @property
+    def statement(self) -> Block:
+        return self.children[0]
+
+    def _pretty_string(self, *, indent: int) -> str:
+        return _pretty_scope(f"thread_loop ({', '.join(map(str, self.domain))})", self.statement, indent)
+
+
+def _pretty_scope(header: str, statement: Block, indent: int) -> str:
+    body = statement._pretty_string(indent=indent+2)
+    return f"{' '*indent}{header} {{\n{body}\n{' '*indent}}}"
 
 
 class Assignment(Terminal):

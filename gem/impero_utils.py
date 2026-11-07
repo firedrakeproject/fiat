@@ -95,12 +95,14 @@ def compile_gem(assignments, prefix_ordering, remove_zeros=False,
     return ImperoC(tree, temporaries, declare, indices)
 
 
-def compile_gem_new(assignments, prefix_ordering, remove_zeros=False):
+def compile_gem_new(assignments, prefix_ordering, remove_zeros=False, parallel_indices=()):
     """Compiles GEM to Impero.
 
     :arg assignments: list of (return variable, expression DAG root) pairs
     :arg prefix_ordering: outermost loop indices
     :arg remove_zeros: remove zero assignment to return variables
+    :arg parallel_indices: indices whose loops have independent iterations.
+        The loops over these indices are marked as parallel.
     """
     # Remove zeros
     if remove_zeros:
@@ -175,7 +177,7 @@ def compile_gem_new(assignments, prefix_ordering, remove_zeros=False):
     ops = inline_temporaries(expressions, ops)
 
     # Build Impero AST
-    tree = make_loop_tree(ops, get_indices)
+    tree = make_loop_tree(ops, get_indices, parallel_indices=frozenset(parallel_indices))
 
     # Collect temporaries
     temporaries = collect_temporaries(tree)
@@ -297,7 +299,7 @@ def collect_temporaries(tree):
     return result
 
 
-def make_loop_tree(ops, get_indices, level=0):
+def make_loop_tree(ops, get_indices, level=0, parallel_indices=frozenset()):
     """Creates an Impero AST with loops from a list of operations and
     their respective free indices.
 
@@ -305,14 +307,16 @@ def make_loop_tree(ops, get_indices, level=0):
     :arg get_indices: callable mapping from GEM nodes to an ordering
                       of free indices
     :arg level: depth of loop nesting
+    :arg parallel_indices: the indices whose loops are marked as parallel
     :returns: Impero AST with loops, without declarations
     """
     keyfunc = lambda op: op.loop_shape(get_indices)[level:level+1]
     statements = []
     for first_index, op_group in groupby(ops, keyfunc):
         if first_index:
-            inner_block = make_loop_tree(op_group, get_indices, level+1)
-            statements.append(imp.For(first_index[0], inner_block))
+            index, = first_index
+            inner_block = make_loop_tree(op_group, get_indices, level+1, parallel_indices)
+            statements.append(imp.For(index, inner_block, is_parallel=index in parallel_indices))
         else:
             statements.extend(op_group)
     # Remove no-op terminals from the tree
