@@ -41,7 +41,6 @@ class NodalEnrichedElement(CiarletElement):
         # Extract common data
         embedded_degrees = [e.degree() for e in elements]
         embedded_degree = max(embedded_degrees)
-        order = max(e.get_order() for e in elements)
         formdegree = None if any(e.get_formdegree() is None for e in elements) \
             else max(e.get_formdegree() for e in elements)
 
@@ -98,7 +97,7 @@ class NodalEnrichedElement(CiarletElement):
 
         # CiarletElement constructor adjusts poly_set coefficients s.t.
         # dual_set is really dual to poly_set
-        super().__init__(poly_set, dual_set, order, formdegree=formdegree, mapping=mapping)
+        super().__init__(poly_set, dual_set, embedded_degree, formdegree=formdegree, mapping=mapping)
 
 
 def _merge_coeffs(coeffss, ref_el, degrees, continuity):

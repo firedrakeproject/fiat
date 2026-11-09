@@ -57,6 +57,7 @@ class GaussLegendre(SpectralElement, DiscontinuousLagrange):
 class KongMulderVeldhuizen(SpectralElement, ScalarFiatElement):
     """Simplicial continuous element with nodes at the KMV points."""
     point_set_family = KMVPointSet
+    embedded_degree = FIAT.KongMulderVeldhuizen.embedded_degree
 
     def __init__(self, cell, degree):
         super(ScalarFiatElement, self).__init__(FIAT.KongMulderVeldhuizen(cell, degree))

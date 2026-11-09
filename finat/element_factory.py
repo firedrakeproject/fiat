@@ -120,6 +120,12 @@ def as_fiat_cell(cell):
     return ufc_cell(cell)
 
 
+for family, element_class in supported_elements.items():
+    if isinstance(element_class, type) and element_class.embedded_degree is not None:
+        finat.ufl.elementlist.register_embedded_degree(
+            family, lambda cell, order, rule=element_class.embedded_degree: rule(as_fiat_cell(cell), order))
+
+
 @singledispatch
 def convert(element, **kwargs):
     """Handler for converting UFL elements to FInAT elements.

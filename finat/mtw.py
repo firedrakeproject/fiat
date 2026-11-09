@@ -9,6 +9,8 @@ from finat.piola_mapped import normal_tangential_transform
 
 
 class MardalTaiWinther(PhysicallyMappedElement, FiatElement):
+    embedded_degree = FIAT.MardalTaiWinther.embedded_degree
+
     def __init__(self, cell, order=1):
         if cell.get_spatial_dimension() == 2:
             cite("Mardal2002")

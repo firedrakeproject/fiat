@@ -256,9 +256,7 @@ class FiniteElement(FiniteElementBase):
     @property
     def embedded_superdegree(self):
         """Return embedded superdegree."""
-        superdegree = self.degree()
+        superdegree = self._embedded_degree
         if not isinstance(superdegree, int):
             superdegree = max(superdegree)
-        if isinstance(self._embedded_degree, int):
-            superdegree = max(superdegree, self._embedded_degree)
         return superdegree

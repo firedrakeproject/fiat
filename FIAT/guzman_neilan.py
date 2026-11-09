@@ -48,7 +48,8 @@ def GuzmanNeilanSpace(ref_el, order, kind=1, reduced=False):
     """
     sd = ref_el.get_spatial_dimension()
     ref_complex = AlfeldSplit(ref_el)
-    C0 = polynomial_set.ONPolynomialSet(ref_complex, sd, shape=(sd,), scale=1, variant="bubble")
+    degree = GuzmanNeilanH1.embedded_degree(ref_el, order)
+    C0 = polynomial_set.ONPolynomialSet(ref_complex, degree, shape=(sd,), scale=1, variant="bubble")
     B = take_interior_bubbles(C0)
     if sd > 2:
         B = modified_bubble_subspace(B)
@@ -88,13 +89,17 @@ class GuzmanNeilanH1(finite_element.CiarletElement):
         sd = ref_el.get_spatial_dimension()
         if order >= sd:
             raise ValueError(f"{type(self).__name__} is only defined for order < dim")
-        degree = sd
         poly_set = GuzmanNeilanSpace(ref_el, order, kind=kind)
         ref_complex = poly_set.get_reference_element()
         K = ref_complex if kind == 2 else ref_el
-        dual = BernardiRaugelDualSet(K, order, degree=degree, ref_complex=ref_complex, quad_scheme=quad_scheme)
+        dual = BernardiRaugelDualSet(K, order, degree=sd, ref_complex=ref_complex, quad_scheme=quad_scheme)
         formdegree = sd - 1  # (n-1)-form
-        super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")
+        super().__init__(poly_set, dual, order, formdegree, mapping="contravariant piola")
+
+    @classmethod
+    def embedded_degree(cls, ref_el, order):
+        """Return the degree of C0 Pd(Alfeld), which contains the corrected facet bubbles."""
+        return ref_el.get_spatial_dimension()
 
 
 class GuzmanNeilanFirstKindH1(GuzmanNeilanH1):

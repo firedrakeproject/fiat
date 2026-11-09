@@ -31,6 +31,9 @@ ufl_elements = {}
 # Aliases: aliases[name] (...) -> (standard_name, ...)
 aliases = {}
 
+# Embedded degrees: embedded_degrees[family](cell, order) -> degree
+embedded_degrees = {}
+
 
 # Function for registering new elements
 def register_element(family, short_name, value_rank, sobolev_space, mapping,
@@ -48,6 +51,20 @@ def register_element(family, short_name, value_rank, sobolev_space, mapping,
 def register_alias(alias, to):
     """Doc."""
     aliases[alias] = to
+
+
+def register_embedded_degree(family, embedded_degree):
+    """Register the degree of the embedding polynomial space of a finite element family.
+
+    Parameters
+    ----------
+    family : str
+        The name of the element family.
+    embedded_degree : callable
+        A function of the cell and the element order that returns the degree
+        of the smallest complete polynomial space containing the element space.
+    """
+    embedded_degrees[family] = embedded_degree
 
 
 def show_elements():
@@ -468,18 +485,9 @@ def canonical_element_description(family, cell, order, form_degree):
     else:
         raise ValueError(f"Invalid value rank {value_rank}.")
 
-    embedded_degree = order
-    if family == "Kong-Mulder-Veldhuizen":
-        if order == 1:
-            bump = 0
-        elif tdim == 2 and order < 5:
-            bump = 1
-        else:
-            bump = 2
-        embedded_degree += bump
-    elif family == "Mardal-Tai-Winther":
-        embedded_degree = tdim + 1
-    elif any(bubble in family for bubble in ("Guzman-Neilan", "Bernardi-Raugel")):
-        embedded_degree = tdim
+    if cell is not None and family in embedded_degrees:
+        embedded_degree = embedded_degrees[family](cell, order)
+    else:
+        embedded_degree = order
 
     return family, short_name, order, reference_value_shape, sobolev_space, mapping, embedded_degree
