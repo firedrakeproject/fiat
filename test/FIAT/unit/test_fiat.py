@@ -21,6 +21,7 @@ import pytest
 
 from FIAT.reference_element import LINE, ReferenceElement
 from FIAT.reference_element import Point, UFCInterval, UFCTriangle, UFCTetrahedron
+from FIAT.reference_element import UFCQuadrilateral, UFCHexahedron
 from FIAT.lagrange import Lagrange
 from FIAT.discontinuous_lagrange import DiscontinuousLagrange   # noqa: F401
 from FIAT.discontinuous_taylor import DiscontinuousTaylor       # noqa: F401
@@ -66,11 +67,19 @@ from FIAT.nodal_enriched import NodalEnrichedElement
 from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen    # noqa: F401
 from FIAT.histopolation import Histopolation                    # noqa: F401
 from FIAT.wuxu import WuXuH3NC, WuXuRobustH3NC                  # noqa: F401
+from FIAT.serendipity import Serendipity                        # noqa: F401
+from FIAT.Sminus import TrimmedSerendipityEdge, TrimmedSerendipityFace  # noqa: F401
+from FIAT.SminusDiv import TrimmedSerendipityDiv                # noqa: F401
+from FIAT.SminusCurl import TrimmedSerendipityCurl              # noqa: F401
+from FIAT.brezzi_douglas_marini_cube import BrezziDouglasMariniCubeEdge, BrezziDouglasMariniCubeFace  # noqa: F401
+from FIAT.quadrature_schemes import create_quadrature
 
 P = Point()
 I = UFCInterval()  # noqa: E741
 T = UFCTriangle()
 S = UFCTetrahedron()
+Q = UFCQuadrilateral()
+H = UFCHexahedron()
 
 
 def test_basis_derivatives_scaling():
@@ -668,6 +677,33 @@ def test_single_point_tabulation(element):
 
     T2 = L.tabulate(0, [point])[(0,) * sd]
     assert T2.shape == (L.space_dimension(), 1)
+
+
+@pytest.mark.parametrize('element', [
+    *(f'Serendipity({cell}, {k})' for cell in 'QH' for k in (1, 2, 3)),
+    *(f'TrimmedSerendipityEdge({cell}, {k})' for cell in 'QH' for k in (1, 2, 3)),
+    *(f'TrimmedSerendipityFace(Q, {k})' for k in (1, 2, 3)),
+    *(f'TrimmedSerendipityDiv({cell}, {k})' for cell in 'QH' for k in (1, 2, 3)),
+    *(f'TrimmedSerendipityCurl({cell}, {k})' for cell in 'QH' for k in (1, 2, 3)),
+    *(f'BrezziDouglasMariniCubeEdge(Q, {k})' for k in (1, 2, 3)),
+    *(f'BrezziDouglasMariniCubeFace(Q, {k})' for k in (1, 2, 3)),
+])
+def test_degree(element):
+    """Check that the degree is the smallest one integrating the mass matrix exactly."""
+    element = eval(element)
+    ref_el = element.get_reference_element()
+    sd = ref_el.get_spatial_dimension()
+    degree = element.degree()
+
+    def mass(quadrature_degree):
+        Q = create_quadrature(ref_el, quadrature_degree)
+        phi = element.tabulate(0, Q.get_points())[(0,) * sd]
+        axes = tuple(range(1, phi.ndim))
+        return np.tensordot(phi * Q.get_weights(), phi, axes=(axes, axes))
+
+    exact = mass(2 * degree + 2)
+    assert np.allclose(mass(2 * degree), exact)
+    assert not np.allclose(mass(2 * degree - 1), exact)
 
 
 if __name__ == '__main__':

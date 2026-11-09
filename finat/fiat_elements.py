@@ -409,6 +409,8 @@ class BrezziDouglasMarini(VectorFiatElement):
 
 
 class BrezziDouglasMariniCubeEdge(VectorFiatElement):
+    embedded_degree = FIAT.BrezziDouglasMariniCubeEdge.embedded_degree
+
     def __init__(self, cell, degree):
         super().__init__(FIAT.BrezziDouglasMariniCubeEdge(cell, degree))
 
@@ -418,6 +420,8 @@ class BrezziDouglasMariniCubeEdge(VectorFiatElement):
 
 
 class BrezziDouglasMariniCubeFace(VectorFiatElement):
+    embedded_degree = FIAT.BrezziDouglasMariniCubeFace.embedded_degree
+
     def __init__(self, cell, degree):
         super().__init__(FIAT.BrezziDouglasMariniCubeFace(cell, degree))
 

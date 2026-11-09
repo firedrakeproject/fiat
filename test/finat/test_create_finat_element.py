@@ -152,6 +152,24 @@ def test_kmv(cell, degree):
     assert (finat_element.degree > degree) or (degree == 1)
 
 
+@pytest.mark.parametrize("family, cell, degree",
+                         [(family, cell, degree)
+                          for family in ("BR", "GN", "GN2")
+                          for cell, degrees in ((ufl.triangle, (1,)), (ufl.tetrahedron, (1, 2)))
+                          for degree in degrees]
+                         + [(family, cell, None)
+                            for family in ("BRB", "GNB")
+                            for cell in (ufl.triangle, ufl.tetrahedron)]
+                         + [("GNH1div", cell, degree) for cell in (ufl.triangle, ufl.tetrahedron) for degree in (2, 3)]
+                         + [("MTW", ufl.triangle, 1), ("MTW", ufl.tetrahedron, 1), ("MTW", ufl.tetrahedron, 2)]
+                         + [("S", cell, degree) for cell in (ufl.quadrilateral, ufl.hexahedron) for degree in (1, 2, 3)]
+                         + [(family, ufl.quadrilateral, degree) for family in ("BDMCE", "BDMCF") for degree in (1, 2, 3)])
+def test_embedded_superdegree(family, cell, degree):
+    ufl_element = finat.ufl.FiniteElement(family, cell, degree)
+    finat_element = create_element(ufl_element)
+    assert ufl_element.embedded_superdegree == finat_element.degree
+
+
 def test_cache_hit(ufl_element):
     A = create_element(ufl_element)
     B = create_element(ufl_element)

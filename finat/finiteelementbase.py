@@ -29,6 +29,11 @@ def broadcast_tensor(expression, multiindex):
 
 class FiniteElementBase(metaclass=ABCMeta):
 
+    embedded_degree = None
+    """A function of the reference cell and the element order that returns
+    the degree of the embedding polynomial space, or None if this degree
+    is the order."""
+
     @abstractproperty
     def cell(self):
         '''The reference cell on which the element is defined.'''

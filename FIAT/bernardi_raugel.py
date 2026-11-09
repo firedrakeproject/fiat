@@ -42,7 +42,7 @@ def BernardiRaugelSpace(ref_el, order, interior=True):
     sd = ref_el.get_spatial_dimension()
     if order > sd:
         raise ValueError("The Bernardi-Raugel space is only defined for order <= dim")
-    degree = sd + max(order-1, 0) if interior else sd
+    degree = BernardiRaugel.embedded_degree(ref_el, order) if interior else sd
     Pd = polynomial_set.ONPolynomialSet(ref_el, degree, shape=(sd,), scale=1, variant="bubble")
     dimPd = expansions.polynomial_dimension(ref_el, degree, continuity="C0")
     entity_ids = expansions.polynomial_entity_ids(ref_el, degree, continuity="C0")
@@ -181,4 +181,9 @@ class BernardiRaugel(finite_element.CiarletElement):
         poly_set = BernardiRaugelSpace(ref_el, order)
         dual = BernardiRaugelDualSet(ref_el, order, degree=sd, hierarchical=hierarchical, quad_scheme=quad_scheme)
         formdegree = 0
-        super().__init__(poly_set, dual, poly_set.degree, formdegree, mapping="contravariant piola")
+        super().__init__(poly_set, dual, order, formdegree, mapping="contravariant piola")
+
+    @classmethod
+    def embedded_degree(cls, ref_el, order):
+        """Return the degree of the facet bubbles, raised by the interior bubbles for order > 1."""
+        return ref_el.get_spatial_dimension() + max(order - 1, 0)

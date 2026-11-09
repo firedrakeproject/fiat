@@ -136,6 +136,7 @@ class CiarletElement(FiniteElement):
 
         if len(poly_set) != len(dual):
             raise ValueError(f"Dimension of function space is {len(poly_set)}, but got {len(dual)} nodes.")
+        assert self.embedded_degree(ref_el, order) == poly_set.get_embedded_degree()
 
         # build generalized Vandermonde matrix
         old_coeffs = poly_set.get_coeffs()
@@ -163,6 +164,11 @@ class CiarletElement(FiniteElement):
                                       poly_set.get_embedded_degree(),
                                       poly_set.get_expansion_set(),
                                       new_coeffs)
+
+    @classmethod
+    def embedded_degree(cls, ref_el, order):
+        """Return the degree of the polynomial space of an element of the given order."""
+        return order
 
     def degree(self):
         "Return the degree of the (embedding) polynomial space."

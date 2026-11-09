@@ -102,4 +102,9 @@ class KongMulderVeldhuizen(finite_element.CiarletElement):
 
         dual = KongMulderVeldhuizenDualSet(ref_el, degree)
         formdegree = 0  # 0-form
-        super().__init__(S, dual, S.degree, formdegree)
+        super().__init__(S, dual, degree, formdegree)
+
+    @classmethod
+    def embedded_degree(cls, ref_el, order):
+        """Return the order raised by the largest degree bump of the bubbles."""
+        return order + max(bump(ref_el, order), default=0)

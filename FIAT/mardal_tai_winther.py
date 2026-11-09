@@ -139,3 +139,8 @@ class MardalTaiWinther(finite_element.CiarletElement):
         poly_set = MardalTaiWintherSpace(ref_el, order)
         formdegree = sd - 1
         super().__init__(poly_set, dual, order, formdegree, mapping="contravariant piola")
+
+    @classmethod
+    def embedded_degree(cls, ref_el, order):
+        """Return the degree of the curl of the bubbles, one more than the spatial dimension."""
+        return ref_el.get_spatial_dimension() + 1

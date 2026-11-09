@@ -126,7 +126,7 @@ class Serendipity(FiniteElement):
         self.dual = compute_pointwise_dual(self, unisolvent_pts(ref_el, degree))
 
     def degree(self):
-        return self.order + 1
+        return self.order
 
     def get_coeffs(self):
         raise NotImplementedError(f"get_coeffs not implemented for {type(self).__name__}")
