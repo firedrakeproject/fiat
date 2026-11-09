@@ -84,8 +84,13 @@ class BrezziDouglasMariniCube(FiniteElement):
     def value_shape(self):
         return (self.fdim,)
 
+    @classmethod
+    def embedded_degree(cls, ref_el, order):
+        """Return the degree of the curls of x^(k+1) y and x y^(k+1) in each variable."""
+        return order + 1
+
     def degree(self):
-        return self.get_order()
+        return self.embedded_degree(self.ref_el, self.get_order())
 
     def dual_basis(self):
         raise NotImplementedError(f"dual_basis is not implemented for {type(self).__name__}")
