@@ -9,7 +9,8 @@
 
 from FIAT import finite_element, dual_set, polynomial_set, expansions
 from FIAT.check_format_variant import parse_quadrature_scheme
-from FIAT.functional import ComponentPointEvaluation, FrobeniusIntegralMoment
+from FIAT.functional import (ComponentPointEvaluation, FrobeniusIntegralMoment,
+                             IntegralMomentOfDivergence)
 from FIAT.hierarchical import make_dual_bubbles, make_projected_bubble_moments
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
@@ -157,13 +158,12 @@ class BernardiRaugelDualSet(dual_set.DualSet):
                     entity_ids[sd-1][f].extend(range(cur, len(nodes)))
 
                 if i == 0 and order > 1 and not any(ref_el.get_interior_facets(dim) for dim in range(order)):
-                    # Interior DoFs: cell averages against the scaled facet normals,
-                    # these are preserved by the contravariant Piola pullback
+                    # Interior DoFs: divergence moments against P_{k-1} / P0.
                     cur = len(nodes)
                     Q = create_quadrature(ref_complex, sd + order - 1)
-                    phi = numpy.full(Q.get_weights().shape, 1 / ref_el.volume())
-                    nodes.extend(FrobeniusIntegralMoment(ref_el, Q, numpy.outer(perp(*thats[f]), phi))
-                                 for f in sorted(facets)[:sd])
+                    P = polynomial_set.ONPolynomialSet(ref_el, order - 1)
+                    phis = P.tabulate(Q.get_points())[(0,) * sd][1:]
+                    nodes.extend(IntegralMomentOfDivergence(ref_el, Q, phi) for phi in phis)
                     entity_ids[sd][0].extend(range(cur, len(nodes)))
         super().__init__(nodes, ref_el, entity_ids)
 

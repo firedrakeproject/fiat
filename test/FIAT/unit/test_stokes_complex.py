@@ -298,6 +298,16 @@ def test_gn_facet_bubbles(reduced):
     assert numpy.allclose(divV, divV[:, :1])
 
 
+def test_gn1_order2_facet_restriction():
+    gn = GuzmanNeilanFirstKindH1(S, order=2)
+    # Keep normal facet moments, excluding tangential constraints.
+    facet_dofs = [dofs[0] for dofs in gn.entity_dofs()[S.get_spatial_dimension() - 1].values()]
+    V = RestrictedElement(gn, indices=facet_dofs)
+    pts = make_points(V.get_reference_complex(), 4)
+    pressure = DG(S, 0).tabulate(0, pts)[(0,)*S.get_spatial_dimension()]
+    assert span_equal(div(V.tabulate(1, pts)), pressure)
+
+
 @pytest.mark.parametrize("reduced", (False, True), ids=("full", "reduced"))
 @pytest.mark.parametrize("kind", (1, 2))
 def test_gn_nested(kind, reduced):
