@@ -160,7 +160,7 @@ class BernardiRaugelDualSet(dual_set.DualSet):
                 if i == 0 and order > 1 and not any(ref_el.get_interior_facets(dim) for dim in range(order)):
                     # Interior DoFs: divergence moments against P_{k-1} / P0.
                     cur = len(nodes)
-                    Q = create_quadrature(ref_complex, sd + order - 1)
+                    Q = create_quadrature(ref_complex, degree + order - 1)
                     P = polynomial_set.ONPolynomialSet(ref_el, order - 1, scale="L2 piola")
                     phis = P.tabulate(Q.get_points())[(0,) * sd][1:]
                     nodes.extend(IntegralMomentOfDivergence(ref_el, Q, phi) for phi in phis)
