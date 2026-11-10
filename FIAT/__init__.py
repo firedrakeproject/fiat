@@ -59,6 +59,7 @@ from FIAT.hellan_herrmann_johnson import HellanHerrmannJohnson
 from FIAT.arnold_winther import ArnoldWinther
 from FIAT.arnold_winther import ArnoldWintherNC
 from FIAT.hu_zhang import HuZhang
+from FIAT.hu_zhang_zhang import HuZhangZhang
 from FIAT.mardal_tai_winther import MardalTaiWinther
 from FIAT.bubble import Bubble, FacetBubble
 from FIAT.hdiv_trace import HDivTrace
@@ -103,6 +104,7 @@ supported_elements = {"Argyris": Argyris,
                       "Guzman-Neilan 1st kind H1": GuzmanNeilanFirstKindH1,
                       "Guzman-Neilan 2nd kind H1": GuzmanNeilanSecondKindH1,
                       "Guzman-Neilan H1(div)": GuzmanNeilanH1div,
+                      "Hu-Zhang-Zhang": HuZhangZhang,
                       "Johnson-Mercier": JohnsonMercier,
                       "Lagrange": Lagrange,
                       "Kong-Mulder-Veldhuizen": KongMulderVeldhuizen,

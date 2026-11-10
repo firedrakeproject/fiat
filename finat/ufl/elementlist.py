@@ -139,6 +139,7 @@ register_element("Guzman-Neilan 1st kind H1", "GN", 1, H1, "contravariant Piola"
 register_element("Guzman-Neilan 2nd kind H1", "GN2", 1, H1, "contravariant Piola", (1, None), simplices[1:])
 register_element("Guzman-Neilan H1(div)", "GNH1div", 1, H1, "contravariant Piola", (2, None), simplices[1:])
 register_element("Guzman-Neilan Bubble", "GNB", 1, H1, "contravariant Piola", (None, None), simplices[1:])
+register_element("Hu-Zhang-Zhang", "HZZ", 1, HCurl, "covariant Piola", (1, 1), ("tetrahedron",))
 
 # Special elements
 register_element("Boundary Quadrature", "BQ", 0, L2, "identity", (0, None), any_cell)
@@ -481,5 +482,7 @@ def canonical_element_description(family, cell, order, form_degree):
         embedded_degree = tdim + 1
     elif any(bubble in family for bubble in ("Guzman-Neilan", "Bernardi-Raugel")):
         embedded_degree = tdim
+    elif family == "Hu-Zhang-Zhang":
+        embedded_degree = tdim + 1
 
     return family, short_name, order, reference_value_shape, sobolev_space, mapping, embedded_degree
