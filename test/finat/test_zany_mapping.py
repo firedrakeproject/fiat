@@ -9,7 +9,7 @@ from math import comb
 from gem.interpreter import evaluate
 from finat.fiat_elements import FiatElement
 from finat.physically_mapped import PhysicallyMappedElement
-from finat.physically_mapped import adjugate_and_determinant, identity
+from finat.physically_mapped import adjugate_and_determinant
 
 
 def test_rectangular_adjugate_and_determinant():
@@ -303,17 +303,14 @@ def test_dual_evaluation(ref_to_phys, element, dimension):
 def test_reduced_johnson_mercier_diagonal_inverse(ref_to_phys, dimension):
     """Each inverse row belongs to the whole entity block."""
     element = finat.ReducedJohnsonMercier(ref_to_phys[dimension].ref_cell, 1)
-    rows = element._vandermonde_rows(ref_to_phys[dimension])
-    for entities in element._element.entity_dofs().values():
-        for dofs in entities.values():
+    matrix = element._vandermonde_matrix(ref_to_phys[dimension])
+    vandermonde = matrix.array()
+    for dim, entities in matrix.dual.entity_ids.items():
+        for entity, dofs in entities.items():
             if not dofs:
                 continue
-            B = identity(len(dofs))
-            V = identity(len(dofs))
-            for k, i in enumerate(dofs):
-                if i in rows:
-                    B[k] = rows[i].entries[dofs]
-                    V[k] = rows[i].inverse
+            B = vandermonde[np.ix_(dofs, dofs)]
+            V = matrix.inverses[dim][entity]
             B = evaluate([gem.ListTensor(B)])[0].arr
             V = evaluate([gem.ListTensor(V)])[0].arr
             assert np.allclose(B @ V, np.eye(len(dofs)))
@@ -333,8 +330,8 @@ class SymbolicMapping:
 
 
 def transformations(element, sd):
-    mapping = SymbolicMapping(sd)
-    return element._physical_vandermonde(mapping), element._inverse_physical_vandermonde(mapping)
+    B = element._vandermonde_matrix(SymbolicMapping(sd))
+    return (B.array(), B.inverse_array())
 
 
 def nonzeros(row):

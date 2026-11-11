@@ -406,15 +406,16 @@ def test_pairing_transformation(sd):
     assert numpy.allclose(pair, numpy.eye(sd * sd) / numpy.linalg.det(J))
 
 
+@pytest.mark.parametrize("avg", [True, False])
 @pytest.mark.parametrize("sd,frame", [(2, (1, 0)), (3, (2, 0)), (3, (1, 1))])
-def test_transformation_inverse(sd, frame):
+def test_transformation_inverse(sd, frame, avg):
     """The inverse of each weight transformation is the inverse of the matrix."""
     ref_el = FIAT.ufc_simplex(sd)
     J = numpy.eye(sd) + numpy.random.default_rng(0).random((sd, sd))
     J = numpy.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object)
     adjJ, detJ = adjugate_and_determinant(J)
     cartesian = cartesian_pullbacks(J, adjJ, detJ)
-    framed = frame_pullbacks(ref_el, frame, *metric_and_adjugate(J), detJ)
+    framed = frame_pullbacks(ref_el, frame, *metric_and_adjugate(J), detJ, avg=avg)
     for pullbacks in (cartesian, framed):
         for mapping in pullbacks:
             G = transformation_matrix(pullbacks[mapping].forward)
