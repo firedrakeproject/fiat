@@ -83,11 +83,9 @@ class PhysicallyMappedFunctional:
         integral over its entity instead of an average.
     :arg tol: Relative tolerance for the range tests on the weights, and
         below which entries of the Riesz representation are dropped.
-    :arg test_mapping: The FIAT mapping of the test function of the node, or
-        None if the dual set does not declare it.
     """
 
-    def __init__(self, node, cell, dim, entity, mapping, avg, tol, test_mapping=None):
+    def __init__(self, node, cell, dim, entity, mapping, avg, tol):
         self.node = node
         self.cell = cell
         self.dim = dim
@@ -95,7 +93,6 @@ class PhysicallyMappedFunctional:
         self.mapping = mapping
         self.avg = avg
         self.tol = tol
-        self.test_mapping = test_mapping
 
     @cached_property
     def weights(self):
@@ -108,20 +105,27 @@ class PhysicallyMappedFunctional:
 
     @cached_property
     def axis_mappings(self):
-        """The mapping of each value and derivative axis of the weights."""
+        """The mapping of each value and derivative axis of the weights.
+
+        A value axis that pairs with a test function that maps in the same
+        Piola way, see :attr:`FIAT.functional.Functional.test_mapping`, maps
+        as an inner product.
+        """
         rank = len(self.node.target_shape)
         mappings = value_mappings(self.mapping, rank)
         if len(mappings) != rank:
             raise ValueError(f"A {self.mapping} functional must have rank {len(mappings)}, not {rank}.")
+        if self.node.test_mapping is not None:
+            tests = value_mappings(self.node.test_mapping, rank)
+            # The test function may have fewer value axes than the node
+            mappings = (*(mapping.replace("piola", "inner product") if "piola" in test and test == mapping else mapping
+                          for mapping, test in zip(mappings, tests)), *mappings[len(tests):])
         return mappings + ("covariant piola",) * self.node.max_deriv_order
 
     @cached_property
     def inner_product_axes(self):
-        """The leading axes of the weights that pair with a test function that maps in the same way."""
-        if self.test_mapping is None:
-            return ()
-        tests = value_mappings(self.test_mapping, len(self.node.target_shape))
-        return tuple(k for k, test in enumerate(tests) if "piola" in test and test == self.axis_mappings[k])
+        """The axes of the weights that pair with a test function that maps in the same way."""
+        return tuple(k for k, mapping in enumerate(self.axis_mappings) if mapping.endswith("inner product"))
 
     @cached_property
     def frame(self):
@@ -142,7 +146,7 @@ class PhysicallyMappedFunctional:
         if self.dim == sd - 1 and (moment or node.max_deriv_order > 0 or len(node.target_shape) > 1):
             return (self.dim, self.entity)
         if moment and 0 < self.dim < sd - 1:
-            covectors = [k for k, mapping in enumerate(self.axis_mappings) if mapping == "covariant piola"]
+            covectors = [k for k, mapping in enumerate(self.axis_mappings) if mapping.startswith("covariant")]
             Q = tangential_projector(cell.compute_tangents(self.dim, self.entity))
             if not all(in_range_of(self.weights, Q, (k,), self.tol) for k in covectors):
                 return (self.dim, self.entity)
@@ -155,12 +159,7 @@ class PhysicallyMappedFunctional:
         # in the order of this dict.
         sd = self.cell.get_spatial_dimension()
         W = self.weights
-        # An axis paired with a test function that maps in the same way is an inner product.
-        inner_products = {"contravariant piola": "contravariant inner product",
-                          "covariant piola": "covariant inner product"}
-        axis_mappings = list(self.axis_mappings)
-        for k in self.inner_product_axes:
-            axis_mappings[k] = inner_products[axis_mappings[k]]
+        axis_mappings = self.axis_mappings
         # Other interior moments map every axis as affine.
         if self.dim == sd and isinstance(self.node, IntegralMoment) and not self.inner_product_axes:
             return {(k,): "affine" for k in range(len(axis_mappings))}
@@ -202,20 +201,15 @@ class PhysicallyMappedFunctional:
         plain integral over its entity, which contributes :math:`-dim`.
         """
         sd = self.cell.get_spatial_dimension()
+        exponents = {"covariant piola": 1, "contravariant piola": sd - 1, "L2 piola": sd,
+                     "covariant inner product": 2, "contravariant inner product": 2 * sd - 2}
         if self.frame is None:
-            exponents = {"covariant piola": 1, "contravariant piola": sd - 1, "L2 piola": sd,
-                         "covariant inner product": 2, "contravariant inner product": 2 * sd - 2}
             return sum(exponents.get(mapping, 0) for mapping in self.pullback_mappings.values())
         exponent = 0
         for axes, mapping in self.pullback_mappings.items():
-            if mapping == "covariant piola":
-                exponent += 1
-            elif mapping == "covariant inner product":
-                exponent += 2
-            elif mapping == "contravariant inner product":
-                exponent += 2 * sd - 2
-            elif mapping == "contravariant piola" and not in_range_of(
-                    self.weights, facet_normal_projector(self.cell, self.entity), axes, self.tol):
+            if mapping != "contravariant piola":
+                exponent += exponents.get(mapping, 0)
+            elif not in_range_of(self.weights, facet_normal_projector(self.cell, self.entity), axes, self.tol):
                 # Tangential components of a contravariant axis
                 exponent += 2 - sd
         if isinstance(self.node, IntegralMoment) and not self.avg:
@@ -246,10 +240,9 @@ class PhysicallyMappedFunctional:
         :returns: A :class:`Pullback`.
         """
         if self.frame is None:
-            pullbacks = cartesian_pullbacks(J, adjJ, detJ)
+            pullbacks = cartesian_pullbacks(J, adjJ, detJ, metric, adj_metric)
         else:
             pullbacks = frame_pullbacks(self.cell, self.frame, metric, adj_metric, detJ)
-        pullbacks.update(inner_product_pullbacks(metric, adj_metric, detJ))
         mappings = list(self.pullback_mappings.values())
         factors = [pullbacks[mapping] for mapping in mappings]
         unit = LinearCombination([one], [numpy.eye(1)])
@@ -275,125 +268,6 @@ class PhysicallyMappedFunctional:
         havg = sum(h[v] for v in vertices) / len(vertices)
         dilation = reduce(mul, [havg] * abs(p))
         return one / dilation if p < 0 else gem.as_gem(dilation)
-
-
-class EntityPullback:
-    r"""The pullback of an entity's nodes and the inverse of its diagonal block.
-
-    Nodes with the same inner product mapping use the Schur complement of
-    the inverse pullback on their weights and an automatically tabulated
-    completion.  The other nodes may have different mappings.  Their rows
-    are inverted first, then the coupling to them is included in the
-    inverse of the whole entity block.
-
-    :arg functionals: A dict from the entity's dofs to their physical functionals.
-    :arg tabulation: The reference tabulation, indexed by derivative order.
-    :arg closure: The dofs on the closure of the entity.
-    """
-
-    def __init__(self, functionals, tabulation, closure):
-        self.functionals = functionals
-        self.dofs = list(functionals)
-        self.inner = [i for i, functional in functionals.items() if functional.inner_product_axes]
-        self.closure = closure
-        self.tol = next(iter(functionals.values())).tol
-        self.tabulation = {}
-        for i, functional in functionals.items():
-            order = functional.node.max_deriv_order
-            points = functional.node.get_order_tensors(order)[0]
-            point_index = tabulation[order][0]
-            D = tabulation[order][1]
-            self.tabulation[i] = D[..., [point_index[x] for x in points]]
-
-    @cached_property
-    def completion(self):
-        r"""Directions in :math:`\ker c` for the inner product nodes, indexed by closure dofs."""
-        if not self.inner:
-            return {}
-        others = [j for j in self.closure if j not in self.inner]
-        if not others:
-            return {}
-        candidates = []
-        for i in self.inner:
-            functional = self.functionals[i]
-            k, = functional.inner_product_axes
-            sd = functional.cell.get_spatial_dimension()
-            D = self.tabulation[i]
-            for A in numpy.eye(sd * sd).reshape(sd * sd, sd, sd):
-                E = numpy.moveaxis(numpy.tensordot(A, functional.weights, axes=(1, k)), 0, k)
-                candidates.append((i, A, numpy.tensordot(D[self.closure], E, axes=E.ndim)))
-        rows = numpy.array([row for _, _, row in candidates])
-        rows = rows[:, [self.closure.index(j) for j in others]]
-        tol = self.tol * numpy.abs(rows).max()
-        basis = {}
-        completion = {}
-        # Elimination selects independent directions and coordinates together.
-        for m, (i, A, c) in enumerate(candidates):
-            row = rows[m].copy()
-            for j, direction in basis.items():
-                row -= row[j] * direction
-            j = numpy.abs(row).argmax()
-            if abs(row[j]) > tol:
-                basis[j] = row / row[j]
-                completion[others[j]] = (i, A, c[[self.closure.index(k) for k in self.inner]])
-        return completion
-
-    def _to_riesz(self, functional: PhysicallyMappedFunctional, G: "LinearCombination",
-                  D: numpy.ndarray) -> numpy.ndarray:
-        """Contract a pulled-back node against the reference tabulation."""
-        axes = list(chain.from_iterable(functional.pullback_mappings))
-        rank = len(axes)
-        A = numpy.tensordot(functional.weights, D, axes=(-1, -1))
-        A = A.transpose(*(rank + 1 + k for k in axes), *axes, rank)
-        n = functional.weights.size // functional.weights.shape[-1]
-        return G.contract(A.reshape(n, n, 1, -1), self.tol).collect_terms().expand()[0]
-
-    def __call__(self, pullbacks):
-        r"""Tabulate the forward rows and :math:`B_{ee}^{-1}`."""
-        forward = []
-        inverse = numpy.full((len(self.dofs), len(self.dofs)), zero, dtype=object)
-        for k, (i, functional) in enumerate(self.functionals.items()):
-            pullback = pullbacks[functional.pullback_key]
-            D = self.tabulation[i]
-            forward.append(self._to_riesz(functional, pullback.forward, D))
-            if i not in self.inner:
-                inverse[k] = self._to_riesz(functional, pullback.inverse, D[self.dofs])
-        forward = numpy.array(forward)
-        if not self.inner:
-            return Pullback(forward, inverse)
-
-        indices = [self.dofs.index(i) for i in self.inner]
-        if any(not isinstance(forward[k, j], gem.Zero)
-               for k, i in enumerate(self.dofs) if i not in self.inner for j in self.inner):
-            raise NotImplementedError("The other nodes of an entity couple to its inner product nodes.")
-        columns = self.inner + list(self.completion)
-        weights = {}
-        for i in self.inner:
-            functional = self.functionals[i]
-            H = pullbacks[functional.pullback_key].inverse
-            weights[i] = self._to_riesz(functional, H, self.tabulation[i][columns])
-        kernel = []
-        for i, A, c in self.completion.values():
-            functional = self.functionals[i]
-            H = pullbacks[functional.pullback_key].inverse
-            factors = [A if axes == functional.inner_product_axes else numpy.eye(numpy.prod([len(A)] * len(axes)))
-                       for axes in functional.pullback_mappings]
-            HA = LinearCombination(H.coefficients, H.matrices @ reduce(numpy.kron, factors))
-            row = self._to_riesz(functional, HA, self.tabulation[i][columns])
-            kernel.append(row - sum(weights[j] * cj for j, cj in zip(self.inner, c)))
-        weights = numpy.array([weights[i] for i in self.inner])
-        n = len(self.inner)
-        diagonal = weights[:, :n]
-        if kernel:
-            # The inverse on these nodes is H_ww - H_wk H_kk^{-1} H_kw.
-            kernel = numpy.array(kernel)
-            H_wk = weights[:, n:]
-            H_kw = kernel[:, :n]
-            H_kk = kernel[:, n:]
-            diagonal -= sparse_matmul(H_wk, sparse_matmul(adjugate(H_kk), H_kw)) / determinant(H_kk)
-        rhs = identity(len(self.dofs))[indices] - sparse_matmul(forward[indices][:, self.dofs], inverse)
-        inverse[indices] = sparse_matmul(diagonal, rhs)
-        return Pullback(forward, inverse)
 
 
 class PhysicallyMappedElement(NeedsCoordinateMappingElement):
@@ -492,23 +366,20 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
     @cached_property
     def _physical_dual_set(self):
         """The :class:`PhysicallyMappedDualSet` of the FIAT element."""
-        return PhysicallyMappedDualSet(self._element.get_dual_set(), self._element.mapping(), self.avg, self.tol)
-
-    @cached_property
-    def _reference_tabulation(self):
-        """The :meth:`PhysicallyMappedDualSet.tabulate` of the nodal basis of the FIAT element."""
-        return self._physical_dual_set.tabulate(self._element.get_nodal_basis())
+        return PhysicallyMappedDualSet(self._element.get_dual_set(), self._element.get_nodal_basis(),
+                                       self._element.mapping(), self.avg, self.tol)
 
     def _vandermonde_matrix(self, coordinate_mapping):
         """The :class:`VandermondeMatrix` on the physical cell."""
         assert coordinate_mapping is not None
-        return VandermondeMatrix(self._physical_dual_set, self._reference_tabulation, coordinate_mapping)
+        return VandermondeMatrix(self._physical_dual_set, coordinate_mapping)
 
 
 class PhysicallyMappedDualSet:
     """The nodes of a FIAT dual set, as :class:`PhysicallyMappedFunctional` objects.
 
     :arg dual: The FIAT dual set.
+    :arg poly_set: The nodal basis of the FIAT element, dual to the nodes.
     :arg mappings: The FIAT mapping of each node.
     :arg avg: If False, an integral moment with a frame is a plain
         integral over its entity instead of an average.
@@ -516,18 +387,17 @@ class PhysicallyMappedDualSet:
         below which entries of the Riesz representation are dropped.
     """
 
-    def __init__(self, dual, mappings, avg, tol):
+    def __init__(self, dual, poly_set, mappings, avg, tol):
         cell = dual.get_reference_element()
         nodes = dual.get_nodes()
         entity_ids = dual.get_entity_ids()
-        test_mappings = dual.get_mapping() or [None] * len(nodes)
         functionals = [None] * len(nodes)
         for dim in entity_ids:
             for entity in entity_ids[dim]:
                 for i in entity_ids[dim][entity]:
-                    functionals[i] = PhysicallyMappedFunctional(nodes[i], cell, dim, entity,
-                                                                mappings[i], avg, tol, test_mappings[i])
+                    functionals[i] = PhysicallyMappedFunctional(nodes[i], cell, dim, entity, mappings[i], avg, tol)
         self.cell = cell
+        self.poly_set = poly_set
         self.tol = tol
         self.functionals = tuple(functionals)
         self.coeffs = dual.get_coeffs()
@@ -547,30 +417,11 @@ class PhysicallyMappedDualSet:
                 groups[dim][entity] = dict(nodes)
         return groups
 
-    def entity_pullbacks(self, tabulation: dict) -> dict:
-        """Build inverse pullbacks for entities with inner-product nodes.
+    @cached_property
+    def tabulation(self):
+        r"""The tabulation of the nodal basis at the points of the nodes.
 
-        Parameters
-        ----------
-        tabulation : dict
-            The reference basis tabulation.
-
-        Returns
-        -------
-        dict
-            Pullbacks indexed by dimension and entity.
-        """
-        return {(dim, entity): EntityPullback({i: self.functionals[i] for i in dofs},
-                                              tabulation, self.entity_closure_ids[dim][entity])
-                for dim, entities in self.entity_ids.items()
-                for entity, dofs in entities.items()
-                if any(self.functionals[i].inner_product_axes for i in dofs)}
-
-    def tabulate(self, poly_set):
-        r"""The tabulation of a nodal basis at the points of the nodes.
-
-        :arg poly_set: The nodal basis :math:`\psi`, dual to the nodes.
-        :returns: A dict from each derivative order k to a tuple of a dict from each
+        A dict from each derivative order k to a tuple of a dict from each
         point :math:`x_q` to its index q, and the tensor
         :math:`D_{jb\gamma q}=(\partial^\gamma\psi^0_j)_b(x_q)` with k
         derivative axes :math:`\gamma`, where :math:`\psi^0` is the nodal
@@ -578,6 +429,7 @@ class PhysicallyMappedDualSet:
         time for each order.
         """
         sd = self.cell.get_spatial_dimension()
+        poly_set = self.poly_set
         num_members = poly_set.get_num_members()
         tshape = poly_set.get_shape()
         points = defaultdict(set)
@@ -601,17 +453,69 @@ class PhysicallyMappedDualSet:
             derivatives[order] = (point_index, D)
         return derivatives
 
-    def to_riesz(self, nodes, G, tabulation, columns):
+    @cached_property
+    def completion(self):
+        r"""A dict mapping each dimension and entity to a dict mapping each :attr:`~PhysicallyMappedFunctional.pullback_key` to the completion of its nodes.
+
+        For nodes with :attr:`~PhysicallyMappedFunctional.inner_product_axes`,
+        the weights :math:`W_i` and the directions :math:`AW_i`, with a
+        constant matrix :math:`A` on the inner product axes, span a space of
+        weights that the pullback maps into itself.  The completion is a
+        basis of the kernel of the Riesz representation :math:`c` on the
+        nodes in this space modulo the :math:`W_i`, the directions
+        :math:`K=AW_i-\sum_j c_j(AW_i)W_j`, chosen by elimination on their
+        Riesz representations on the rest of the closure of the entity.
+
+        Each direction is keyed by the dof of the closure where its pivot
+        lies, and is a tuple of i, the matrix of A on all the axes of the
+        weights, and the coordinates :math:`c_j(AW_i)`.  The completion is
+        empty for nodes without inner product axes.
+        """
+        completion = {}
+        for dim in self.groups:
+            completion[dim] = {}
+            for entity in self.groups[dim]:
+                closure = self.entity_closure_ids[dim][entity]
+                completion[dim][entity] = {}
+                for key, nodes in self.groups[dim][entity].items():
+                    directions = completion[dim][entity][key] = {}
+                    functional = self.functionals[nodes[0]]
+                    others = [j for j in closure if j not in nodes]
+                    if not functional.inner_product_axes or not others:
+                        continue
+                    sd = self.cell.get_spatial_dimension()
+                    units = numpy.eye(sd * sd).reshape(sd * sd, sd, sd)
+                    matrices = [reduce(numpy.kron, [A if axes == functional.inner_product_axes else numpy.eye(len(A) ** len(axes))
+                                                    for axes in functional.pullback_mappings])
+                                for A in units]
+                    G = LinearCombination([one] * len(matrices), matrices)
+                    candidates = [(i, K, row) for i in nodes
+                                  for K, row in zip(matrices, self.to_riesz([i], G, closure).matrices[:, 0])]
+                    rows = numpy.array([row for *_, row in candidates])[:, [closure.index(j) for j in others]]
+                    tol = self.tol * numpy.abs(rows).max()
+                    basis = {}
+                    # Elimination selects independent directions and coordinates together.
+                    for (i, K, c), row in zip(candidates, rows):
+                        row = row.copy()
+                        for j, direction in basis.items():
+                            row -= row[j] * direction
+                        j = numpy.abs(row).argmax()
+                        if abs(row[j]) > tol:
+                            basis[j] = row / row[j]
+                            directions[others[j]] = (i, K, c[[closure.index(m) for m in nodes]])
+        return completion
+
+    def to_riesz(self, nodes, G, columns):
         r"""The Riesz representations :math:`(GW_i):D_j` of nodes with the same :attr:`~PhysicallyMappedFunctional.pullback_mappings`.
 
         Here :math:`W_i` are the weights of node i and :math:`D_j` are the
-        derivatives of the basis function j at its points.  The nodes with
-        the same derivative order and points contract in a single product,
-        as in :meth:`FIAT.dual_set.DualSet.to_riesz`.
+        derivatives of the basis function j at its points, from
+        :attr:`tabulation`.  The nodes with the same derivative order and
+        points contract in a single product, as in
+        :meth:`FIAT.dual_set.DualSet.to_riesz`.
 
         :arg nodes: The nodes i.
         :arg G: The pullback of the weights, a :class:`LinearCombination` on their axes.
-        :arg tabulation: The :meth:`tabulate` of the basis.
         :arg columns: The basis functions j.
         :returns: A :class:`LinearCombination` of constant matrices over
             the nodes and the basis functions.
@@ -627,7 +531,7 @@ class PhysicallyMappedDualSet:
 
         R = numpy.zeros((len(G.matrices), len(nodes), len(columns)))
         for (order, points), positions in point_groups.items():
-            point_index, D = tabulation[order]
+            point_index, D = self.tabulation[order]
             D = D[columns][..., [point_index[x] for x in points]]
             W = numpy.stack([self.functionals[nodes[k]].weights for k in positions])
             # Contract the weights with the derivatives at the points, and
@@ -659,24 +563,44 @@ class VandermondeMatrix:
     on the points of a tabulation, so the back-substitution multiplies each
     entry with a tabulated value.
 
+    For an entity e, the diagonal block of :math:`B_0` has the rows
+    :math:`c(GW_k)`, where :math:`W_k` are the weights of the nodes,
+    :math:`G` is their pullback, and :math:`c` is the contraction with the
+    reference basis, see :meth:`PhysicallyMappedDualSet.to_riesz`.  Let
+    :math:`(W, K)` be a basis of a space of weights that :math:`G` maps
+    into itself, where :math:`K` is the
+    :attr:`~PhysicallyMappedDualSet.completion`, and let :math:`H` be the
+    coordinates of :math:`G^{-1}` on this basis.  Then
+    :math:`B_{ee}^{-1}=H_{WW}-H_{WK}H_{KK}^{-1}H_{KW}`.  When :math:`G`
+    maps :math:`\ker c` into itself, the completion is empty, and
+    :math:`B_{ee}^{-1}` has the rows :math:`c(G^{-1}W_k)`.  Most nodes
+    satisfy this kernel inclusion, so their rows of the inverse are
+    assembled from the inverse pullback alone.
+
     :arg dual: The :class:`PhysicallyMappedDualSet`.
-    :arg tabulation: The :meth:`PhysicallyMappedDualSet.tabulate` of the
-        reference basis.
     :arg coordinate_mapping: Object providing the physical geometry
         as GEM expressions.
     """
 
-    def __init__(self, dual, tabulation, coordinate_mapping):
+    def __init__(self, dual, coordinate_mapping):
         self.dual = dual
-        self.tabulation = tabulation
         self.coordinate_mapping = coordinate_mapping
 
     @cached_property
     def groups(self):
-        """A dict mapping each dimension and entity to the :class:`BlockRow` objects of the entity.
+        r"""A dict mapping each dimension and entity to the :class:`BlockRow` objects of the entity.
+
+        The rows of the inverse of the nodes with an empty
+        :attr:`~PhysicallyMappedDualSet.completion` are those of the
+        inverse pullback.  For the nodes b with a completion, the other
+        nodes a of the entity do not couple to them, so
+        :math:`B_{ee}^{-1}` has the rows
+        :math:`B_{bb}^{-1}(I_b - B_{ba}B_{aa}^{-1})`, with
+        :math:`B_{bb}^{-1}` from :meth:`completed_inverse`.
 
         :raises NotImplementedError: If a row couples to a dof outside the
-            closure of the entity of the node.
+            closure of the entity of the node, or the other nodes of an
+            entity couple to nodes with a completion.
         """
         dual = self.dual
         sd = dual.cell.get_spatial_dimension()
@@ -693,35 +617,75 @@ class VandermondeMatrix:
 
         columns = list(range(len(dual.functionals)))
         pullbacks = {}
-        entity_pullbacks = dual.entity_pullbacks(self.tabulation)
         groups = {}
         for dim in dual.groups:
             groups[dim] = {}
             for entity in dual.groups[dim]:
                 diag = dual.entity_ids[dim][entity]
                 closure = dual.entity_closure_ids[dim][entity]
-                groups[dim][entity] = []
+                completion = dual.completion[dim][entity]
+                entries = {}
                 for key, nodes in dual.groups[dim][entity].items():
                     # Assemble the rows by applying the pulled-back nodes to the reference basis
                     if key not in pullbacks:
                         pullbacks[key] = dual.functionals[nodes[0]].pullback(J, adjJ, detJ, metric, adj_metric)
-                    pullback = pullbacks[key]
-                    entries = dual.to_riesz(nodes, pullback.forward, self.tabulation, columns)
+                    entries[key] = dual.to_riesz(nodes, pullbacks[key].forward, columns)
 
                     # The rows may only couple to the dofs in the closure of their entity
-                    outside = [j for j in numpy.flatnonzero(entries.matrices.any(axis=(0, 1))) if j not in closure]
+                    outside = [j for j in numpy.flatnonzero(entries[key].matrices.any(axis=(0, 1))) if j not in closure]
                     if outside:
                         raise NotImplementedError(f"The pullback of dofs {nodes} on entity {(dim, entity)} needs dofs "
                                                   f"{outside} outside its closure, so it is not local to the entity.")
 
-                    inverse = dual.to_riesz(nodes, pullback.inverse, self.tabulation, diag).collect_terms().expand()
-                    scales = [dual.functionals[i].scaling(h) for i in nodes]
-                    groups[dim][entity].append(BlockRow(nodes, entries, inverse, scales))
-                if (dim, entity) in entity_pullbacks:
-                    inverse = entity_pullbacks[dim, entity](pullbacks).inverse
-                    groups[dim][entity] = [group._replace(inverse=inverse[[diag.index(i) for i in group.nodes]])
-                                           for group in groups[dim][entity]]
+                inverse = numpy.full((len(diag), len(diag)), zero, dtype=object)
+                for key, nodes in dual.groups[dim][entity].items():
+                    if not completion[key]:
+                        rows = [diag.index(i) for i in nodes]
+                        inverse[rows] = dual.to_riesz(nodes, pullbacks[key].inverse, diag).collect_terms().expand()
+                for key, nodes in dual.groups[dim][entity].items():
+                    if completion[key]:
+                        if any(entries[other].matrices[:, :, nodes].any() for other in entries if other != key):
+                            raise NotImplementedError("The other nodes of an entity couple to its nodes with a completion.")
+                        rows = [diag.index(i) for i in nodes]
+                        others = [j for j in diag if j not in nodes]
+                        B_ba = LinearCombination(entries[key].coefficients, entries[key].matrices[:, :, others])
+                        rhs = identity(len(diag))[rows] - sparse_matmul(B_ba.collect_terms().expand(),
+                                                                        inverse[[diag.index(j) for j in others]])
+                        B_bb_inverse = self.completed_inverse(nodes, completion[key], pullbacks[key].inverse)
+                        inverse[rows] = sparse_matmul(B_bb_inverse, rhs)
+
+                groups[dim][entity] = [BlockRow(nodes, entries[key], inverse[[diag.index(i) for i in nodes]],
+                                                [dual.functionals[i].scaling(h) for i in nodes])
+                                       for key, nodes in dual.groups[dim][entity].items()]
         return groups
+
+    def completed_inverse(self, nodes, completion, inverse_pullback):
+        r"""The inverse :math:`B_{bb}^{-1}=H_{WW}-H_{WK}H_{KK}^{-1}H_{KW}` of the diagonal block of nodes with a completion.
+
+        The rows of :math:`H` are the Riesz representations
+        :math:`c(G^{-1}W_i)` and :math:`c(G^{-1}K)` on the nodes and on the
+        pivots of the completion.
+
+        :arg nodes: The nodes b, which share a pullback.
+        :arg completion: Their :attr:`~PhysicallyMappedDualSet.completion`.
+        :arg inverse_pullback: The inverse pullback :math:`G^{-1}` of their weights.
+        :returns: An object array of GEM scalars.
+        """
+        dual = self.dual
+        H = inverse_pullback
+        columns = nodes + list(completion)
+        weights = dual.to_riesz(nodes, H, columns).collect_terms().expand()
+        # The rows of K = AW_i - sum_j c_j W_j share the entries of the rows of the W_j
+        kernel = numpy.array([
+            dual.to_riesz([i], LinearCombination(H.coefficients, H.matrices @ K), columns).collect_terms().expand()[0]
+            - sparse_vecmat(literal_array(c), weights)
+            for i, K, c in completion.values()])
+        n = len(nodes)
+        H_ww, H_wk, H_kw, H_kk = weights[:, :n], weights[:, n:], kernel[:, :n], kernel[:, n:]
+        adj = adjugate(H_kk)
+        # The determinant is the first entry of H_kk adj(H_kk)
+        reciprocal = one / sparse_matmul(H_kk[:1], adj[:, :1])[0, 0]
+        return H_ww - sparse_matmul(H_wk, sparse_matmul(adj, H_kw) * reciprocal)
 
     @cached_property
     def inverses(self):
@@ -1146,8 +1110,20 @@ def round_to_int(x, tol):
     return numpy.where(numpy.abs(x - rounded) <= tol, rounded, x)
 
 
-def cartesian_pullbacks(J, adjJ, detJ):
-    """The :class:`Pullback` of each mapping in Cartesian components."""
+def cartesian_pullbacks(J, adjJ, detJ, metric, adj_metric):
+    r"""The :class:`Pullback` of each mapping in Cartesian components.
+
+    An axis paired with a test function that maps by the same Piola map F
+    pulls back as :math:`F^TF`, which is :math:`G/\det J^2` for the
+    contravariant map and :math:`G^{-1}` for the covariant map, with the
+    metric :math:`G=J^TJ`.
+
+    :arg J: The Jacobian as an object array of GEM scalars.
+    :arg adjJ: The adjugate of the Jacobian.
+    :arg detJ: The determinant of the Jacobian.
+    :arg metric: The metric :math:`J^TJ`.
+    :arg adj_metric: The adjugate of the metric.
+    """
     sd = J.shape[1]
     affine = LinearCombination([one], [numpy.eye(sd)])
     contravariant = LinearCombination.from_matrix(J.T / detJ)
@@ -1158,29 +1134,23 @@ def cartesian_pullbacks(J, adjJ, detJ):
     # as (J^T/detJ) K^T = I/detJ, so the pair scales its weights by 1/detJ.
     pairing = LinearCombination([one / detJ], [numpy.eye(sd * sd)])
     pairing_inverse = LinearCombination([detJ], [numpy.eye(sd * sd)])
+    contravariant_inner = LinearCombination.from_matrix(metric / detJ**2)
+    contravariant_inner_inverse = LinearCombination.from_matrix(adj_metric)
+    covariant_inner = LinearCombination.from_matrix(adj_metric / detJ**2)
+    covariant_inner_inverse = LinearCombination.from_matrix(metric)
     return {"affine": Pullback(affine, affine),
             "contravariant piola": Pullback(contravariant, contravariant_inverse),
             "covariant piola": Pullback(covariant, covariant_inverse),
-            "L2 piola": Pullback(pairing, pairing_inverse)}
-
-
-def inner_product_pullbacks(metric, adj_metric, detJ):
-    r"""The :class:`Pullback` of each mapping of an axis paired with a test function that maps in the same way.
-
-    For the Piola map F, the pair pulls back as :math:`F^TF`, which is
-    :math:`G/\det J^2` for the contravariant map and :math:`G^{-1}` for
-    the covariant map, with the metric :math:`G=J^TJ`.
-    """
-    contravariant = LinearCombination.from_matrix(metric / detJ**2)
-    contravariant_inverse = LinearCombination.from_matrix(adj_metric)
-    covariant = LinearCombination.from_matrix(adj_metric / detJ**2)
-    covariant_inverse = LinearCombination.from_matrix(metric)
-    return {"contravariant inner product": Pullback(contravariant, contravariant_inverse),
-            "covariant inner product": Pullback(covariant, covariant_inverse)}
+            "L2 piola": Pullback(pairing, pairing_inverse),
+            "contravariant inner product": Pullback(contravariant_inner, contravariant_inner_inverse),
+            "covariant inner product": Pullback(covariant_inner, covariant_inner_inverse)}
 
 
 def frame_pullbacks(cell, frame, metric, adj_metric, detJ, avg=True):
     """The :class:`Pullback` of each mapping in the frame of an entity.
+
+    The inner products act on Cartesian components, as in
+    :func:`cartesian_pullbacks`.
 
     :arg cell: The reference cell.
     :arg frame: The entity ``(dim, entity)``, a facet or an edge of a tetrahedron.
@@ -1198,7 +1168,13 @@ def frame_pullbacks(cell, frame, metric, adj_metric, detJ, avg=True):
     else:
         pullbacks, measure = edge_pullbacks(cell, entity, metric, avg)
     affine = Pullback(LinearCombination([measure], [numpy.eye(sd)]), LinearCombination([one / measure], [numpy.eye(sd)]))
-    pullbacks = {"affine": affine, **pullbacks}
+    contravariant_inner = Pullback(LinearCombination.from_matrix(metric / detJ**2).scaled(measure),
+                                   LinearCombination.from_matrix(adj_metric).scaled(one / measure))
+    covariant_inner = Pullback(LinearCombination.from_matrix(adj_metric / detJ**2).scaled(measure),
+                               LinearCombination.from_matrix(metric).scaled(one / measure))
+    pullbacks = {"affine": affine, **pullbacks,
+                 "contravariant inner product": contravariant_inner,
+                 "covariant inner product": covariant_inner}
     if not avg:
         pullbacks[None] = Pullback(LinearCombination([measure], [numpy.eye(1)]), LinearCombination([one / measure], [numpy.eye(1)]))
     return pullbacks

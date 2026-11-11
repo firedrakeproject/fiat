@@ -299,10 +299,14 @@ def test_dual_evaluation(ref_to_phys, element, dimension):
     check_dual_evaluation(element, ref_to_phys[dimension])
 
 
-@pytest.mark.parametrize("dimension", [2, 3])
-def test_reduced_johnson_mercier_diagonal_inverse(ref_to_phys, dimension):
+@pytest.mark.parametrize("dimension, element", [
+    *((2, e) for e in zany_piola_elements[2]),
+    *((2, e) for e in zany_piola_elements[3]),
+    *((3, e) for e in zany_piola_elements[3]),
+])
+def test_diagonal_inverse(ref_to_phys, element, dimension):
     """Each inverse row belongs to the whole entity block."""
-    element = finat.ReducedJohnsonMercier(ref_to_phys[dimension].ref_cell, 1)
+    element = element(ref_to_phys[dimension].ref_cell)
     matrix = element._vandermonde_matrix(ref_to_phys[dimension])
     vandermonde = matrix.array()
     for dim, entities in matrix.dual.entity_ids.items():

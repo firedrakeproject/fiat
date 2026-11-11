@@ -114,21 +114,19 @@ class ReducedJohnsonMercierDualSet(dual_set.DualSet):
             entity_ids[sd-1][f].extend(range(cur, len(nodes)))
 
             # Normal-tangential moments against the complement of RM(F), the
-            # symmetric fields t_i nu_j + t_j nu_i, whose moments give the facet strain
+            # symmetric fields t_i nu_j + t_j nu_i, whose moments give the facet strain.
+            # The test functions of the constraints map contravariantly, as the L2
+            # complements of the covariant spaces RM(F) and RM(T)
             phis = [numpy.outer(thats[i], nu[j]) + numpy.outer(thats[j], nu[i])
                     for i in range(sd-1) for j in range(i, sd-1)]
-            constraints[f] = [FrobeniusIntegralMoment(ref_el, Qf, phi[:, None, :] * n[None, :, None])
+            constraints[f] = [FrobeniusIntegralMoment(ref_el, Qf, phi[:, None, :] * n[None, :, None],
+                                                      test_mapping="contravariant covariant piola")
                               for phi in phis]
-
-        # The test functions of the constraints map contravariantly, as the L2
-        # complements of the covariant spaces RM(F) and RM(T)
-        mapping = [None] * len(nodes)
 
         # Facet constraints
         for f in sorted(top[sd-1]):
             cur = len(nodes)
             nodes.extend(constraints[f])
-            mapping.extend(["contravariant covariant piola"] * len(constraints[f]))
             entity_ids[sd-1][f].extend(range(cur, len(nodes)))
 
         # Interior constraints: moments of divergence against the complement of RM(T)
@@ -145,10 +143,9 @@ class ReducedJohnsonMercierDualSet(dual_set.DualSet):
                 phi = numpy.zeros((sd, len(qpts)))
                 phi[i] += grads[j]
                 phi[j] += grads[i]
-                nodes.append(IntegralMomentOfTensorDivergence(ref_el, Q, phi))
-                mapping.append("contravariant piola")
+                nodes.append(IntegralMomentOfTensorDivergence(ref_el, Q, phi, test_mapping="contravariant piola"))
         entity_ids[sd][0].extend(range(cur, len(nodes)))
-        super().__init__(nodes, ref_el, entity_ids, mapping=mapping)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class ReducedJohnsonMercier(finite_element.CiarletElement):

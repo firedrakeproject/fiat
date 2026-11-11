@@ -43,14 +43,17 @@ class Functional:
          differentiation in each spatial direction.
     :arg functional_type: a string labeling the kind of functional
          this is.
+    :arg test_mapping: the FIAT mapping of the test function of the
+         functional, or None if the test function is not mapped.
     """
     def __init__(self, ref_el, target_shape, pt_dict, deriv_dict,
-                 functional_type):
+                 functional_type, test_mapping=None):
         self.ref_el = ref_el
         self.target_shape = target_shape
         self.pt_dict = pt_dict
         self.deriv_dict = deriv_dict
         self.functional_type = functional_type
+        self.test_mapping = test_mapping
         if len(deriv_dict) > 0:
             self.max_deriv_order = max(sum(wac[1]) for wac in chain(*deriv_dict.values()))
         else:
@@ -359,9 +362,11 @@ class IntegralMoment(Functional):
     :arg comp: Optional argument indicating that only a particular
          component of the input function should be integrated against f
     :arg shp: Optional argument giving the value shape of input functions.
+    :arg test_mapping: Optional FIAT mapping of the test function f of the
+         moment, or None if the test function is not mapped.
     """
 
-    def __init__(self, ref_el, Q, f_at_qpts, comp=(), shp=(), nm=""):
+    def __init__(self, ref_el, Q, f_at_qpts, comp=(), shp=(), nm="", test_mapping=None):
         f_at_qpts = numpy.asarray(f_at_qpts)
         points = Q.get_points()
         if f_at_qpts.ndim == 0 or f_at_qpts.shape[-1] != len(points):
@@ -381,7 +386,8 @@ class IntegralMoment(Functional):
         self.f_at_qpts = f_at_qpts
         self.comp = comp
         self.Q = Q
-        super().__init__(ref_el, target_shape, pt_dict, {}, nm or "IntegralMoment")
+        super().__init__(ref_el, target_shape, pt_dict, {}, nm or "IntegralMoment",
+                         test_mapping=test_mapping)
 
     @cached_property
     def _order_tensors(self):
@@ -421,9 +427,11 @@ class IntegralMomentOfDerivative(IntegralMoment):
          component of the input function should be integrated against f.
          Without it, the leading axes of f index all components of the input.
     :arg shp: Optional argument giving the value shape of input functions.
+    :arg test_mapping: Optional FIAT mapping of the test function f of the
+         moment, or None if the test function is not mapped.
     """
 
-    def __init__(self, ref_el, Q, f_at_qpts, *directions, comp=(), shp=(), nm=""):
+    def __init__(self, ref_el, Q, f_at_qpts, *directions, comp=(), shp=(), nm="", test_mapping=None):
         sd = ref_el.get_spatial_dimension()
         f_at_qpts = numpy.asarray(f_at_qpts)
         S = numpy.ones(())
@@ -462,7 +470,8 @@ class IntegralMomentOfDerivative(IntegralMoment):
         self.Q = Q
         self.f_at_qpts = f_at_qpts
         self.comp = comp
-        Functional.__init__(self, ref_el, shp, {}, dpt_dict, nm or "IntegralMomentOfDerivative")
+        Functional.__init__(self, ref_el, shp, {}, dpt_dict, nm or "IntegralMomentOfDerivative",
+                            test_mapping=test_mapping)
 
 
 class IntegralMomentOfNormalDerivative(IntegralMomentOfDerivative):
@@ -478,8 +487,9 @@ class IntegralMomentOfNormalDerivative(IntegralMomentOfDerivative):
 
 class FrobeniusIntegralMoment(IntegralMoment):
 
-    def __init__(self, ref_el, Q, f_at_qpts, nm=None):
-        super().__init__(ref_el, Q, f_at_qpts, nm=nm or "FrobeniusIntegralMoment")
+    def __init__(self, ref_el, Q, f_at_qpts, nm=None, test_mapping=None):
+        super().__init__(ref_el, Q, f_at_qpts, nm=nm or "FrobeniusIntegralMoment",
+                         test_mapping=test_mapping)
 
 
 class IntegralLegendreDirectionalMoment(FrobeniusIntegralMoment):
@@ -559,9 +569,10 @@ class IntegralMomentOfDivergence(IntegralMomentOfDerivative):
 class IntegralMomentOfTensorDivergence(IntegralMomentOfDerivative):
     """Like IntegralMomentOfDivergence, but on symmetric tensors."""
 
-    def __init__(self, ref_el, Q, f_at_qpts):
+    def __init__(self, ref_el, Q, f_at_qpts, test_mapping=None):
         sd = ref_el.get_spatial_dimension()
-        super().__init__(ref_el, Q, f_at_qpts, numpy.eye(sd), shp=(sd, sd), nm="IntegralMomentOfTensorDivergence")
+        super().__init__(ref_el, Q, f_at_qpts, numpy.eye(sd), shp=(sd, sd), nm="IntegralMomentOfTensorDivergence",
+                         test_mapping=test_mapping)
 
 
 class PointNormalEvaluation(Functional):
