@@ -7,7 +7,8 @@ name = "firedrake-fiat"
 # TODO RELEASE
 version = "2026.11.0.dev0"
 dependencies = [
-  "fenics-ufl==2026.2",
+  # TODO RELEASE
+  "fenics-ufl @ git+https://github.com/FEniCS/ufl.git@main",
   "numpy>=1.16",
   "recursivenodes",
   "scipy",
