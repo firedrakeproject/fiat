@@ -18,6 +18,7 @@ from functools import cached_property
 import numpy
 
 from FIAT import polynomial_set, jacobi, quadrature, quadrature_schemes
+from FIAT.reference_element import make_affine_mapping
 
 
 class Functional:
@@ -43,17 +44,14 @@ class Functional:
          differentiation in each spatial direction.
     :arg functional_type: a string labeling the kind of functional
          this is.
-    :arg test_mapping: the FIAT mapping of the test function of the
-         functional, or None if the test function is not mapped.
     """
     def __init__(self, ref_el, target_shape, pt_dict, deriv_dict,
-                 functional_type, test_mapping=None):
+                 functional_type):
         self.ref_el = ref_el
         self.target_shape = target_shape
         self.pt_dict = pt_dict
         self.deriv_dict = deriv_dict
         self.functional_type = functional_type
-        self.test_mapping = test_mapping
         if len(deriv_dict) > 0:
             self.max_deriv_order = max(sum(wac[1]) for wac in chain(*deriv_dict.values()))
         else:
@@ -362,11 +360,9 @@ class IntegralMoment(Functional):
     :arg comp: Optional argument indicating that only a particular
          component of the input function should be integrated against f
     :arg shp: Optional argument giving the value shape of input functions.
-    :arg test_mapping: Optional FIAT mapping of the test function f of the
-         moment, or None if the test function is not mapped.
     """
 
-    def __init__(self, ref_el, Q, f_at_qpts, comp=(), shp=(), nm="", test_mapping=None):
+    def __init__(self, ref_el, Q, f_at_qpts, comp=(), shp=(), nm=""):
         f_at_qpts = numpy.asarray(f_at_qpts)
         points = Q.get_points()
         if f_at_qpts.ndim == 0 or f_at_qpts.shape[-1] != len(points):
@@ -386,8 +382,7 @@ class IntegralMoment(Functional):
         self.f_at_qpts = f_at_qpts
         self.comp = comp
         self.Q = Q
-        super().__init__(ref_el, target_shape, pt_dict, {}, nm or "IntegralMoment",
-                         test_mapping=test_mapping)
+        super().__init__(ref_el, target_shape, pt_dict, {}, nm or "IntegralMoment")
 
     @cached_property
     def _order_tensors(self):
@@ -427,11 +422,9 @@ class IntegralMomentOfDerivative(IntegralMoment):
          component of the input function should be integrated against f.
          Without it, the leading axes of f index all components of the input.
     :arg shp: Optional argument giving the value shape of input functions.
-    :arg test_mapping: Optional FIAT mapping of the test function f of the
-         moment, or None if the test function is not mapped.
     """
 
-    def __init__(self, ref_el, Q, f_at_qpts, *directions, comp=(), shp=(), nm="", test_mapping=None):
+    def __init__(self, ref_el, Q, f_at_qpts, *directions, comp=(), shp=(), nm=""):
         sd = ref_el.get_spatial_dimension()
         f_at_qpts = numpy.asarray(f_at_qpts)
         S = numpy.ones(())
@@ -470,8 +463,7 @@ class IntegralMomentOfDerivative(IntegralMoment):
         self.Q = Q
         self.f_at_qpts = f_at_qpts
         self.comp = comp
-        Functional.__init__(self, ref_el, shp, {}, dpt_dict, nm or "IntegralMomentOfDerivative",
-                            test_mapping=test_mapping)
+        Functional.__init__(self, ref_el, shp, {}, dpt_dict, nm or "IntegralMomentOfDerivative")
 
 
 class IntegralMomentOfNormalDerivative(IntegralMomentOfDerivative):
@@ -487,9 +479,8 @@ class IntegralMomentOfNormalDerivative(IntegralMomentOfDerivative):
 
 class FrobeniusIntegralMoment(IntegralMoment):
 
-    def __init__(self, ref_el, Q, f_at_qpts, nm=None, test_mapping=None):
-        super().__init__(ref_el, Q, f_at_qpts, nm=nm or "FrobeniusIntegralMoment",
-                         test_mapping=test_mapping)
+    def __init__(self, ref_el, Q, f_at_qpts, nm=None):
+        super().__init__(ref_el, Q, f_at_qpts, nm=nm or "FrobeniusIntegralMoment")
 
 
 class IntegralLegendreDirectionalMoment(FrobeniusIntegralMoment):
@@ -569,10 +560,61 @@ class IntegralMomentOfDivergence(IntegralMomentOfDerivative):
 class IntegralMomentOfTensorDivergence(IntegralMomentOfDerivative):
     """Like IntegralMomentOfDivergence, but on symmetric tensors."""
 
-    def __init__(self, ref_el, Q, f_at_qpts, test_mapping=None):
+    def __init__(self, ref_el, Q, f_at_qpts):
         sd = ref_el.get_spatial_dimension()
-        super().__init__(ref_el, Q, f_at_qpts, numpy.eye(sd), shp=(sd, sd), nm="IntegralMomentOfTensorDivergence",
-                         test_mapping=test_mapping)
+        super().__init__(ref_el, Q, f_at_qpts, numpy.eye(sd), shp=(sd, sd), nm="IntegralMomentOfTensorDivergence")
+
+
+class IntegralMomentOfStrain(IntegralMomentOfDerivative):
+    r"""Functional :math:`S:\varepsilon(u)` of the strain of a vector field u derived from the input.
+
+    The strain :math:`\varepsilon(u)=\frac{1}{2}(\nabla u+\nabla u^T)` pairs
+    the vector axis of u, which is the first value axis of the input, with a
+    gradient through the Euclidean inner product.  S is a constant symmetric
+    tensor.
+    """
+
+
+class IntegralMomentOfTractionStrain(IntegralMomentOfStrain):
+    r"""Facet average of the strain :math:`S:\varepsilon_F(\sigma n)` of the traction of a matrix field.
+
+    :arg ref_el: a :class:`Cell`.
+    :arg facet_no: the facet F.
+    :arg Q_face: a :class:`QuadratureRule` on the reference facet.
+    :arg S: a symmetric tensor tangential to F, so that only the tangential
+         traction and its tangential derivatives enter.
+    """
+
+    def __init__(self, ref_el, facet_no, Q_face, S):
+        sd = ref_el.get_spatial_dimension()
+        n = ref_el.compute_scaled_normal(facet_no)
+        Q = quadrature.FacetQuadratureRule(ref_el, sd-1, facet_no, Q_face, avg=True)
+        # The traction axis, the normal axis, the derivative axis, and the points
+        f_at_qpts = numpy.multiply.outer(numpy.einsum("ab,c->acb", S, n), numpy.ones(len(Q.pts)))
+        super().__init__(ref_el, Q, f_at_qpts, shp=(sd, sd), nm="IntegralMomentOfTractionStrain")
+
+
+class IntegralMomentOfDivergenceStrain(IntegralMomentOfStrain):
+    r"""The strain :math:`S:\varepsilon(I_T\operatorname{div}\sigma)` of the divergence of a matrix field on an Alfeld split.
+
+    :math:`I_T` interpolates by linear polynomials at the barycenters
+    :math:`x_K` of the subcells K, so that
+    :math:`S:\varepsilon(I_T w) = \sum_K w(x_K)\cdot S\nabla\phi_K`, with
+    the linear Lagrange basis :math:`\phi_K` at these points.
+
+    :arg ref_complex: the Alfeld split of a :class:`Cell`.
+    :arg S: a symmetric tensor.
+    """
+
+    def __init__(self, ref_complex, S):
+        ref_el = ref_complex.get_parent()
+        sd = ref_el.get_spatial_dimension()
+        vertices = numpy.asarray(ref_complex.get_vertices())
+        top = ref_complex.get_topology()
+        points = numpy.array([vertices[list(top[sd][K])].mean(axis=0) for K in sorted(top[sd])])
+        grads = make_affine_mapping(points, numpy.eye(len(points)))[0]
+        Q = quadrature.QuadratureRule(ref_el, points, numpy.ones(len(points)))
+        super().__init__(ref_el, Q, S @ grads.T, numpy.eye(sd), shp=(sd, sd), nm="IntegralMomentOfDivergenceStrain")
 
 
 class PointNormalEvaluation(Functional):

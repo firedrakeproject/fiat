@@ -16,7 +16,7 @@ from operator import add, mul
 import gem
 import numpy
 
-from FIAT.functional import IntegralMoment
+from FIAT.functional import IntegralMoment, IntegralMomentOfStrain
 from finat.citations import cite
 
 zero = gem.Zero()
@@ -69,8 +69,8 @@ class PhysicallyMappedFunctional:
     :attr:`weights`: ``affine``, ``covariant piola``, ``contravariant
     piola``, ``L2 piola`` for a contravariant axis paired with a covariant
     axis through the identity, or ``contravariant inner product`` and
-    ``covariant inner product`` for an axis paired with a test function that
-    maps in the same way.  These mappings act on Cartesian components if
+    ``covariant inner product`` for an axis that a strain pairs with a
+    gradient through the Euclidean inner product.  These mappings act on Cartesian components if
     :attr:`frame` is None, and on components in the frame of the entity
     :attr:`frame` otherwise.
 
@@ -107,24 +107,21 @@ class PhysicallyMappedFunctional:
     def axis_mappings(self):
         """The mapping of each value and derivative axis of the weights.
 
-        A value axis that pairs with a test function that maps in the same
-        Piola way, see :attr:`FIAT.functional.Functional.test_mapping`, maps
-        as an inner product.
+        The vector axis of a :class:`FIAT.functional.IntegralMomentOfStrain`
+        maps as an inner product, since the strain pairs it with a gradient
+        through the Euclidean inner product.
         """
         rank = len(self.node.target_shape)
         mappings = value_mappings(self.mapping, rank)
         if len(mappings) != rank:
             raise ValueError(f"A {self.mapping} functional must have rank {len(mappings)}, not {rank}.")
-        if self.node.test_mapping is not None:
-            tests = value_mappings(self.node.test_mapping, rank)
-            # The test function may have fewer value axes than the node
-            mappings = (*(mapping.replace("piola", "inner product") if "piola" in test and test == mapping else mapping
-                          for mapping, test in zip(mappings, tests)), *mappings[len(tests):])
+        if isinstance(self.node, IntegralMomentOfStrain):
+            mappings = (mappings[0].replace("piola", "inner product"), *mappings[1:])
         return mappings + ("covariant piola",) * self.node.max_deriv_order
 
     @cached_property
     def inner_product_axes(self):
-        """The axes of the weights that pair with a test function that maps in the same way."""
+        """The axes of the weights that map as an inner product."""
         return tuple(k for k, mapping in enumerate(self.axis_mappings) if mapping.endswith("inner product"))
 
     @cached_property
@@ -1113,8 +1110,8 @@ def round_to_int(x, tol):
 def cartesian_pullbacks(J, adjJ, detJ, metric, adj_metric):
     r"""The :class:`Pullback` of each mapping in Cartesian components.
 
-    An axis paired with a test function that maps by the same Piola map F
-    pulls back as :math:`F^TF`, which is :math:`G/\det J^2` for the
+    An axis that maps by a Piola map F and pairs through the Euclidean inner
+    product with a direction that also maps by F pulls back as :math:`F^TF`, which is :math:`G/\det J^2` for the
     contravariant map and :math:`G^{-1}` for the covariant map, with the
     metric :math:`G=J^TJ`.
 

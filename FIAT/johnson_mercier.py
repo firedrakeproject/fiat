@@ -1,9 +1,8 @@
 from FIAT import finite_element, dual_set, macro, polynomial_set
 from FIAT.check_format_variant import parse_quadrature_scheme
-from FIAT.functional import (FrobeniusIntegralMoment, IntegralMomentOfTensorDivergence,
-                             TensorBidirectionalIntegralMoment)
+from FIAT.functional import (FrobeniusIntegralMoment, IntegralMomentOfDivergenceStrain,
+                             IntegralMomentOfTractionStrain, TensorBidirectionalIntegralMoment)
 from FIAT.quadrature import FacetQuadratureRule
-from FIAT.reference_element import make_affine_mapping
 import numpy
 
 
@@ -86,15 +85,15 @@ class ReducedJohnsonMercierDualSet(dual_set.DualSet):
         Q = parse_quadrature_scheme(ref_facet, degree+1, quad_scheme)
         P1 = polynomial_set.ONPolynomialSet(ref_facet, degree, scale="orthonormal")
         P1_at_qpts = P1.tabulate(Q.get_points())[(0,)*(sd - 1)]
-        # Barycentric coordinates on the facet with respect to the tangents t_i = v_i - v_0
-        bary = ref_facet.compute_barycentric_coordinates(Q.get_points()).T
-        # Position relative to the facet barycenter is sum_i t_i mu_i
-        mu = bary[1:] - 1/sd
-        # nu_j = lambda_j - lambda_0 satisfies int mu_i nu_j = 0 for i != j
-        nu = bary[1:] - bary[:1]
+        # The facet strain of a linear traction is constant
+        Q0 = parse_quadrature_scheme(ref_facet, 0, quad_scheme)
+        if sd == 3:
+            # Position relative to the facet barycenter, sum_i t_i mu_i
+            bary = ref_facet.compute_barycentric_coordinates(Q.get_points()).T
+            mu = bary[1:] - 1/sd
 
         # Facet degrees of freedom
-        constraints = {}
+        strains = {}
         for f in sorted(top[sd-1]):
             cur = len(nodes)
             n = ref_el.compute_scaled_normal(f)
@@ -113,37 +112,22 @@ class ReducedJohnsonMercierDualSet(dual_set.DualSet):
                 nodes.append(FrobeniusIntegralMoment(ref_el, Qf, rot[:, None, :] * n[None, :, None]))
             entity_ids[sd-1][f].extend(range(cur, len(nodes)))
 
-            # Normal-tangential moments against the complement of RM(F), the
-            # symmetric fields t_i nu_j + t_j nu_i, whose moments give the facet strain.
-            # The test functions of the constraints map contravariantly, as the L2
-            # complements of the covariant spaces RM(F) and RM(T)
-            phis = [numpy.outer(thats[i], nu[j]) + numpy.outer(thats[j], nu[i])
-                    for i in range(sd-1) for j in range(i, sd-1)]
-            constraints[f] = [FrobeniusIntegralMoment(ref_el, Qf, phi[:, None, :] * n[None, :, None],
-                                                      test_mapping="contravariant covariant piola")
-                              for phi in phis]
+            # The facet strain of the traction vanishes exactly when its
+            # tangential part lies in RM(F)
+            strains[f] = [IntegralMomentOfTractionStrain(ref_el, f, Q0, numpy.outer(thats[i], thats[j]) + numpy.outer(thats[j], thats[i]))
+                          for i in range(sd-1) for j in range(i, sd-1)]
 
-        # Facet constraints
         for f in sorted(top[sd-1]):
             cur = len(nodes)
-            nodes.extend(constraints[f])
+            nodes.extend(strains[f])
             entity_ids[sd-1][f].extend(range(cur, len(nodes)))
 
-        # Interior constraints: moments of divergence against the complement of RM(T)
-        # in P0(Alfeld), spanned by S grad(lambda_i) on the subcell opposite to vertex i,
-        # for each symmetric matrix S
-        Q = parse_quadrature_scheme(ref_complex, 2*(degree-1), quad_scheme)
-        qpts = Q.get_points()
-        grad_bary = make_affine_mapping(ref_el.get_vertices(), numpy.eye(sd+1))[0]
-        subcells = numpy.argmin(ref_el.compute_barycentric_coordinates(qpts), axis=1)
-        grads = grad_bary[subcells].T
+        # Interior degrees of freedom: the strain of I_T div(sigma), which vanishes
+        # exactly when div(sigma) lies in P_T RM(T)
         cur = len(nodes)
-        for i in range(sd):
-            for j in range(i, sd):
-                phi = numpy.zeros((sd, len(qpts)))
-                phi[i] += grads[j]
-                phi[j] += grads[i]
-                nodes.append(IntegralMomentOfTensorDivergence(ref_el, Q, phi, test_mapping="contravariant piola"))
+        I = numpy.eye(sd)
+        nodes.extend(IntegralMomentOfDivergenceStrain(ref_complex, numpy.outer(I[i], I[j]) + numpy.outer(I[j], I[i]))
+                     for i in range(sd) for j in range(i, sd))
         entity_ids[sd][0].extend(range(cur, len(nodes)))
         super().__init__(nodes, ref_el, entity_ids)
 
