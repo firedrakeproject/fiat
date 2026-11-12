@@ -4,29 +4,49 @@
 #
 # Written by Pablo D. Brubeck (brubeck@protonmail.com), 2024
 
-# This is not quite Bernardi-Raugel, but it has 2*dim*(dim+1) dofs and includes
-# dim**2-1 extra constraint functionals.  The first (dim+1)**2 basis functions
-# are the reference element bfs, but the extra dim**2-1 are used in the
-# transformation theory.
+# The extended element includes dim-1 tangential constraints on each facet.
+# These are numbered last and used in the basis transformation.
 
 from FIAT import finite_element, dual_set, polynomial_set, expansions
 from FIAT.check_format_variant import parse_quadrature_scheme
-from FIAT.functional import ComponentPointEvaluation, FrobeniusIntegralMoment
+from FIAT.functional import (ComponentPointEvaluation, FrobeniusIntegralMoment,
+                             IntegralMomentOfDivergence)
 from FIAT.hierarchical import make_projected_bubble_moments
 from FIAT.quadrature import FacetQuadratureRule
+from FIAT.quadrature_schemes import create_quadrature
 
 import numpy
 import math
 
 
-def BernardiRaugelSpace(ref_el, order):
-    """Return a basis for the extended Bernardi-Raugel space: (Pk + FacetBubble)^d."""
+def BernardiRaugelSpace(ref_el, order, interior=True):
+    """Return a basis for the extended Bernardi-Raugel space.
+
+    The space is (Pk + FacetBubble + InteriorBubble P_{k-2})^d.  For k >= 2, the
+    interior bubbles control the divergence in P_{k-1} / P0.
+
+    Parameters
+    ----------
+    ref_el : FIAT.reference_element.Cell
+        The reference cell or macrocell.
+    order : int
+        The polynomial degree k.
+    interior : bool, optional
+        Include the interior bubbles if True.
+
+    Returns
+    -------
+    FIAT.polynomial_set.PolynomialSet
+        A basis for the extended Bernardi-Raugel space, with the Pk basis
+        numbered first, followed by facet and interior bubbles.
+    """
     sd = ref_el.get_spatial_dimension()
     if order > sd:
         raise ValueError("The Bernardi-Raugel space is only defined for order <= dim")
-    Pd = polynomial_set.ONPolynomialSet(ref_el, sd, shape=(sd,), scale=1, variant="bubble")
-    dimPd = expansions.polynomial_dimension(ref_el, sd, continuity="C0")
-    entity_ids = expansions.polynomial_entity_ids(ref_el, sd, continuity="C0")
+    degree = sd + max(order-1, 0) if interior else sd
+    Pd = polynomial_set.ONPolynomialSet(ref_el, degree, shape=(sd,), scale=1, variant="bubble")
+    dimPd = expansions.polynomial_dimension(ref_el, degree, continuity="C0")
+    entity_ids = expansions.polynomial_entity_ids(ref_el, degree, continuity="C0")
 
     slices = {dim: slice(math.comb(order-1, dim)) for dim in range(order)}
     slices.pop(sd-1, None)
@@ -40,8 +60,14 @@ def BernardiRaugelSpace(ref_el, order):
     facets = list(set(entity_ids[sd-1]) - set(interior_facets))
     ids.extend(i + j*dimPd
                for f in sorted(facets)
-               for i in entity_ids[sd-1][f]
+               for i in entity_ids[sd-1][f][:1]
                for j in range(sd))
+    if interior and order > 1:
+        # The cell bubbles of degree d+k-1 span b_K P_{k-2}.
+        ids.extend(i + j*dimPd
+                   for cell in sorted(entity_ids[sd])
+                   for i in entity_ids[sd][cell]
+                   for j in range(sd))
     return Pd.take(ids)
 
 
@@ -130,6 +156,18 @@ class BernardiRaugelDualSet(dual_set.DualSet):
 
                     nodes.append(FrobeniusIntegralMoment(ref_el, Q, numpy.outer(comp, phi)))
                     entity_ids[sd-1][f].extend(range(cur, len(nodes)))
+
+                if i == 0 and order > 1 and not any(ref_el.get_interior_facets(dim) for dim in range(order)):
+                    # Interior DoFs: divergence moments against P_{k-1} / P0.
+                    cur = len(nodes)
+                    Q = create_quadrature(ref_complex, degree + order - 1)
+                    P = polynomial_set.ONPolynomialSet(ref_el, order - 1, scale=1)
+                    phis = P.tabulate(Q.get_points())[(0,) * sd][1:]
+                    # The divergence maps as L2 Piola
+                    J = ref_el.compute_tangents(sd, 0).T
+                    phis *= numpy.sign(numpy.linalg.det(J))
+                    nodes.extend(IntegralMomentOfDivergence(ref_el, Q, phi) for phi in phis)
+                    entity_ids[sd][0].extend(range(cur, len(nodes)))
         super().__init__(nodes, ref_el, entity_ids)
 
 
@@ -142,13 +180,13 @@ class BernardiRaugel(finite_element.CiarletElement):
     with tangential facet moments as dofs and normal facet bubbles constrained.
     """
     def __init__(self, ref_el, order=1, hierarchical=False, quad_scheme=None, rotated=False):
-        degree = ref_el.get_spatial_dimension()
-        if order >= degree:
+        sd = ref_el.get_spatial_dimension()
+        if order >= sd:
             raise ValueError(f"{type(self).__name__} only defined for order < dim")
         poly_set = BernardiRaugelSpace(ref_el, order)
-        dual = BernardiRaugelDualSet(ref_el, order, degree=degree,
+        dual = BernardiRaugelDualSet(ref_el, order, degree=sd,
                                      hierarchical=hierarchical, quad_scheme=quad_scheme,
                                      rotated=rotated)
         formdegree = 0
         mapping = "covariant piola" if rotated else "contravariant piola"
-        super().__init__(poly_set, dual, degree, formdegree, mapping=mapping)
+        super().__init__(poly_set, dual, poly_set.degree, formdegree, mapping=mapping)
