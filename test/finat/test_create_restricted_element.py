@@ -1,6 +1,7 @@
 import pytest
 import ufl
-from finat.ufl import FiniteElement, RestrictedElement, VectorElement, TensorElement, MixedElement
+from finat.ufl import (FiniteElement, RestrictedElement, VectorElement, TensorElement, MixedElement,
+                       TensorProductElement)
 
 sub_elements = [
     FiniteElement("CG", ufl.triangle, 1),
@@ -41,3 +42,18 @@ def test_create_restricted_mixed_element(sub_elements):
     mixed = MixedElement(sub_elements)
     expected = MixedElement([elem["facet"] for elem in sub_elements])
     assert mixed["facet"] == expected
+
+
+@pytest.mark.parametrize("element", [
+    FiniteElement("CG", ufl.triangle, 3),
+    TensorProductElement(FiniteElement("CG", ufl.triangle, 2), FiniteElement("CG", ufl.interval, 1)),
+], ids=("CG(3)", "CG(2)xCG(1)"))
+def test_restricted_element_embedded_degrees(element):
+    """Check that a restricted element's embedded degree is an int,
+    including on a tensor product cell where its degree is a tuple
+    """
+    restricted = element["facet"]
+    assert restricted.embedded_superdegree == element.embedded_superdegree
+
+    mixed = MixedElement(element, restricted)
+    assert mixed.embedded_superdegree == element.embedded_superdegree

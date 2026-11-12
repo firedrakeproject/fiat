@@ -486,6 +486,8 @@ def canonical_element_description(family, cell, order, form_degree):
         embedded_degree = tdim + 1
     elif family in {"Reduced-Fu-Guzman-Neilan H1(curl)", "Hu-Zhang-Zhang"}:
         embedded_degree = tdim + 1
+    elif family == "Bernardi-Raugel" and order is not None:
+        embedded_degree = tdim + max(order - 1, 0)
     elif any(bubble in family for bubble in ("Guzman-Neilan", "Bernardi-Raugel")):
         embedded_degree = tdim
 
