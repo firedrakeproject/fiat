@@ -27,6 +27,10 @@ from gem.interpreter import evaluate
     (3, finat.MardalTaiWinther, 2, None),
     (2, finat.GuzmanNeilanFirstKindH1, 1, None),
     (3, finat.GuzmanNeilanFirstKindH1, 1, None),
+    (3, finat.ReducedFuGuzmanNeilanH1curl, 2, None),
+    (3, finat.ReducedFuGuzmanNeilanH1curl, 3, None),
+    (3, finat.HuZhangZhang, 1, None),
+    (3, finat.HuZhangZhang, 2, None),
     (2, finat.JohnsonMercier, 1, None),
     (3, finat.JohnsonMercier, 1, None),
 ])

@@ -59,6 +59,8 @@ from FIAT.arnold_qin import ArnoldQin                           # noqa: F401
 from FIAT.christiansen_hu import ChristiansenHu                 # noqa: F401
 from FIAT.guzman_neilan import GuzmanNeilanFirstKindH1          # noqa: F401
 from FIAT.guzman_neilan import GuzmanNeilanSecondKindH1         # noqa: F401
+from FIAT.fu_guzman_neilan import ReducedFuGuzmanNeilanH1curl   # noqa: F401
+from FIAT.hu_zhang_zhang import HuZhangZhang                    # noqa: F401
 from FIAT.johnson_mercier import JohnsonMercier                 # noqa: F401
 from FIAT.bubble import Bubble, FacetBubble                     # noqa: F401
 from FIAT.enriched import EnrichedElement                       # noqa: F401
@@ -408,6 +410,10 @@ elements = [
     "GuzmanNeilanSecondKindH1(S, 1)",
     "GuzmanNeilanSecondKindH1(S, 2)",
     "NodalEnrichedElement(GuzmanNeilanFirstKindH1(S, 0), AlfeldSorokina(S))",
+    "ReducedFuGuzmanNeilanH1curl(S, 2)",
+    "ReducedFuGuzmanNeilanH1curl(S, 3)",
+    "HuZhangZhang(S, 1)",
+    "HuZhangZhang(S, 2)",
 
     # MixedElement made of nodal elements should be nodal, but its API
     # is currently just broken.

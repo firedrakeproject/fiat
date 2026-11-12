@@ -312,3 +312,14 @@ if petsctools is not None:
  year = {2008}
 }
 }""")
+    petsctools.add_citation("HuZhangZhang2022", """
+@article{HuZhangZhang2022,
+  title={A family of finite element {Stokes} complexes in three dimensions},
+  author={Hu, Kaibo and Zhang, Qian and Zhang, Zhimin},
+  journal={SIAM Journal on Numerical Analysis},
+  volume={60},
+  number={1},
+  pages={222--243},
+  year={2022},
+  doi={10.1137/20M1358700}
+}""")

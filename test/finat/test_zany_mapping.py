@@ -243,6 +243,10 @@ def test_unreduced_arnold_winther(ref_to_phys):
     (3, finat.MardalTaiWinther, 2),
     (3, finat.GuzmanNeilanFirstKindH1, 2),
     (3, finat.BernardiRaugel, 2),
+    (3, finat.ReducedFuGuzmanNeilanH1curl, 2),
+    (3, finat.ReducedFuGuzmanNeilanH1curl, 3),
+    (3, finat.HuZhangZhang, 1),
+    (3, finat.HuZhangZhang, 2),
 ])
 def test_high_order_stokes_elements(ref_to_phys, element, dimension, degree):
     check_zany_mapping(element, ref_to_phys[dimension], degree)
