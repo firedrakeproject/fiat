@@ -42,16 +42,16 @@
 <span class="c1">#</span>
 <span class="c1"># Written by Pablo D. Brubeck (brubeck@protonmail.com), 2024</span>
 
-<span class="c1"># This is not quite Bernardi-Raugel, but it has 2*dim*(dim+1) dofs and includes</span>
-<span class="c1"># dim**2-1 extra constraint functionals.  The first (dim+1)**2 basis functions</span>
-<span class="c1"># are the reference element bfs, but the extra dim**2-1 are used in the</span>
-<span class="c1"># transformation theory.</span>
+<span class="c1"># The extended element includes dim-1 tangential constraints on each facet.</span>
+<span class="c1"># These are numbered last and used in the basis transformation.</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">finite_element</span><span class="p">,</span> <span class="n">dual_set</span><span class="p">,</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">expansions</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.check_format_variant</span><span class="w"> </span><span class="kn">import</span> <span class="n">parse_quadrature_scheme</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.functional</span><span class="w"> </span><span class="kn">import</span> <span class="n">ComponentPointEvaluation</span><span class="p">,</span> <span class="n">FrobeniusIntegralMoment</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.functional</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">ComponentPointEvaluation</span><span class="p">,</span> <span class="n">FrobeniusIntegralMoment</span><span class="p">,</span>
+                             <span class="n">IntegralMomentOfDivergence</span><span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.hierarchical</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_projected_bubble_moments</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature</span><span class="w"> </span><span class="kn">import</span> <span class="n">FacetQuadratureRule</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature_schemes</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_quadrature</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
@@ -59,14 +59,34 @@
 
 <div class="viewcode-block" id="BernardiRaugelSpace">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.bernardi_raugel.BernardiRaugelSpace">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">BernardiRaugelSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Return a basis for the extended Bernardi-Raugel space: (Pk + FacetBubble)^d."""</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">BernardiRaugelSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">interior</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return a basis for the extended Bernardi-Raugel space.</span>
+
+<span class="sd">    The space is (Pk + FacetBubble + InteriorBubble P_{k-2})^d.  For k &gt;= 2, the</span>
+<span class="sd">    interior bubbles control the divergence in P_{k-1} / P0.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    ref_el : FIAT.reference_element.Cell</span>
+<span class="sd">        The reference cell or macrocell.</span>
+<span class="sd">    order : int</span>
+<span class="sd">        The polynomial degree k.</span>
+<span class="sd">    interior : bool, optional</span>
+<span class="sd">        Include the interior bubbles if True.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    FIAT.polynomial_set.PolynomialSet</span>
+<span class="sd">        A basis for the extended Bernardi-Raugel space, with the Pk basis</span>
+<span class="sd">        numbered first, followed by facet and interior bubbles.</span>
+<span class="sd">    """</span>
     <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
     <span class="k">if</span> <span class="n">order</span> <span class="o">&gt;</span> <span class="n">sd</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"The Bernardi-Raugel space is only defined for order &lt;= dim"</span><span class="p">)</span>
-    <span class="n">Pd</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">sd</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">sd</span><span class="p">,),</span> <span class="n">scale</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">"bubble"</span><span class="p">)</span>
-    <span class="n">dimPd</span> <span class="o">=</span> <span class="n">expansions</span><span class="o">.</span><span class="n">polynomial_dimension</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">sd</span><span class="p">,</span> <span class="n">continuity</span><span class="o">=</span><span class="s2">"C0"</span><span class="p">)</span>
-    <span class="n">entity_ids</span> <span class="o">=</span> <span class="n">expansions</span><span class="o">.</span><span class="n">polynomial_entity_ids</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">sd</span><span class="p">,</span> <span class="n">continuity</span><span class="o">=</span><span class="s2">"C0"</span><span class="p">)</span>
+    <span class="n">degree</span> <span class="o">=</span> <span class="n">sd</span> <span class="o">+</span> <span class="nb">max</span><span class="p">(</span><span class="n">order</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="k">if</span> <span class="n">interior</span> <span class="k">else</span> <span class="n">sd</span>
+    <span class="n">Pd</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">sd</span><span class="p">,),</span> <span class="n">scale</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">"bubble"</span><span class="p">)</span>
+    <span class="n">dimPd</span> <span class="o">=</span> <span class="n">expansions</span><span class="o">.</span><span class="n">polynomial_dimension</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">continuity</span><span class="o">=</span><span class="s2">"C0"</span><span class="p">)</span>
+    <span class="n">entity_ids</span> <span class="o">=</span> <span class="n">expansions</span><span class="o">.</span><span class="n">polynomial_entity_ids</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">continuity</span><span class="o">=</span><span class="s2">"C0"</span><span class="p">)</span>
 
     <span class="n">slices</span> <span class="o">=</span> <span class="p">{</span><span class="n">dim</span><span class="p">:</span> <span class="nb">slice</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">comb</span><span class="p">(</span><span class="n">order</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">dim</span><span class="p">))</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">order</span><span class="p">)}</span>
     <span class="n">slices</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
@@ -80,8 +100,14 @@
     <span class="n">facets</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">entity_ids</span><span class="p">[</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="n">interior_facets</span><span class="p">))</span>
     <span class="n">ids</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="n">j</span><span class="o">*</span><span class="n">dimPd</span>
                <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">facets</span><span class="p">)</span>
-               <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">entity_ids</span><span class="p">[</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="n">f</span><span class="p">]</span>
+               <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">entity_ids</span><span class="p">[</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="n">f</span><span class="p">][:</span><span class="mi">1</span><span class="p">]</span>
                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">interior</span> <span class="ow">and</span> <span class="n">order</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="c1"># The cell bubbles of degree d+k-1 span b_K P_{k-2}.</span>
+        <span class="n">ids</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="n">j</span><span class="o">*</span><span class="n">dimPd</span>
+                   <span class="k">for</span> <span class="n">cell</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">entity_ids</span><span class="p">[</span><span class="n">sd</span><span class="p">])</span>
+                   <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">entity_ids</span><span class="p">[</span><span class="n">sd</span><span class="p">][</span><span class="n">cell</span><span class="p">]</span>
+                   <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">))</span>
     <span class="k">return</span> <span class="n">Pd</span><span class="o">.</span><span class="n">take</span><span class="p">(</span><span class="n">ids</span><span class="p">)</span></div>
 
 
@@ -166,6 +192,18 @@
 
                     <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">FrobeniusIntegralMoment</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="n">comp</span><span class="p">,</span> <span class="n">phi</span><span class="p">)))</span>
                     <span class="n">entity_ids</span><span class="p">[</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="n">f</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
+
+                <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">order</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_interior_facets</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">order</span><span class="p">)):</span>
+                    <span class="c1"># Interior DoFs: divergence moments against P_{k-1} / P0.</span>
+                    <span class="n">cur</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
+                    <span class="n">Q</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">ref_complex</span><span class="p">,</span> <span class="n">degree</span> <span class="o">+</span> <span class="n">order</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+                    <span class="n">P</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+                    <span class="n">phis</span> <span class="o">=</span> <span class="n">P</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">())[(</span><span class="mi">0</span><span class="p">,)</span> <span class="o">*</span> <span class="n">sd</span><span class="p">][</span><span class="mi">1</span><span class="p">:]</span>
+                    <span class="c1"># The divergence maps as L2 Piola</span>
+                    <span class="n">J</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_tangents</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>
+                    <span class="n">phis</span> <span class="o">*=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">sign</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">det</span><span class="p">(</span><span class="n">J</span><span class="p">))</span>
+                    <span class="n">nodes</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">IntegralMomentOfDivergence</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">phi</span><span class="p">)</span> <span class="k">for</span> <span class="n">phi</span> <span class="ow">in</span> <span class="n">phis</span><span class="p">)</span>
+                    <span class="n">entity_ids</span><span class="p">[</span><span class="n">sd</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">)</span></div>
 
 
@@ -179,13 +217,13 @@
 <span class="sd">    DG_{k-1}. This pair is inf-sup stable, but only weakly divergence-free.</span>
 <span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-        <span class="n">degree</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
-        <span class="k">if</span> <span class="n">order</span> <span class="o">&gt;=</span> <span class="n">degree</span><span class="p">:</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">order</span> <span class="o">&gt;=</span> <span class="n">sd</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> only defined for order &lt; dim"</span><span class="p">)</span>
         <span class="n">poly_set</span> <span class="o">=</span> <span class="n">BernardiRaugelSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="p">)</span>
-        <span class="n">dual</span> <span class="o">=</span> <span class="n">BernardiRaugelDualSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="n">degree</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="n">hierarchical</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="o">=</span><span class="n">quad_scheme</span><span class="p">)</span>
+        <span class="n">dual</span> <span class="o">=</span> <span class="n">BernardiRaugelDualSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="n">sd</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="n">hierarchical</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="o">=</span><span class="n">quad_scheme</span><span class="p">)</span>
         <span class="n">formdegree</span> <span class="o">=</span> <span class="mi">0</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">formdegree</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="s2">"contravariant piola"</span><span class="p">)</span></div>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">poly_set</span><span class="o">.</span><span class="n">degree</span><span class="p">,</span> <span class="n">formdegree</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="s2">"contravariant piola"</span><span class="p">)</span></div>
 
 </pre></div>
 

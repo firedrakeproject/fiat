@@ -534,6 +534,8 @@
         <span class="n">embedded_degree</span> <span class="o">+=</span> <span class="n">bump</span>
     <span class="k">elif</span> <span class="n">family</span> <span class="o">==</span> <span class="s2">"Mardal-Tai-Winther"</span><span class="p">:</span>
         <span class="n">embedded_degree</span> <span class="o">=</span> <span class="n">tdim</span> <span class="o">+</span> <span class="mi">1</span>
+    <span class="k">elif</span> <span class="n">family</span> <span class="o">==</span> <span class="s2">"Bernardi-Raugel"</span> <span class="ow">and</span> <span class="n">order</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">embedded_degree</span> <span class="o">=</span> <span class="n">tdim</span> <span class="o">+</span> <span class="nb">max</span><span class="p">(</span><span class="n">order</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
     <span class="k">elif</span> <span class="nb">any</span><span class="p">(</span><span class="n">bubble</span> <span class="ow">in</span> <span class="n">family</span> <span class="k">for</span> <span class="n">bubble</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"Guzman-Neilan"</span><span class="p">,</span> <span class="s2">"Bernardi-Raugel"</span><span class="p">)):</span>
         <span class="n">embedded_degree</span> <span class="o">=</span> <span class="n">tdim</span>
 

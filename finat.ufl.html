@@ -871,6 +871,18 @@ A component is a tuple of one or more ints.</p>
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.ufl.restrictedelement.</span></span><span class="sig-name descname"><span class="pre">RestrictedElement</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">restriction_domain</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/restrictedelement.html#RestrictedElement"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.restrictedelement.RestrictedElement" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#finat.ufl.finiteelementbase.FiniteElementBase" title="finat.ufl.finiteelementbase.FiniteElementBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">FiniteElementBase</span></code></a></p>
 <p>Represents the restriction of a finite element to a type of cell entity.</p>
+<dl class="py property">
+<dt class="sig sig-object py" id="finat.ufl.restrictedelement.RestrictedElement.embedded_subdegree">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">embedded_subdegree</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a></span><a class="headerlink" href="#finat.ufl.restrictedelement.RestrictedElement.embedded_subdegree" title="Link to this definition">¶</a></dt>
+<dd><p>The degree of the largest Lagrange space that this element contains.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="finat.ufl.restrictedelement.RestrictedElement.embedded_superdegree">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">embedded_superdegree</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><a class="headerlink" href="#finat.ufl.restrictedelement.RestrictedElement.embedded_superdegree" title="Link to this definition">¶</a></dt>
+<dd><p>The degree of the smallest Lagrange space that contains this element.</p>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.ufl.restrictedelement.RestrictedElement.is_cellwise_constant">
 <span class="sig-name descname"><span class="pre">is_cellwise_constant</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/restrictedelement.html#RestrictedElement.is_cellwise_constant"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.restrictedelement.RestrictedElement.is_cellwise_constant" title="Link to this definition">¶</a></dt>
@@ -1539,6 +1551,18 @@ element is nodal.</p>
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.ufl.</span></span><span class="sig-name descname"><span class="pre">RestrictedElement</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">restriction_domain</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/restrictedelement.html#RestrictedElement"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.RestrictedElement" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#finat.ufl.finiteelementbase.FiniteElementBase" title="finat.ufl.finiteelementbase.FiniteElementBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">FiniteElementBase</span></code></a></p>
 <p>Represents the restriction of a finite element to a type of cell entity.</p>
+<dl class="py property">
+<dt class="sig sig-object py" id="finat.ufl.RestrictedElement.embedded_subdegree">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">embedded_subdegree</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a></span><a class="headerlink" href="#finat.ufl.RestrictedElement.embedded_subdegree" title="Link to this definition">¶</a></dt>
+<dd><p>The degree of the largest Lagrange space that this element contains.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="finat.ufl.RestrictedElement.embedded_superdegree">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">embedded_superdegree</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><a class="headerlink" href="#finat.ufl.RestrictedElement.embedded_superdegree" title="Link to this definition">¶</a></dt>
+<dd><p>The degree of the smallest Lagrange space that contains this element.</p>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.ufl.RestrictedElement.is_cellwise_constant">
 <span class="sig-name descname"><span class="pre">is_cellwise_constant</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/restrictedelement.html#RestrictedElement.is_cellwise_constant"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.RestrictedElement.is_cellwise_constant" title="Link to this definition">¶</a></dt>
@@ -2030,6 +2054,8 @@ remapped = WithMapping(E, “identity”)</p>
 </li>
 <li><a class="reference internal" href="#module-finat.ufl.restrictedelement">finat.ufl.restrictedelement module</a><ul>
 <li><a class="reference internal" href="#finat.ufl.restrictedelement.RestrictedElement"><code class="docutils literal notranslate"><span class="pre">RestrictedElement</span></code></a><ul>
+<li><a class="reference internal" href="#finat.ufl.restrictedelement.RestrictedElement.embedded_subdegree"><code class="docutils literal notranslate"><span class="pre">RestrictedElement.embedded_subdegree</span></code></a></li>
+<li><a class="reference internal" href="#finat.ufl.restrictedelement.RestrictedElement.embedded_superdegree"><code class="docutils literal notranslate"><span class="pre">RestrictedElement.embedded_superdegree</span></code></a></li>
 <li><a class="reference internal" href="#finat.ufl.restrictedelement.RestrictedElement.is_cellwise_constant"><code class="docutils literal notranslate"><span class="pre">RestrictedElement.is_cellwise_constant()</span></code></a></li>
 <li><a class="reference internal" href="#finat.ufl.restrictedelement.RestrictedElement.mapping"><code class="docutils literal notranslate"><span class="pre">RestrictedElement.mapping()</span></code></a></li>
 <li><a class="reference internal" href="#finat.ufl.restrictedelement.RestrictedElement.num_restricted_sub_elements"><code class="docutils literal notranslate"><span class="pre">RestrictedElement.num_restricted_sub_elements()</span></code></a></li>
@@ -2159,6 +2185,8 @@ remapped = WithMapping(E, “identity”)</p>
 </ul>
 </li>
 <li><a class="reference internal" href="#finat.ufl.RestrictedElement"><code class="docutils literal notranslate"><span class="pre">RestrictedElement</span></code></a><ul>
+<li><a class="reference internal" href="#finat.ufl.RestrictedElement.embedded_subdegree"><code class="docutils literal notranslate"><span class="pre">RestrictedElement.embedded_subdegree</span></code></a></li>
+<li><a class="reference internal" href="#finat.ufl.RestrictedElement.embedded_superdegree"><code class="docutils literal notranslate"><span class="pre">RestrictedElement.embedded_superdegree</span></code></a></li>
 <li><a class="reference internal" href="#finat.ufl.RestrictedElement.is_cellwise_constant"><code class="docutils literal notranslate"><span class="pre">RestrictedElement.is_cellwise_constant()</span></code></a></li>
 <li><a class="reference internal" href="#finat.ufl.RestrictedElement.mapping"><code class="docutils literal notranslate"><span class="pre">RestrictedElement.mapping()</span></code></a></li>
 <li><a class="reference internal" href="#finat.ufl.RestrictedElement.num_restricted_sub_elements"><code class="docutils literal notranslate"><span class="pre">RestrictedElement.num_restricted_sub_elements()</span></code></a></li>
