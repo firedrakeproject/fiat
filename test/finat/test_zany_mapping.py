@@ -150,6 +150,7 @@ def test_C1_interval(ref_to_phys, element, degree):
 @pytest.mark.parametrize("element", [
                          finat.Morley,
                          finat.Hermite,
+                         finat.ReducedHermite,
                          finat.Bell,
                          finat.WuXuH3NC,
                          finat.WuXuRobustH3NC,
@@ -158,10 +159,15 @@ def test_C1_triangle(ref_to_phys, element):
     check_zany_mapping(element, ref_to_phys[2])
 
 
+def test_rotated_bernardi_raugel(ref_to_phys):
+    check_zany_mapping(finat.BernardiRaugel, ref_to_phys[2], rotated=True)
+
+
 @pytest.mark.parametrize("element", [
                          finat.Morley,
                          finat.Hermite,
                          finat.Walkington,
+                         finat.ReducedWalkington,
                          ])
 def test_C1_tetrahedron(ref_to_phys, element):
     check_zany_mapping(element, ref_to_phys[3])

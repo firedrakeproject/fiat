@@ -57,6 +57,22 @@ def test_polynomial_set_recombine_requires_one_column_per_polynomial() -> None:
         poly_set.recombine(numpy.eye(len(poly_set) + 1))
 
 
+@pytest.mark.parametrize("dim,constraints", [(2, (1, 1/2)), (3, (1, 2/3, 1/3))])
+def test_taylor_constrained_polynomial_set(dim, constraints):
+    cell = reference_element.ufc_simplex(dim)
+    degree = len(constraints) + 1
+    poly_set = polynomial_set.ONPolynomialSet(cell, degree)
+    constrained = polynomial_set.TaylorConstrainedPolynomialSet(poly_set, constraints)
+    assert len(constrained) == len(poly_set) - 1
+
+    # The constraint is exact on polynomials of one degree less
+    pts = cell.make_points(dim, 0, degree + dim + 1)
+    V = constrained.tabulate(pts)[(0,) * dim]
+    P = polynomial_set.ONPolynomialSet(cell, degree - 1).tabulate(pts)[(0,) * dim]
+    coeffs, *_ = numpy.linalg.lstsq(V.T, P.T, rcond=None)
+    assert numpy.allclose(V.T @ coeffs, P.T)
+
+
 @pytest.mark.parametrize("degree", [10])
 def test_expansion_values(cell, degree):
     dim = cell.get_spatial_dimension()
