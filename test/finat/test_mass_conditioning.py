@@ -6,6 +6,10 @@ from gem.interpreter import evaluate
 
 @pytest.mark.parametrize("sd,element,degree,variant", [
     (2, finat.Hermite, 3, None),
+    (2, finat.ArnoldWintherNC, 2, None),
+    (2, finat.ArnoldWinther, 3, None),
+    (2, finat.HuZhang, 3, "integral"),
+    (2, finat.HuZhang, 3, "point"),
     (2, finat.QuadraticPowellSabin6, 2, None),
     (2, finat.QuadraticPowellSabin12, 2, None),
     (2, finat.ReducedHsiehCloughTocher, 3, None),
@@ -20,15 +24,35 @@ from gem.interpreter import evaluate
     (2, finat.BrambleZlamalC2, 9, None),
     (2, finat.AlfeldC2, 5, None),
     (3, finat.Walkington, 5, None),
+    (3, finat.MardalTaiWinther, 2, None),
+    (2, finat.GuzmanNeilanFirstKindH1, 1, None),
+    (3, finat.GuzmanNeilanFirstKindH1, 1, None),
+    (2, finat.JohnsonMercier, 1, None),
+    (3, finat.JohnsonMercier, 1, None),
 ])
 def test_mass_scaling(scaled_ref_to_phys, sd, element, degree, variant):
-    ref_cell = scaled_ref_to_phys[sd][0].ref_cell
-    if variant is not None:
-        ref_element = element(ref_cell, degree, variant=variant)
-    else:
-        ref_element = element(ref_cell, degree)
+    kwargs = {} if variant is None else dict(variant=variant)
+    check_mass_scaling(scaled_ref_to_phys, sd, element, degree, **kwargs)
 
-    Q = finat.quadrature.make_quadrature(ref_cell, 2*degree)
+
+@pytest.mark.parametrize("avg", [True, False])
+@pytest.mark.parametrize("element,degree", [
+    (finat.QuadraticPowellSabin12, 2),
+    (finat.HsiehCloughTocher, 3),
+    (finat.HsiehCloughTocher, 4),
+    (finat.Argyris, 5),
+    (finat.AlfeldC2, 5),
+    (finat.BrambleZlamalC2, 9),
+])
+def test_mass_scaling_avg(scaled_ref_to_phys, element, degree, avg):
+    check_mass_scaling(scaled_ref_to_phys, 2, element, degree, avg=avg)
+
+
+def check_mass_scaling(scaled_ref_to_phys, sd, element, degree, **kwargs):
+    ref_cell = scaled_ref_to_phys[sd][0].ref_cell
+    ref_element = element(ref_cell, degree, **kwargs)
+
+    Q = finat.quadrature.make_quadrature(ref_element.complex, 2*ref_element.degree)
     qpts = Q.point_set
     qwts = Q.weights
 
@@ -39,9 +63,11 @@ def test_mass_scaling(scaled_ref_to_phys, sd, element, degree, variant):
 
         z = (0,) * ref_element.cell.get_spatial_dimension()
         finat_vals_gem = ref_element.basis_evaluation(0, qpts, coordinate_mapping=mapping)[z]
-        phis = evaluate([finat_vals_gem])[0].arr.T
+        value_size = np.prod(ref_element.value_shape, dtype=int)
+        phis = evaluate([finat_vals_gem])[0].arr.reshape(len(qwts), -1, value_size)
 
-        M = np.dot(np.multiply(phis, qwts * abs(np.linalg.det(J))), phis.T)
+        weighted_phis = phis * (qwts * abs(np.linalg.det(J)))[:, None, None]
+        M = np.tensordot(weighted_phis, phis, axes=((0, 2), (0, 2)))
         kappa.append(np.linalg.cond(M))
 
     kappa = np.array(kappa)

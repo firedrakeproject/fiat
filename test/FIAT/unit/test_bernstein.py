@@ -17,20 +17,28 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with FIAT.  If not, see <https://www.gnu.org/licenses/>.
 
+import math
+
 import numpy
 import pytest
 
 from FIAT.reference_element import ufc_simplex
-from FIAT.bernstein import Bernstein
+from FIAT.bernstein import Bernstein, BernsteinPolynomialSet
+from FIAT.barycentric_interpolation import get_lagrange_points
+from FIAT.finite_element import CiarletElement
+from FIAT.hct import HCTDualSet, HsiehCloughTocher
+from FIAT.lagrange import Lagrange
+from FIAT.macro import AlfeldSplit, CkPolynomialSet, PowellSabinSplit, WorseyFarinSplit
 from FIAT.quadrature_schemes import create_quadrature
+from FIAT.walkington import Walkington, WalkingtonDualSet
 
 
 D02 = numpy.array([
     [0.65423405, 1.39160021, 0.65423405, 3.95416573, 1.39160021, 3.95416573],
     [3.95416573, 3.95416573, 1.39160021, 1.39160021, 0.65423405, 0.65423405],
-    [0.0831321, -2.12896637, 2.64569763, -7.25409741, 1.17096531, -6.51673126],
     [0., 0., 0., 0., 0., 0.],
     [-7.90833147, -7.90833147, -2.78320042, -2.78320042, -1.30846811, -1.30846811],
+    [0.0831321, -2.12896637, 2.64569763, -7.25409741, 1.17096531, -6.51673126],
     [-2.12896637, 0.0831321, -7.25409741, 2.64569763, -6.51673126, 1.17096531],
     [0., 0., 0., 0., 0., 0.],
     [0., 0., 0., 0., 0., 0.],
@@ -41,9 +49,9 @@ D02 = numpy.array([
 D11 = numpy.array([
     [0.65423405, 1.39160021, 0.65423405, 3.95416573, 1.39160021, 3.95416573],
     [3.29993168, 2.56256552, 0.73736616, -2.56256552, -0.73736616, -3.29993168],
-    [0.73736616, -0.73736616, 3.29993168, -3.29993168, 2.56256552, -2.56256552],
     [-3.95416573, -3.95416573, -1.39160021, -1.39160021, -0.65423405, -0.65423405],
     [-4.69153189, -3.21679958, -4.69153189, 1.90833147, -3.21679958, 1.90833147],
+    [0.73736616, -0.73736616, 3.29993168, -3.29993168, 2.56256552, -2.56256552],
     [-1.39160021, -0.65423405, -3.95416573, -0.65423405, -3.95416573, -1.39160021],
     [0., 0., 0., 0., 0., 0.],
     [3.95416573, 3.95416573, 1.39160021, 1.39160021, 0.65423405, 0.65423405],
@@ -54,15 +62,34 @@ D11 = numpy.array([
 D20 = numpy.array([
     [0.65423405, 1.39160021, 0.65423405, 3.95416573, 1.39160021, 3.95416573],
     [2.64569763, 1.17096531, 0.0831321, -6.51673126, -2.12896637, -7.25409741],
-    [1.39160021, 0.65423405, 3.95416573, 0.65423405, 3.95416573, 1.39160021],
     [-7.25409741, -6.51673126, -2.12896637, 1.17096531, 0.0831321, 2.64569763],
     [-2.78320042, -1.30846811, -7.90833147, -1.30846811, -7.90833147, -2.78320042],
+    [1.39160021, 0.65423405, 3.95416573, 0.65423405, 3.95416573, 1.39160021],
     [0., 0., 0., 0., 0., 0.],
     [3.95416573, 3.95416573, 1.39160021, 1.39160021, 0.65423405, 0.65423405],
     [1.39160021, 0.65423405, 3.95416573, 0.65423405, 3.95416573, 1.39160021],
     [0., 0., 0., 0., 0., 0.],
     [0., 0., 0., 0., 0., 0.],
 ])
+
+
+def rank(matrix: numpy.ndarray) -> int:
+    """Compute matrix rank with a tolerance suitable for tabulated values."""
+    return numpy.linalg.matrix_rank(matrix, tol=1E-12)
+
+
+@pytest.mark.parametrize("dim", (1, 2, 3))
+def test_bernstein_degree_one_matches_lagrange(dim):
+    """Ensure that degree-one Bernstein basis functions are hat functions."""
+    ref_el = ufc_simplex(dim)
+    points = numpy.array(ref_el.vertices)
+    bernstein = Bernstein(ref_el, 1)
+    lagrange = Lagrange(ref_el, 1)
+
+    numpy.testing.assert_allclose(
+        bernstein.tabulate(0, points)[(0,) * dim],
+        lagrange.tabulate(0, points)[(0,) * dim],
+    )
 
 
 def test_bernstein_2nd_derivatives():
@@ -80,6 +107,248 @@ def test_bernstein_2nd_derivatives():
     assert numpy.allclose(D20, actual[(2, 0)])
 
 
-if __name__ == '__main__':
-    import os
-    pytest.main(os.path.abspath(__file__))
+@pytest.mark.parametrize("dim, degree",
+                         [(dim, degree) for dim in (1, 2, 3) for degree in range(1, 2*dim + 1)])
+def test_bernstein_dual_basis(dim, degree):
+    elem = Bernstein(ufc_simplex(dim), degree)
+    poly_set = elem.get_nodal_basis()
+    dualmat = elem.get_dual_set().to_riesz(poly_set)
+
+    assert numpy.allclose(dualmat @ poly_set.get_coeffs().T, numpy.eye(elem.space_dimension()))
+
+
+@pytest.mark.parametrize("dim, degree",
+                         [(dim, degree) for dim in (2, 3) for degree in range(1, 2*dim + 1)])
+def test_bernstein_c0_alfeld(dim, degree):
+    ref_el = AlfeldSplit(ufc_simplex(dim))
+    poly_set = BernsteinPolynomialSet(ref_el, degree, order=0)
+    points = create_quadrature(ref_el, 2*degree).get_points()
+
+    expected_dimension = sum(
+        math.comb(degree - 1, dim) * len(ref_el.get_topology()[dim])
+        for dim in ref_el.get_topology()
+    )
+    values = poly_set.tabulate(points)[(0,) * dim]
+    c0_values = CkPolynomialSet(ref_el, degree, order=0).tabulate(points)[(0,) * dim]
+    assert poly_set.get_num_members() == expected_dimension
+    assert numpy.allclose(values.sum(axis=0), 1)
+    assert rank(values) == rank(c0_values) == rank(numpy.vstack([values, c0_values]))
+
+
+@pytest.mark.parametrize("dim", (1, 2, 3))
+def test_bernstein_c0_degree_zero(dim):
+    ref_el = AlfeldSplit(ufc_simplex(dim))
+    default = BernsteinPolynomialSet(ref_el, 0)
+    explicit = BernsteinPolynomialSet(ref_el, 0, order=0, vorder=0)
+
+    assert explicit.get_num_members() == 1
+    assert numpy.array_equal(explicit.get_coeffs(), default.get_coeffs())
+
+
+@pytest.mark.parametrize("dim, variant, degree",
+                         [(dim, variant, degree)
+                          for dim in (1, 2, 3)
+                          for variant in ("alfeld", "iso", "powell-sabin", "worsey-farin")
+                          for degree in range(1, 6)
+                          if (dim, variant) != (1, "worsey-farin")])
+def test_bernstein_macro_variant(dim, variant, degree):
+    ref_el = ufc_simplex(dim)
+    elem = Bernstein(ref_el, degree, variant=variant)
+    ref_complex = elem.get_reference_complex()
+    poly_set = elem.get_nodal_basis()
+    dualmat = elem.get_dual_set().to_riesz(poly_set)
+    assert elem.is_macroelement()
+    assert numpy.allclose(dualmat @ poly_set.get_coeffs().T, numpy.eye(elem.space_dimension()))
+
+    points = get_lagrange_points(elem.get_dual_set())
+    values = elem.tabulate(0, points)[(0,) * dim]
+    c0_values = CkPolynomialSet(ref_complex, degree, order=0).tabulate(points)[(0,) * dim]
+    assert rank(values) == rank(c0_values) == rank(numpy.vstack([values, c0_values]))
+
+    for facet, dofs in elem.entity_closure_dofs()[dim - 1].items():
+        facet_values = elem.tabulate(0, ref_el.make_points(dim - 1, facet, degree + 3))[(0,) * dim]
+        assert numpy.allclose(numpy.delete(facet_values, dofs, axis=0), 0)
+
+
+@pytest.mark.parametrize("degree, expected_dimension", ((1, 3), (2, 6), (3, 12)))
+def test_bernstein_c1_alfeld_dimension(degree, expected_dimension):
+    ref_el = AlfeldSplit(ufc_simplex(2))
+    poly_set = BernsteinPolynomialSet(ref_el, degree, order=1)
+
+    assert poly_set.get_num_members() == expected_dimension
+
+
+@pytest.mark.parametrize("dim, degree",
+                         [(dim, degree) for dim in (1, 2, 3) for degree in range(1, 2*dim + 1)])
+def test_bernstein_c1_alfeld(dim, degree):
+    ref_el = AlfeldSplit(ufc_simplex(dim))
+    poly_set = BernsteinPolynomialSet(ref_el, degree, order=1)
+    coeffs = poly_set.get_coeffs()
+
+    facet_points = numpy.array([point for facet in ref_el.get_interior_facets(dim - 1)
+                                for point in ref_el.make_points(dim - 1, facet, degree + 2)])
+    jumps = poly_set.get_expansion_set().tabulate_jumps(degree, facet_points, order=1)
+    assert numpy.allclose(coeffs @ jumps[0], 0)
+    assert numpy.allclose(coeffs @ jumps[1], 0)
+
+    points = create_quadrature(ref_el, 2*degree).get_points()
+    values = poly_set.tabulate(points)[(0,) * dim]
+    c1_values = CkPolynomialSet(ref_el, degree, order=1).tabulate(points)[(0,) * dim]
+    assert numpy.allclose(values.sum(axis=0), 1)
+    assert rank(values) == len(values) == rank(c1_values) == rank(numpy.vstack([values, c1_values]))
+
+
+def assert_vertex_supersmoothness(poly_set, vorder):
+    ref_el = poly_set.get_reference_element()
+    vertex = ref_el.get_vertices_of_subcomplex(ref_el.get_interior_facets(0))
+    jumps = poly_set.get_expansion_set().tabulate_jumps(poly_set.get_degree(), vertex, order=vorder)
+    for r in range(vorder + 1):
+        assert numpy.allclose(poly_set.get_coeffs() @ jumps[r], 0, atol=1E-10 * abs(jumps[r]).max())
+
+
+@pytest.mark.parametrize("dim, degree, vorder",
+                         [(dim, degree, vorder) for dim in (2, 3) for degree in range(dim + 1, 2*dim)
+                          for vorder in range(degree + 1)])
+def test_bernstein_c1_supersmooth_alfeld(dim, degree, vorder):
+    ref_el = AlfeldSplit(ufc_simplex(dim))
+    poly_set = BernsteinPolynomialSet(ref_el, degree, order=1, vorder=vorder)
+    assert_vertex_supersmoothness(poly_set, vorder)
+
+    points = create_quadrature(ref_el, 2*degree).get_points()
+    values = poly_set.tabulate(points)[(0,) * dim]
+    ck_values = CkPolynomialSet(ref_el, degree, order=1, vorder=vorder).tabulate(points)[(0,) * dim]
+    assert rank(values) == len(values) == rank(ck_values) == rank(numpy.vstack([values, ck_values]))
+
+
+@pytest.mark.parametrize("degree, vorder",
+                         [(degree, vorder) for degree in range(1, 6) for vorder in range(1, degree + 1)])
+def test_bernstein_c0_supersmooth_alfeld(degree, vorder):
+    ref_el = AlfeldSplit(ufc_simplex(2))
+    poly_set = BernsteinPolynomialSet(ref_el, degree, order=0, vorder=vorder)
+    assert_vertex_supersmoothness(poly_set, vorder)
+
+    # Lai and Schumaker (2007), Theorem 9.7
+    expected_dimension = math.comb(vorder + 2, 2) + 3 * (math.comb(degree + 1, 2) - math.comb(vorder + 1, 2))
+    assert poly_set.get_num_members() == expected_dimension
+
+
+@pytest.mark.parametrize("dim, degree", [(2, 1), (2, 3), (2, 8), (2, 14), (3, 8)])
+def test_bernstein_supersmooth_stable_coefficients(dim: int, degree: int) -> None:
+    ref_el = AlfeldSplit(ufc_simplex(dim))
+    poly_set = BernsteinPolynomialSet(ref_el, degree, order=1, vorder=degree-1)
+    coeffs = poly_set.get_coeffs()
+    assert abs(coeffs).max() < 30
+    # Constant reproduction allows for cancellation among signed coefficients.
+    assert numpy.all(abs(coeffs.sum(axis=0) - 1)
+                     <= 16 * numpy.finfo(float).eps * abs(coeffs).sum(axis=0))
+
+
+@pytest.mark.parametrize("degree", (3, 5, 8))
+def test_bernstein_hct(degree):
+    ref_el = ufc_simplex(2)
+    ref_complex = AlfeldSplit(ref_el)
+    ck_poly_set = CkPolynomialSet(ref_complex, degree, order=1, vorder=degree-1, variant="bubble")
+    ck_elem = CiarletElement(ck_poly_set, HCTDualSet(ref_complex, degree), degree)
+    elem = HsiehCloughTocher(ref_el, degree)
+    points = create_quadrature(ref_complex, 2*degree).get_points()
+    expected = ck_elem.tabulate(1, points)
+    actual = elem.tabulate(1, points)
+    assert all(numpy.allclose(expected[alpha], actual[alpha]) for alpha in expected)
+
+
+def test_bernstein_walkington():
+    ref_el = ufc_simplex(3)
+    degree = 5
+    poly_set = BernsteinPolynomialSet(AlfeldSplit(ref_el), degree, order=1, vorder=4)
+    assert poly_set.get_num_members() == 65
+
+    ck_poly_set = CkPolynomialSet(AlfeldSplit(ref_el), degree, order=1, vorder=4, variant="bubble")
+    ck_elem = CiarletElement(ck_poly_set, WalkingtonDualSet(ref_el, degree), degree)
+    elem = Walkington(ref_el, degree)
+    points = create_quadrature(elem.get_reference_complex(), 2*degree).get_points()
+    expected = ck_elem.tabulate(1, points)
+    actual = elem.tabulate(1, points)
+    assert all(numpy.allclose(expected[alpha], actual[alpha]) for alpha in expected)
+
+
+@pytest.mark.parametrize("dim", (1, 2, 3))
+def test_bernstein_c1_simplex(dim):
+    ref_el = ufc_simplex(dim)
+    degree = 3
+
+    c0_coeffs = BernsteinPolynomialSet(ref_el, degree, order=0).get_coeffs()
+    c1_coeffs = BernsteinPolynomialSet(ref_el, degree, order=1).get_coeffs()
+    assert numpy.array_equal(c0_coeffs, c1_coeffs)
+
+
+def test_bernstein_c1_entity_ids():
+    ref_el = AlfeldSplit(ufc_simplex(2))
+    degree = 3
+    top = ref_el.get_topology()
+
+    entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
+    num_members = 0
+    for dim in top:
+        for entity in top[dim]:
+            if dim == 2 or entity not in ref_el.get_interior_facets(dim):
+                num_dofs = math.comb(degree - 1, dim)
+                entity_ids[dim][entity] = list(range(num_members, num_members + num_dofs))
+                num_members += num_dofs
+
+    perm = numpy.random.default_rng(0).permutation(num_members)
+    permuted_ids = {dim: {entity: [perm[i] for i in ids] for entity, ids in entities.items()}
+                    for dim, entities in entity_ids.items()}
+
+    coeffs = BernsteinPolynomialSet(ref_el, degree, order=1, entity_ids=entity_ids).get_coeffs()
+    permuted_coeffs = BernsteinPolynomialSet(ref_el, degree, order=1, entity_ids=permuted_ids).get_coeffs()
+    assert numpy.allclose(permuted_coeffs[perm], coeffs)
+
+
+def assert_same_span(poly_set, ck_poly_set):
+    ref_el = poly_set.get_reference_element()
+    dim = ref_el.get_spatial_dimension()
+    points = create_quadrature(ref_el, 2*poly_set.get_degree()).get_points()
+    values = poly_set.tabulate(points)[(0,) * dim]
+    ck_values = ck_poly_set.tabulate(points)[(0,) * dim]
+    assert numpy.allclose(values.sum(axis=0), 1)
+    assert rank(values) == len(values) == rank(ck_values) == rank(numpy.vstack([values, ck_values]))
+
+
+@pytest.mark.parametrize("split, dim, degree, order, vorder",
+                         [(AlfeldSplit, 2, 4, 2, None),
+                          (AlfeldSplit, 2, 7, 3, None),
+                          # Lai and Schumaker (2007), Theorem 8.5
+                          (AlfeldSplit, 2, 5, 2, 3),
+                          (AlfeldSplit, 2, 9, 3, 7),
+                          (PowellSabinSplit, 2, 2, 1, None),
+                          (PowellSabinSplit, 2, 3, 1, None),
+                          # No free supersmoothness: the interior vertex lies on three lines
+                          (PowellSabinSplit, 2, 5, 1, 2),
+                          (WorseyFarinSplit, 3, 3, 1, None)])
+def test_bernstein_ck_macro(split, dim, degree, order, vorder):
+    ref_el = split(ufc_simplex(dim))
+    poly_set = BernsteinPolynomialSet(ref_el, degree, order=order, vorder=vorder)
+    if vorder is not None:
+        assert_vertex_supersmoothness(poly_set, vorder)
+    ck_poly_set = CkPolynomialSet(ref_el, degree, order=order, vorder=vorder)
+    assert_same_span(poly_set, ck_poly_set)
+
+
+@pytest.mark.parametrize("degree", (3, 5))
+def test_bernstein_boundary_vertex_order(degree):
+    ref_el = AlfeldSplit(ufc_simplex(2))
+    order = {1: dict.fromkeys(ref_el.get_interior_facets(1), 1), 0: {0: 2}}
+    poly_set = BernsteinPolynomialSet(ref_el, degree, order=order)
+    vertex = ref_el.get_vertices()[0:1]
+    jumps = poly_set.get_expansion_set().tabulate_jumps(degree, vertex, order=2)
+    for r in range(3):
+        assert numpy.allclose(poly_set.get_coeffs() @ jumps[r], 0)
+    # C2 at a boundary vertex shared by two cells adds one condition.
+    assert poly_set.get_num_members() == BernsteinPolynomialSet(ref_el, degree, order=1).get_num_members() - 1
+    assert_same_span(poly_set, CkPolynomialSet(ref_el, degree, order=order))
+
+
+def test_bernstein_degree_zero_dict():
+    ref_el = AlfeldSplit(ufc_simplex(2))
+    order = {1: dict.fromkeys(ref_el.get_interior_facets(1), 1)}
+    assert BernsteinPolynomialSet(ref_el, 0, order=order).get_num_members() == 1

@@ -30,6 +30,33 @@ def cell(request):
     return reference_element.default_simplex(dim)
 
 
+@pytest.mark.parametrize("dim", range(4))
+def test_negative_polynomial_dimension(dim):
+    cell = reference_element.default_simplex(dim)
+    assert expansions.polynomial_dimension(cell, -1) == 0
+
+
+@pytest.mark.parametrize("shape", [(), (2,), (2, 2)])
+def test_polynomial_set_recombine(shape: tuple) -> None:
+    cell = reference_element.default_simplex(2)
+    poly_set = polynomial_set.ONPolynomialSet(cell, 1, shape=shape)
+    coefficients = numpy.arange(2 * len(poly_set), dtype=float).reshape(2, len(poly_set))
+
+    recombined = poly_set.recombine(coefficients)
+    expected = numpy.tensordot(coefficients, poly_set.get_coeffs(), axes=(1, 0))
+
+    assert recombined.get_shape() == shape
+    assert numpy.array_equal(recombined.get_coeffs(), expected)
+
+
+def test_polynomial_set_recombine_requires_one_column_per_polynomial() -> None:
+    cell = reference_element.default_simplex(2)
+    poly_set = polynomial_set.ONPolynomialSet(cell, 1)
+
+    with pytest.raises(ValueError, match="one column per polynomial"):
+        poly_set.recombine(numpy.eye(len(poly_set) + 1))
+
+
 @pytest.mark.parametrize("degree", [10])
 def test_expansion_values(cell, degree):
     dim = cell.get_spatial_dimension()
@@ -84,6 +111,31 @@ def test_expansion_values(cell, degree):
             assert numpy.allclose(uh, exact, atol=1E-14)
 
 
+@pytest.mark.parametrize("dim", [2, 3])
+@pytest.mark.parametrize("variant", [None, "bubble"])
+def test_high_order_expansion_derivatives(dim, variant):
+    cell = reference_element.default_simplex(dim)
+    degree = 5
+    order = 4
+    points = reference_element.make_lattice(cell.get_vertices(), 5, interior=1)
+
+    fallback = expansions.ExpansionSet(cell, variant=variant)
+    fallback.recurrence_order = 2
+    expected = fallback._tabulate(degree, points, order=order)
+
+    recurrence = expansions.ExpansionSet(cell, variant=variant)
+
+    def get_dmats(*args, **kwargs):
+        raise AssertionError("high-order derivatives should use recurrence tabulation")
+
+    recurrence.get_dmats = get_dmats
+    actual = recurrence._tabulate(degree, points, order=order)
+
+    assert actual.keys() == expected.keys()
+    for alpha in actual:
+        assert numpy.allclose(actual[alpha], expected[alpha], atol=1E-10, rtol=1E-10)
+
+
 @pytest.mark.parametrize("degree", [10])
 def test_expansion_orthonormality(cell, degree):
     U = expansions.ExpansionSet(cell)
@@ -98,16 +150,20 @@ def test_expansion_orthonormality(cell, degree):
 @pytest.mark.parametrize("degree", [10])
 def test_bubble_duality(cell, degree):
     sd = cell.get_spatial_dimension()
-    B = polynomial_set.make_bubbles(cell, degree)
+    B = polynomial_set.make_bubbles(cell, degree, scale=None)
+    D = polynomial_set.ONPolynomialSet(cell, degree-sd-1, variant="dual")
 
-    Q = create_quadrature(cell, 2*B.degree - sd - 1)
+    Q = create_quadrature(cell, B.degree + D.degree)
     qpts, qwts = Q.get_points(), Q.get_weights()
     phi = B.tabulate(qpts)[(0,) * sd]
-    phi_dual = phi / abs(phi[0])
-    scale = 2 ** sd
-    results = scale * numpy.dot(numpy.multiply(phi_dual, qwts), phi.T)
-    assert numpy.allclose(results, numpy.diag(numpy.diag(results)))
-    assert numpy.allclose(numpy.diag(results), 1.0)
+    phi_dual = D.tabulate(qpts)[(0,) * sd]
+
+    pairing = numpy.dot(numpy.multiply(phi_dual, qwts), phi.T)
+    ordering = numpy.argmax(numpy.abs(pairing), axis=0)
+    assert numpy.array_equal(numpy.sort(ordering), numpy.arange(len(phi)))
+
+    expected = numpy.eye(len(phi))
+    assert numpy.allclose(pairing[ordering], expected)
 
 
 @pytest.mark.parametrize("degree", [10])

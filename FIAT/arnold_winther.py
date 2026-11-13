@@ -12,6 +12,7 @@
 from FIAT import finite_element, dual_set, polynomial_set
 from FIAT.reference_element import TRIANGLE
 from FIAT.quadrature_schemes import create_quadrature
+from FIAT.nedelec import contravariant_piola_dual
 from FIAT.functional import (ComponentPointEvaluation,
                              TensorBidirectionalIntegralMoment,
                              IntegralMomentOfTensorDivergence,
@@ -101,6 +102,7 @@ class ArnoldWintherDual(dual_set.DualSet):
             entity_ids[1][entity].extend(range(cur, len(nodes)))
 
         # internal dofs: moments of unique components against P_{k-3}
+        cur = len(nodes)
         n = list(map(ref_el.compute_scaled_normal, sorted(top[sd-1])))
         Q = create_quadrature(ref_el, 2*(degree-1))
         P = polynomial_set.ONPolynomialSet(ref_el, degree-3, scale="L2 piola")
@@ -109,11 +111,14 @@ class ArnoldWintherDual(dual_set.DualSet):
                      for phi in phis for i in range(sd) for j in range(i, sd))
 
         # constraint dofs: moments of divergence against P_{k-1} \ P_{k-2}
-        P = polynomial_set.ONPolynomialSet(ref_el, degree-1, shape=(sd,))
+        P = polynomial_set.ONPolynomialSet(ref_el, degree-1, shape=(sd,), scale=1)
         dimPkm1 = P.expansion_set.get_num_members(degree-1)
         dimPkm2 = P.expansion_set.get_num_members(degree-2)
         PH = P.take([i + j * dimPkm1 for j in range(sd) for i in range(dimPkm2, dimPkm1)])
         phis = PH.tabulate(Q.get_points())[(0,)*sd]
+        # The divergence maps as contravariant Piola divided by detJ
+        J = ref_el.compute_tangents(sd, 0).T
+        phis = numpy.linalg.det(J) * contravariant_piola_dual(J, phis)
         nodes.extend(IntegralMomentOfTensorDivergence(ref_el, Q, phi) for phi in phis)
 
         entity_ids[2][0].extend(range(cur, len(nodes)))

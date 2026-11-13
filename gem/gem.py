@@ -35,7 +35,7 @@ __all__ = ['Node', 'Identity', 'Literal', 'Zero', 'Failure',
            'Index', 'VariableIndex', 'Indexed', 'ComponentTensor',
            'IndexSum', 'ListTensor', 'Concatenate', 'Delta', 'OrientationVariableIndex',
            'index_sum', 'partial_indexed', 'reshape', 'view',
-           'indices', 'as_gem', 'FlexiblyIndexed',
+           'indices', 'as_gem', 'sqrt', 'FlexiblyIndexed',
            'Inverse', 'Solve', 'extract_type', 'uint_type', 'Piecewise']
 
 
@@ -92,25 +92,25 @@ class Node(NodeBase, metaclass=NodeMeta):
         return componentwise(Product, minus, self)
 
     def __add__(self, other):
-        return componentwise(Sum, self, as_gem(other))
+        return componentwise(Sum, self, as_gem(other, dtype=self.dtype))
 
     def __radd__(self, other):
-        return as_gem(other).__add__(self)
+        return as_gem(other, dtype=self.dtype).__add__(self)
 
     def __sub__(self, other):
-        return componentwise(Sum, self, -as_gem(other))
+        return componentwise(Sum, self, -as_gem(other, dtype=self.dtype))
 
     def __rsub__(self, other):
-        return as_gem(other).__sub__(self)
+        return as_gem(other, dtype=self.dtype).__sub__(self)
 
     def __mul__(self, other):
-        return componentwise(Product, self, as_gem(other))
+        return componentwise(Product, self, as_gem(other, dtype=self.dtype))
 
     def __rmul__(self, other):
-        return as_gem(other).__mul__(self)
+        return as_gem(other, dtype=self.dtype).__mul__(self)
 
     def __matmul__(self, other):
-        other = as_gem(other)
+        other = as_gem(other, dtype=self.dtype)
         if not self.shape and not other.shape:
             return Product(self, other)
         elif not (self.shape and other.shape):
@@ -123,7 +123,7 @@ class Node(NodeBase, metaclass=NodeMeta):
         return ComponentTensor(IndexSum(expr, (k, )), (*i, *j))
 
     def __rmatmul__(self, other):
-        return as_gem(other).__matmul__(self)
+        return as_gem(other, dtype=self.dtype).__matmul__(self)
 
     def __abs__(self):
         return componentwise(partial(MathFunction, "abs"), self)
@@ -132,16 +132,16 @@ class Node(NodeBase, metaclass=NodeMeta):
         return componentwise(Power, self, as_gem(other))
 
     def __lt__(self, other):
-        return componentwise(partial(Comparison, "<"), self, as_gem(other))
+        return componentwise(partial(Comparison, "<"), self, as_gem(other, dtype=self.dtype))
 
     def __gt__(self, other):
-        return componentwise(partial(Comparison, ">"), self, as_gem(other))
+        return componentwise(partial(Comparison, ">"), self, as_gem(other, dtype=self.dtype))
 
     def __le__(self, other):
-        return componentwise(partial(Comparison, "<="), self, as_gem(other))
+        return componentwise(partial(Comparison, "<="), self, as_gem(other, dtype=self.dtype))
 
     def __ge__(self, other):
-        return componentwise(partial(Comparison, ">="), self, as_gem(other))
+        return componentwise(partial(Comparison, ">="), self, as_gem(other, dtype=self.dtype))
 
     @property
     def T(self):
@@ -633,7 +633,7 @@ class Index(IndexBase):
 
     def __lt__(self, other):
         # Allow sorting of free indices in Python 3
-        return id(self) < id(other)
+        return self.count < other.count
 
     def __getstate__(self):
         return self.name, self.extent, self.count
@@ -806,11 +806,6 @@ class FlexiblyIndexed(Scalar):
                     idxs_.append((index, stride))
                     # last += (unknown_extent - 1) * stride
                 elif isinstance(index, int):
-                    # TODO: Attach dtype to each Node.
-                    # Here, we should simply be able to do:
-                    # >>> offset_ += index * stride
-                    # but "+" and "*" are not currently correctly overloaded
-                    # for indices (integers); they assume floats.
                     if not isinstance(offset, Integral):
                         raise NotImplementedError(f"Found non-Integral offset : {offset}")
                     if isinstance(stride, Constant):
@@ -875,8 +870,11 @@ class ComponentTensor(Node):
 
         # Index folding
         if isinstance(expression, Indexed):
-            if multiindex == expression.multiindex:
-                return expression.children[0]
+            child, = expression.children
+            # Simplify ComponentTensor(Indexed(child, i), i) -> child
+            # Only fold if the child does not depend on the multiindex
+            if multiindex == expression.multiindex and not (set(multiindex) & set(child.free_indices)):
+                return child
 
         self = super(ComponentTensor, cls).__new__(cls)
         self.children = (expression,)
@@ -1148,7 +1146,7 @@ def unique(indices):
     :arg indices: iterable of indices
     :returns: sorted tuple of unique free indices
     """
-    return tuple(sorted(set(indices), key=id))
+    return tuple(sorted(set(indices), key=lambda index: index.count))
 
 
 def index_sum(expression, indices):
@@ -1289,7 +1287,7 @@ def view(expression, *slices):
 
 # Static one object for quicker constant folding
 one = Literal(1)
-minus = Literal(-1)
+minus = Literal(-1, dtype=int)
 
 
 # Syntax sugar
@@ -1313,8 +1311,11 @@ def componentwise(op, *exprs):
     Each expression must either have the same shape, or else be
     scalar. Shaped expressions are indexed, the op is applied to the
     scalar expressions and the result is wrapped up in a ComponentTensor.
+    If every expression is scalar, the op is applied to them directly.
 
     """
+    if not any(e.shape for e in exprs):
+        return op(*exprs)
     shapes = set(e.shape for e in exprs)
     if len(shapes - {()}) > 1:
         raise ValueError("expressions must have matching shape (or else be scalar)")
@@ -1324,13 +1325,17 @@ def componentwise(op, *exprs):
     return ComponentTensor(op(*exprs), i)
 
 
-def as_gem(expr):
+def as_gem(expr, dtype=None):
     """Attempt to convert an expression into GEM of scalar type.
 
     Parameters
     ----------
     expr : Node or Number
         The expression.
+    dtype : numpy.dtype, optional
+        The dtype of the node that ``expr`` combines with. A number then
+        converts to the smallest dtype that holds both its value and
+        ``dtype``. Without ``dtype``, a number converts to float or complex.
 
     Returns
     -------
@@ -1346,7 +1351,9 @@ def as_gem(expr):
     if isinstance(expr, Node):
         return expr
     elif isinstance(expr, Number):
-        return Literal(expr)
+        if dtype is not None:
+            dtype = numpy.result_type(dtype, numpy.min_scalar_type(expr))
+        return Literal(expr, dtype=dtype)
     elif isinstance(expr, (bool, numpy.bool)):
         return Literal(bool(expr))
     elif isinstance(expr, numpy.ndarray):
@@ -1357,6 +1364,14 @@ def as_gem(expr):
             return Literal(expr)
     else:
         raise ValueError("Do not know how to convert %r to GEM" % expr)
+
+
+def sqrt(x):
+    """The square root of a GEM scalar, which compiles to a call of sqrt instead of pow."""
+    x = as_gem(x)
+    if isinstance(x, Constant):
+        return Literal(numpy.sqrt(x.value))
+    return MathFunction("sqrt", x)
 
 
 def as_gem_uint(expr):

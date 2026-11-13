@@ -34,6 +34,7 @@ from FIAT.orientation_utils import (
     make_cell_orientation_reflection_map_simplex,
     make_cell_orientation_reflection_map_tensorproduct,
     make_entity_permutations_simplex,
+    make_entity_permutations_tensorproduct
 )
 
 POINT = 0
@@ -96,7 +97,7 @@ def make_lattice(verts, n, interior=0, variant=None):
     X = numpy.array(verts)
     if D == 1 and n == 0:
         return list(map(tuple, X))
-    get_point = lambda alpha: tuple(numpy.dot(_recursive(D - 1, n, alpha, family), X))
+    get_point = lambda alpha: tuple(numpy.dot(_recursive(D - 1, n, alpha, family), X).astype(X.dtype))
     return list(map(get_point, multiindex_equal(D, n, interior)))
 
 
@@ -267,6 +268,32 @@ class Cell:
         """
         raise NotImplementedError("Should be implemented in a subclass.")
 
+    def get_orientation_coord_maps(self):
+        """Returns an affine map that changes the reference coordinates of this cell
+        from each orientation to the canonical orientation.
+
+        An orientation ``o`` describes how the vertices of this cell are ordered
+        relative to its canonical vertex order. For each orientation ``o``, the map is
+
+            X_can = Q[o] @ X_o + t[o],
+
+        where ``X_o`` are the reference coordinates of a point when the cell has
+        orientation ``o``, and ``X_can`` are the reference coordinates of the same
+        point in the canonical orientation.
+
+        Returns
+        -------
+        dict
+            Maps each orientation ``o`` (an integer) to the tuple ``(Q[o], t[o])``.
+            ``Q[o]`` has shape ``(dim, dim)`` and ``t[o]`` has shape ``(dim,)``.
+
+        Notes
+        -----
+        Each map is built from the vertex permutation ``p`` of orientation ``o``,
+        which takes vertex ``i`` of the cell to vertex ``p[i]``.
+        """
+        raise NotImplementedError("Should be implemented in a subclass.")
+
     def point_entity_ids(self, points, tol=1E-10):
         """Returns the topological entity association for points on this cell."""
         raise NotImplementedError("Should be implemented in a subclass.")
@@ -325,6 +352,101 @@ class Cell:
 
         """
         raise NotImplementedError("Should be implemented in a subclass.")
+
+    def _facet_orientation_coord_maps(self):
+        """Return the affine transformation that maps, for every possible facet orientation `o`, the facet-local reference coordinates
+        to the facet-local coordinates expressed in the canonical orientation.
+
+        For each facet orientation `o`, the map is
+
+            X_f_can = Q_o @ X_f_o + t_o,
+
+        where X_f_can defines the facet-local coordinates in the facet's canonical orientation and
+        X_f_o defines the facet-local coordinates of the same point when the facet is in orientation `o`.
+
+        A vertex permutation is first obtained for each possible facet permutation and is then used to construct the corresponding coordinate map.
+
+        Returns
+        -------
+        dict
+            Maps each facet orientation integer o to an affine map (Q_o, t_o) acting on facet-local coordinates.
+        """
+        facet = self.construct_subelement(self.get_spatial_dimension() - 1)
+        o_coord_maps = facet.get_orientation_coord_maps()
+        return o_coord_maps
+
+    def _facet_embedding_coord_maps(self):
+        """Return the affine transformation that maps the reference coordinates of a point on each facet
+        to the reference coordinates of the cell.
+
+        For each local facet `lf`, the map is
+
+            X = A[lf] @ X_f + b[lf],
+
+        where ``X_f`` are the reference coordinates of a point on the facet and ``X``
+        are the reference coordinates of the same point in the cell.
+
+        Returns
+        -------
+        A : numpy.ndarray
+            The matrix of each map, with shape ``(num_facets, dim, dim - 1)``.
+        b : numpy.ndarray
+            The translation vector of each map, with shape ``(num_facets, dim)``.
+        A_inv : numpy.ndarray
+            The pseudo-inverse of each matrix, with shape ``(num_facets, dim - 1, dim)``.
+            ``A_inv[lf] @ (X - b[lf])`` gives the facet coordinates of a point ``X``
+            that lies on facet ``lf``.
+        """
+        facet_dim = self.get_spatial_dimension() - 1
+        num_facets = len(self.get_topology()[facet_dim])
+
+        # Extract the coefficients of the facet embedding map by evaluating the entity transform at the facet origin and unit vectors
+        facet_points = numpy.vstack([numpy.zeros(facet_dim), numpy.eye(facet_dim)])
+        mapped = numpy.stack([self.get_entity_transform(facet_dim, lf)(facet_points) for lf in range(num_facets)])
+        b = mapped[:, 0]
+        A = numpy.swapaxes(mapped[:, 1:] - b[:, None], 1, 2)
+        A_inv = numpy.linalg.pinv(A)
+        return A, b, A_inv
+
+    def facet_neighbour_coord_maps(self):
+        """Return the affine transformation that maps the reference coordinates of facet points between the two cells sharing that facet.
+
+        Example:
+        Suppose a cell has local facet ``lf_from`` with orientation ``o_from`` corresponding to local facet ``lf_to`` with orientation `o_to` in the other cell across that facet.
+
+        Then a point in the first cell, lying on the local facet ``lf_from`` with reference coordinates ``X``, has reference coordinates in the neighbouring cell:
+
+            X' = A[lf_from, lf_to, o_from, o_to] @ X + b[lf_from, lf_to, o_from, o_to]
+
+        Returns
+        -------
+        A : numpy.ndarray
+            The matrix of each map, with shape
+            ``(num_facets, num_facets, num_orientations, num_orientations, dim, dim)``.
+        b : numpy.ndarray
+            The translation vector of each map, with shape
+            ``(num_facets, num_facets, num_orientations, num_orientations, dim)``.
+        """
+
+        A_f, b_f, A_f_inv = self._facet_embedding_coord_maps()
+        o_coord_maps = self._facet_orientation_coord_maps()
+        Q = numpy.stack([o_coord_maps[o][0] for o in range(len(o_coord_maps))])
+        t = numpy.stack([o_coord_maps[o][1] for o in range(len(o_coord_maps))])
+        Q_inv = numpy.linalg.inv(Q)
+
+        # List all possible combinations of facets and orientations
+        nf, no = len(A_f), len(Q)  # number of local facets, number of facet orientations
+        lf_from, lf_to, o_from, o_to = numpy.meshgrid(numpy.arange(nf), numpy.arange(nf), numpy.arange(no), numpy.arange(no), indexing="ij")
+
+        # Changes the facet coordinates from orientation o_from to orientation o_to.
+        Q_to = Q_inv[o_to] @ Q[o_from]
+        t_to = numpy.einsum("...ij, ...j -> ...i", Q_inv[o_to], t[o_from] - t[o_to])
+
+        # Maps the cell coordinates to facet coordinates, changes the orientation,
+        # and then maps the facet coordinates into the neighbouring cell.
+        A = A_f[lf_to] @ Q_to @ A_f_inv[lf_from]
+        b = (b_f[lf_to] + numpy.einsum("...ij, ...j -> ...i", A_f[lf_to], t_to) - numpy.einsum("...ij, ...j -> ...i", A, b_f[lf_from]))
+        return A, b
 
     def is_simplex(self):
         return False
@@ -939,9 +1061,39 @@ class Simplex(SimplicialComplex):
         dimension = self.get_spatial_dimension()
         return self.construct_subelement(dimension - 1)
 
+    def get_orientation_coord_maps(self):
+        """Returns the orientation maps of this simplex, as described in
+        :meth:`Cell.get_orientation_coord_maps`.
+
+        The orientations are the vertex permutations from
+        :func:`make_entity_permutations_simplex`.
+        """
+        # Build the map orientation -> vertex permutation
+        dim = self.get_spatial_dimension()
+        verts = numpy.asarray(self.get_vertices())
+        o_p_maps = make_entity_permutations_simplex(dim=dim, npoints=2)
+        # Convert each vertex permutation into an affine map between coordinates
+        o_coord_maps = {}
+        for o, p in o_p_maps.items():
+            permuted_verts = verts[p]
+            Q, t = make_affine_mapping(verts, permuted_verts)
+            o_coord_maps[o] = (Q, t)
+        return o_coord_maps
+
 
 # Backwards compatible name
 ReferenceElement = Simplex
+
+
+def cast_vertices(verts, dtype):
+    """Cast a tuple of vertex coordinate tuples to the given numpy dtype.
+
+    :arg verts: a tuple of tuples of vertex coordinates.
+    :arg dtype: a numpy dtype, or `None` to leave `verts` unchanged.
+    """
+    if dtype is None:
+        return verts
+    return tuple(tuple(row) for row in numpy.array(verts, dtype=dtype))
 
 
 class UFCSimplex(Simplex):
@@ -1198,6 +1350,12 @@ class TensorProductCell(Cell):
             delimiter[i + 1] = delimiter[i] + lengths[i]
         return [slice(delimiter[i], delimiter[i+1])
                 for i in range(n)]
+
+    def _facet_embedding_coord_maps(self):
+        raise NotImplementedError("Facet maps are not yet implemented for general tensor product cells.")
+
+    def _facet_orientation_coord_maps(self):
+        raise NotImplementedError("Facet maps are not yet implemented for general tensor product cells.")
 
     def get_dimension(self):
         """Returns the subelement dimension of the cell, a tuple of
@@ -1478,6 +1636,33 @@ class Hypercube(Cell):
         d, e = self.unflattening_map[(dim, entity_i)]
         return self.product.get_entity_transform(d, e)
 
+    def get_orientation_coord_maps(self):
+        """Returns the orientation maps of this hypercube, as described in
+        :meth:`Cell.get_orientation_coord_maps`.
+
+        The orientations are the integer encodings of the vertex permutations
+        that :func:`make_entity_permutations_tensorproduct` builds from the
+        interval factors of the hypercube.
+        """
+        verts = numpy.asarray(self.get_vertices())
+        # Build the map orientation -> vertex permutation
+        factors = self.product.cells
+        factor_dims = [f.get_spatial_dimension() for f in factors]
+        # Build the vertex permutations of a hypercube out of the vertex permutations of its factors
+        tp_maps = make_entity_permutations_tensorproduct(factors, factor_dims, [make_entity_permutations_simplex(d, 2) for d in factor_dims])
+        # Convert the tuple keys (e0, io_0, io_1...) into FIAT's integer orientations.
+        # pass the nested dictionary { dimension tuple : { entity number : { orientation tuple : permutation } } } to flatten_permutations
+        o_p_maps = flatten_permutations({tuple(factor_dims): {0: tp_maps}})[self.get_spatial_dimension()][0]
+        # Convert each vertex permutation into an affine map
+        o_coord_maps = {}
+        # vertex subset: vertex 0 and its neighbour along each axis are linearly independent
+        subset = [0, *(2**i for i in range(self.get_spatial_dimension()))]
+        for o, p in o_p_maps.items():
+            permuted_verts = verts[p]
+            Q, t = make_affine_mapping(verts[subset], permuted_verts[subset])
+            o_coord_maps[o] = (Q, t)
+        return o_coord_maps
+
     def volume(self):
         """Computes the volume in the appropriate dimensional measure."""
         return self.product.volume()
@@ -1668,19 +1853,27 @@ def make_affine_mapping(xs, ys):
     return A, b
 
 
-def ufc_hypercube(spatial_dim):
+def ufc_hypercube(spatial_dim, dtype=None):
     """Factory function that maps spatial dimension to an instance of
-    the UFC reference hypercube of that dimension."""
+    the UFC reference hypercube of that dimension.
+
+    :arg dtype: optional numpy dtype to cast the vertex coordinates to.
+        Defaults to the plain Python `float` used by the hardcoded
+        vertex coordinates.
+    """
     if spatial_dim == 0:
-        return Point()
+        cell = Point()
     elif spatial_dim == 1:
-        return UFCInterval()
+        cell = UFCInterval()
     elif spatial_dim == 2:
-        return UFCQuadrilateral()
+        cell = UFCQuadrilateral()
     elif spatial_dim == 3:
-        return UFCHexahedron()
+        cell = UFCHexahedron()
     else:
         raise RuntimeError(f"Can't create UFC hypercube of dimension {spatial_dim}.")
+    if dtype is not None:
+        cell.vertices = cast_vertices(cell.vertices, dtype)
+    return cell
 
 
 def default_simplex(spatial_dim):
@@ -1698,34 +1891,42 @@ def default_simplex(spatial_dim):
         raise RuntimeError(f"Can't create default simplex of dimension {spatial_dim}.")
 
 
-def ufc_simplex(spatial_dim):
+def ufc_simplex(spatial_dim, dtype=None):
     """Factory function that maps spatial dimension to an instance of
-    the UFC reference simplex of that dimension."""
+    the UFC reference simplex of that dimension.
+
+    :arg dtype: optional numpy dtype to cast the vertex coordinates to.
+        Defaults to the plain Python `float` used by the hardcoded
+        vertex coordinates.
+    """
     if spatial_dim == 0:
-        return Point()
+        cell = Point()
     elif spatial_dim == 1:
-        return UFCInterval()
+        cell = UFCInterval()
     elif spatial_dim == 2:
-        return UFCTriangle()
+        cell = UFCTriangle()
     elif spatial_dim == 3:
-        return UFCTetrahedron()
+        cell = UFCTetrahedron()
     else:
         raise RuntimeError(f"Can't create UFC simplex of dimension {spatial_dim}.")
+    if dtype is not None:
+        cell.vertices = cast_vertices(cell.vertices, dtype)
+    return cell
 
 
-def symmetric_simplex(spatial_dim):
+def symmetric_simplex(spatial_dim, dtype=None):
     A = numpy.array([[2, 1, 1],
                      [0, numpy.sqrt(3), numpy.sqrt(3)/3],
-                     [0, 0, numpy.sqrt(6)*(2/3)]])
+                     [0, 0, numpy.sqrt(6)*(2/3)]], dtype=dtype)
     A = A[:spatial_dim, :][:, :spatial_dim]
     b = A.sum(axis=1) * (-1 / (1 + spatial_dim))
-    Ref1 = ufc_simplex(spatial_dim)
+    Ref1 = ufc_simplex(spatial_dim, dtype=dtype)
     v = numpy.dot(Ref1.get_vertices(), A.T) + b[None, :]
     vertices = tuple(map(tuple, v))
     return SymmetricSimplex(Ref1.get_shape(), vertices, Ref1.get_topology())
 
 
-def ufc_cell(cell):
+def ufc_cell(cell, dtype=None):
     """Handle incoming calls from FFC."""
 
     # celltype could be a string or a cell.
@@ -1736,19 +1937,19 @@ def ufc_cell(cell):
 
     if " * " in celltype:
         # Tensor product cell
-        return TensorProductCell(*map(ufc_cell, celltype.split(" * ")))
+        return TensorProductCell(*(ufc_cell(c, dtype=dtype) for c in celltype.split(" * ")))
     elif celltype == "quadrilateral":
-        return UFCQuadrilateral()
+        return ufc_hypercube(2, dtype=dtype)
     elif celltype == "hexahedron":
-        return UFCHexahedron()
+        return ufc_hypercube(3, dtype=dtype)
     elif celltype == "vertex":
-        return ufc_simplex(0)
+        return ufc_simplex(0, dtype=dtype)
     elif celltype == "interval":
-        return ufc_simplex(1)
+        return ufc_simplex(1, dtype=dtype)
     elif celltype == "triangle":
-        return ufc_simplex(2)
+        return ufc_simplex(2, dtype=dtype)
     elif celltype == "tetrahedron":
-        return ufc_simplex(3)
+        return ufc_simplex(3, dtype=dtype)
     else:
         raise RuntimeError(f"Don't know how to create UFC cell of type {str(celltype)}")
 

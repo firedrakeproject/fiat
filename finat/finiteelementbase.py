@@ -4,10 +4,27 @@ from itertools import chain
 import gem
 import numpy
 from gem.interpreter import evaluate
-from gem.optimise import delta_elimination, sum_factorise, traverse_product
 from gem.utils import cached_property
 
 from finat.quadrature import make_quadrature
+
+
+def broadcast_tensor(expression, multiindex):
+    """Reshape a tensor expression, broadcasting over the indices it lacks.
+
+    :arg expression: an indexed tensor.
+    :arg multiindex: the indices to turn into a shape.
+    :returns: ``expression`` as a tensor of the extents of ``multiindex``.
+
+    :class:`gem.ComponentTensor` requires every index to be free in the
+    expression, which a cellwise constant, say, does not satisfy.  Multiply
+    by ones to broadcast over the missing indices.
+    """
+    missing = tuple(i for i in multiindex if i not in expression.free_indices)
+    if missing:
+        ones = gem.Literal(numpy.ones(tuple(i.extent for i in missing)))
+        expression = gem.Product(expression, gem.Indexed(ones, missing))
+    return gem.ComponentTensor(expression, multiindex)
 
 
 class FiniteElementBase(metaclass=ABCMeta):
@@ -164,6 +181,38 @@ class FiniteElementBase(metaclass=ABCMeta):
            provides physical geometry callbacks (may be None).
         '''
 
+    def _stack_tabulations(self, order, ps, entity=None, coordinate_mapping=None):
+        """Tabulate on each point set of a union, stacking on the point index.
+
+        :arg order: return derivatives up to this order.
+        :arg ps: the :class:`~finat.point_set.UnionPointSet` to tabulate on.
+        :arg entity: the cell entity on which to tabulate.
+        :arg coordinate_mapping: a :class:`~.physically_mapped.PhysicalGeometry`
+            object that provides physical geometry callbacks (may be None).
+        :returns: the tabulation on the whole of ``ps``, as
+            :meth:`basis_evaluation` returns.
+
+        A union of points has no structure of its own, so structured elements
+        tabulate on each point set in turn and stack the tabulations here.
+        """
+        tables = [self.basis_evaluation(order, sub, entity,
+                                        coordinate_mapping=coordinate_mapping)
+                  for sub in ps.point_sets]
+        keys, = set(map(frozenset, tables))
+        p, = ps.indices
+        multiindex = tuple(chain(self.get_indices(), self.get_value_indices()))
+
+        def concatenate(alpha):
+            # The point indices are free in each table, so promote them to a
+            # shape before concatenating the tables along it.
+            pieces = [broadcast_tensor(gem.Indexed(table[alpha], multiindex),
+                                       sub.indices)
+                      for table, sub in zip(tables, ps.point_sets)]
+            return gem.ComponentTensor(
+                gem.Indexed(gem.Concatenate(*pieces), (p,)), multiindex)
+
+        return {alpha: concatenate(alpha) for alpha in keys}
+
     @abstractmethod
     def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
         '''Return code for evaluating the element at an arbitrary points on
@@ -255,20 +304,40 @@ class FiniteElementBase(metaclass=ABCMeta):
         :param coordinate_mapping: a
            :class:`~.physically_mapped.PhysicalGeometry` object that
            provides physical geometry callbacks (may be None).
-        :returns: A tuple ``(dual_evaluation_gem_expression, basis_indices)``
-                  where the given ``basis_indices`` are those needed to form a
-                  return expression for the code which is compiled from
-                  ``dual_evaluation_gem_expression`` (alongside any argument
+        :returns: A tuple ``(evaluation, point_indices, basis_indices)`` where
+                  ``evaluation`` is summed over the value shape but still has
+                  ``point_indices`` free, leaving the caller to choose how to
+                  contract over the points. The given ``basis_indices`` are
+                  those needed to form a return expression for the code which
+                  is compiled from ``evaluation`` (alongside any argument
                   multiindices already encoded within ``fn``)
         '''
+        # Only a direct sum can dual evaluate each summand on its own points,
+        # so bring the sum outermost first.
+        from finat.enriched import as_enriched  # Avoid circular import
+        summands = as_enriched(self)
+        if summands is not None and summands is not self:
+            return summands.dual_evaluation(fn, coordinate_mapping=coordinate_mapping)
+        return self._dual_evaluation(fn, coordinate_mapping=coordinate_mapping)
+
+    def _dual_evaluation(self, fn, coordinate_mapping=None):
+        """Dual evaluate an element that is not a direct sum.
+
+        :arg fn: Callable representing the function to dual evaluate.
+            Callable should take in an :class:`AbstractPointSet` and return a
+            GEM expression for evaluation of the function at those points.
+        :arg coordinate_mapping: a :class:`~.physically_mapped.PhysicalGeometry`
+            object that provides physical geometry callbacks (may be None).
+        :returns: an ``(evaluation, point_indices, basis_indices)`` triple, as
+            :meth:`dual_evaluation` returns.
+
+        :meth:`dual_evaluation` rewrites an element as a direct sum before
+        calling this, so the element here has a single set of points.
+        """
         Q, x = self.dual_basis
         Q = self.dual_transformation(Q, coordinate_mapping=coordinate_mapping)
 
         expr = fn(x)
-        # Apply targeted sum factorisation and delta elimination to
-        # the expression
-        sum_indices, factors = delta_elimination(*traverse_product(expr))
-        expr = sum_factorise(sum_indices, factors)
         # NOTE: any shape indices in the expression are because the
         # expression is tensor valued.
         assert expr.shape == Q.shape[len(Q.shape)-len(expr.shape):]
@@ -276,13 +345,8 @@ class FiniteElementBase(metaclass=ABCMeta):
         basis_indices = gem.indices(len(Q.shape) - len(expr.shape))
         Qi = Q[basis_indices + shape_indices]
         expri = expr[shape_indices]
-        evaluation = gem.IndexSum(Qi * expri, x.indices + shape_indices)
-        # Now we want to factorise over the new contraction with x,
-        # ignoring any shape indices to avoid hitting the sum-
-        # factorisation index limit (this is a bit of a hack).
-        # Really need to do a more targeted job here.
-        evaluation = gem.optimise.contraction(evaluation, shape_indices)
-        return evaluation, basis_indices
+        evaluation = gem.IndexSum(Qi * expri, shape_indices)
+        return evaluation, x.indices, basis_indices
 
     def dual_transformation(self, Q, coordinate_mapping=None):
         """Transforms reference dual evaluation into physical dual evaluation.

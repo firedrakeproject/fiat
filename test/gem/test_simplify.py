@@ -55,6 +55,22 @@ def test_componenttensor_from_indexed(A):
     assert A == gem.ComponentTensor(Aij, (i, j))
 
 
+def test_componenttensor_from_diagonal():
+    i, = gem.indices(1)
+    a = gem.Variable("a", (2,))
+    b = gem.Variable("b", (2,))
+    rows = gem.ListTensor([gem.Indexed(a, (i,)), gem.Indexed(b, (i,))])
+    # Indexing rows on its diagonal, the index is bound by the ComponentTensor
+    diagonal = gem.Indexed(rows, (i,))
+    assert gem.ComponentTensor(diagonal, (i,)).free_indices == ()
+
+    # Unrolling the trace substitutes the index in both slots
+    expr, = gem.optimise.unroll_indexsum([gem.IndexSum(diagonal, (i,))],
+                                         predicate=lambda index: True)
+    result, = gem.optimise.remove_componenttensors([expr])
+    assert result == gem.Sum(gem.Indexed(a, (0,)), gem.Indexed(b, (1,)))
+
+
 def test_indexed_transpose(A):
     i, j = gem.indices(2)
     ATij = gem.Indexed(A.T, (i, j))
