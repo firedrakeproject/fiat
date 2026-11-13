@@ -393,7 +393,7 @@ def test_pairing_transformation(sd):
     J = numpy.eye(sd) + numpy.random.default_rng(0).random((sd, sd))
     adjJ, detJ = adjugate_and_determinant(numpy.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object))
     J = numpy.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object)
-    pullbacks = cartesian_pullbacks(J, adjJ, detJ)
+    pullbacks = cartesian_pullbacks(J, adjJ, detJ, *metric_and_adjugate(J))
     contravariant = transformation_matrix(pullbacks["contravariant piola"].forward)
     covariant = transformation_matrix(pullbacks["covariant piola"].forward)
     pair = transformation_matrix(pullbacks["L2 piola"].forward)
@@ -414,7 +414,7 @@ def test_transformation_inverse(sd, frame, avg):
     J = numpy.eye(sd) + numpy.random.default_rng(0).random((sd, sd))
     J = numpy.array([[gem.Literal(Jij) for Jij in row] for row in J], dtype=object)
     adjJ, detJ = adjugate_and_determinant(J)
-    cartesian = cartesian_pullbacks(J, adjJ, detJ)
+    cartesian = cartesian_pullbacks(J, adjJ, detJ, *metric_and_adjugate(J))
     framed = frame_pullbacks(ref_el, frame, *metric_and_adjugate(J), detJ, avg=avg)
     for pullbacks in (cartesian, framed):
         for mapping in pullbacks:

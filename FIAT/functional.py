@@ -18,6 +18,7 @@ from functools import cached_property
 import numpy
 
 from FIAT import polynomial_set, jacobi, quadrature, quadrature_schemes
+from FIAT.reference_element import make_affine_mapping
 
 
 class Functional:
@@ -562,6 +563,58 @@ class IntegralMomentOfTensorDivergence(IntegralMomentOfDerivative):
     def __init__(self, ref_el, Q, f_at_qpts):
         sd = ref_el.get_spatial_dimension()
         super().__init__(ref_el, Q, f_at_qpts, numpy.eye(sd), shp=(sd, sd), nm="IntegralMomentOfTensorDivergence")
+
+
+class IntegralMomentOfStrain(IntegralMomentOfDerivative):
+    r"""Functional :math:`S:\varepsilon(u)` of the strain of a vector field u derived from the input.
+
+    The strain :math:`\varepsilon(u)=\frac{1}{2}(\nabla u+\nabla u^T)` pairs
+    the vector axis of u, which is the first value axis of the input, with a
+    gradient through the Euclidean inner product.  S is a constant symmetric
+    tensor.
+    """
+
+
+class IntegralMomentOfTractionStrain(IntegralMomentOfStrain):
+    r"""Facet average of the strain :math:`S:\varepsilon_F(\sigma n)` of the traction of a matrix field.
+
+    :arg ref_el: a :class:`Cell`.
+    :arg facet_no: the facet F.
+    :arg Q_face: a :class:`QuadratureRule` on the reference facet.
+    :arg S: a symmetric tensor tangential to F, so that only the tangential
+         traction and its tangential derivatives enter.
+    """
+
+    def __init__(self, ref_el, facet_no, Q_face, S):
+        sd = ref_el.get_spatial_dimension()
+        n = ref_el.compute_scaled_normal(facet_no)
+        Q = quadrature.FacetQuadratureRule(ref_el, sd-1, facet_no, Q_face, avg=True)
+        # The traction axis, the normal axis, the derivative axis, and the points
+        f_at_qpts = numpy.multiply.outer(numpy.einsum("ab,c->acb", S, n), numpy.ones(len(Q.pts)))
+        super().__init__(ref_el, Q, f_at_qpts, shp=(sd, sd), nm="IntegralMomentOfTractionStrain")
+
+
+class IntegralMomentOfDivergenceStrain(IntegralMomentOfStrain):
+    r"""The strain :math:`S:\varepsilon(I_T\operatorname{div}\sigma)` of the divergence of a matrix field on an Alfeld split.
+
+    :math:`I_T` interpolates by linear polynomials at the barycenters
+    :math:`x_K` of the subcells K, so that
+    :math:`S:\varepsilon(I_T w) = \sum_K w(x_K)\cdot S\nabla\phi_K`, with
+    the linear Lagrange basis :math:`\phi_K` at these points.
+
+    :arg ref_complex: the Alfeld split of a :class:`Cell`.
+    :arg S: a symmetric tensor.
+    """
+
+    def __init__(self, ref_complex, S):
+        ref_el = ref_complex.get_parent()
+        sd = ref_el.get_spatial_dimension()
+        vertices = numpy.asarray(ref_complex.get_vertices())
+        top = ref_complex.get_topology()
+        points = numpy.array([vertices[list(top[sd][K])].mean(axis=0) for K in sorted(top[sd])])
+        grads = make_affine_mapping(points, numpy.eye(len(points)))[0]
+        Q = quadrature.QuadratureRule(ref_el, points, numpy.ones(len(points)))
+        super().__init__(ref_el, Q, S @ grads.T, numpy.eye(sd), shp=(sd, sd), nm="IntegralMomentOfDivergenceStrain")
 
 
 class PointNormalEvaluation(Functional):

@@ -206,6 +206,7 @@ zany_piola_elements = {
         finat.AlfeldSorokina,
         finat.ChristiansenHu,
         finat.JohnsonMercier,
+        finat.ReducedJohnsonMercier,
         finat.GuzmanNeilanFirstKindH1,
         finat.GuzmanNeilanSecondKindH1,
         finat.GuzmanNeilanBubble,
@@ -297,6 +298,28 @@ dual_basis_elements = [e for e in zany_piola_elements[3]
 ])
 def test_dual_evaluation(ref_to_phys, element, dimension):
     check_dual_evaluation(element, ref_to_phys[dimension])
+
+
+@pytest.mark.parametrize("dimension, element", [
+    *((2, e) for e in zany_piola_elements[2]),
+    *((2, e) for e in zany_piola_elements[3]),
+    *((3, e) for e in zany_piola_elements[3]),
+])
+def test_diagonal_inverse(ref_to_phys, element, dimension):
+    """Each inverse row belongs to the whole entity block."""
+    element = element(ref_to_phys[dimension].ref_cell)
+    matrix = element._vandermonde_matrix(ref_to_phys[dimension])
+    vandermonde = matrix.array()
+    for dim, entities in matrix.dual.entity_ids.items():
+        for entity, dofs in entities.items():
+            if not dofs:
+                continue
+            B = vandermonde[np.ix_(dofs, dofs)]
+            V = matrix.inverses[dim][entity]
+            B = evaluate([gem.ListTensor(B)])[0].arr
+            V = evaluate([gem.ListTensor(V)])[0].arr
+            assert np.allclose(B @ V, np.eye(len(dofs)))
+            assert np.allclose(V @ B, np.eye(len(dofs)))
 
 
 class SymbolicMapping:

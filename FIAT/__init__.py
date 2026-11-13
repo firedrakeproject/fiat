@@ -27,7 +27,7 @@ from FIAT.alfeld_sorokina import AlfeldSorokina
 from FIAT.arnold_qin import ArnoldQin
 from FIAT.guzman_neilan import GuzmanNeilanFirstKindH1, GuzmanNeilanSecondKindH1, GuzmanNeilanH1div
 from FIAT.christiansen_hu import ChristiansenHu
-from FIAT.johnson_mercier import JohnsonMercier
+from FIAT.johnson_mercier import JohnsonMercier, ReducedJohnsonMercier
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini
 from FIAT.Sminus import TrimmedSerendipityEdge, TrimmedSerendipityFace
 from FIAT.SminusDiv import TrimmedSerendipityDiv
@@ -104,6 +104,7 @@ supported_elements = {"Argyris": Argyris,
                       "Guzman-Neilan 2nd kind H1": GuzmanNeilanSecondKindH1,
                       "Guzman-Neilan H1(div)": GuzmanNeilanH1div,
                       "Johnson-Mercier": JohnsonMercier,
+                      "Reduced Johnson-Mercier": ReducedJohnsonMercier,
                       "Lagrange": Lagrange,
                       "Kong-Mulder-Veldhuizen": KongMulderVeldhuizen,
                       "Gauss-Lobatto-Legendre": GaussLobattoLegendre,
