@@ -17,7 +17,7 @@ from finat.ufl.finiteelementbase import FiniteElementBase, shifted_sub_degrees
 class EnrichedElementBase(FiniteElementBase):
     """The vector sum of several finite element spaces."""
 
-    def __init__(self, *elements):
+    def __init__(self, *elements, family=None):
         """Doc."""
         self._elements = elements
 
@@ -49,9 +49,11 @@ class EnrichedElementBase(FiniteElementBase):
 
         # Get name of subclass: EnrichedElement or NodalEnrichedElement
         class_name = self.__class__.__name__
+        if family is None:
+            family = class_name
 
         # Initialize element data
-        FiniteElementBase.__init__(self, class_name, cell, degree,
+        FiniteElementBase.__init__(self, family, cell, degree,
                                    quad_scheme, reference_value_shape)
 
     def mapping(self):
@@ -87,6 +89,7 @@ class EnrichedElementBase(FiniteElementBase):
 
     def reconstruct(self, **kwargs):
         """Doc."""
+        family = kwargs.pop("family", self.family())
         degree = kwargs.pop('degree', None)
         if degree is None:
             degrees = [None] * len(self._elements)
@@ -94,7 +97,7 @@ class EnrichedElementBase(FiniteElementBase):
             degrees = degree
         else:
             degrees = shifted_sub_degrees(self._elements, degree)
-        return type(self)(*(e.reconstruct(degree=d, **kwargs) for d, e in zip(degrees, self._elements)))
+        return type(self)(*(e.reconstruct(degree=d, **kwargs) for d, e in zip(degrees, self._elements)), family=family)
 
     @property
     def embedded_subdegree(self):

@@ -11,7 +11,7 @@ from gem.utils import cached_property
 from finat.cube import FlattenedDimensions
 from finat.discontinuous import DiscontinuousElement
 from finat.finiteelementbase import FiniteElementBase, broadcast_tensor
-from finat.hdivcurl import HCurlElement, HDivElement, WrapperElementBase
+from finat.hdivcurl import HCurlElement, HDivElement, HDivTraceElement, WrapperElementBase
 from finat.point_set import UnionPointSet
 from finat.quadrature_element import QuadratureElement
 from finat.tensor_product import TensorProductElement
@@ -421,4 +421,11 @@ def is_orthogonal(A, B):
         contraction = gem.ComponentTensor(gem.Product(a, b), (zeta,))
         result, = evaluate([contraction])
         return not result.arr.any()
+    elif isinstance(A, HDivTraceElement) and isinstance(B, HDivTraceElement):
+        A_ids = A.entity_dofs()
+        B_ids = B.entity_dofs()
+        A_support = set((dim, entity) for dim in A_ids for entity in A_ids[dim] if A_ids[dim][entity])
+        B_support = set((dim, entity) for dim in A_ids for entity in B_ids[dim] if B_ids[dim][entity])
+        return (len(A_support & B_support) == 0)
+
     return False
