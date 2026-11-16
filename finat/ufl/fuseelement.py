@@ -35,7 +35,10 @@ class FuseElement(FiniteElementBase):
         super().__init__("FUSE", cell, degree, None, triple.get_value_shape())
 
     def __repr__(self):
-        return repr(self.triple)
+        # the repr identifies the element in UFL and Firedrake caches: the
+        # triple's description and the cell 
+        import fuse
+        return f"FuseElement({self.triple!r}, {self.cell!r})"
 
     def __str__(self):
         return f"<FuseElem on {self.triple.cell}>"
