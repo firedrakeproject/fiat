@@ -236,6 +236,7 @@ def test_unreduced_arnold_winther(ref_to_phys):
 @pytest.mark.parametrize("dimension, element, degree", [
     (3, finat.MardalTaiWinther, 2),
     (3, finat.GuzmanNeilanFirstKindH1, 2),
+    (3, finat.BernardiRaugel, 2),
 ])
 def test_high_order_stokes_elements(ref_to_phys, element, dimension, degree):
     check_zany_mapping(element, ref_to_phys[dimension], degree)
