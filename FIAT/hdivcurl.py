@@ -13,7 +13,6 @@ from FIAT import functional
 def Hdiv(element):
     if not isinstance(element, TensorProductElement):
         raise NotImplementedError
-
     if element.A.get_formdegree() is None or element.B.get_formdegree() is None:
         raise ValueError("form degree of sub-element was None (not set during initialisation), Hdiv cannot be done without this information")
     formdegree = element.A.get_formdegree() + element.B.get_formdegree()
