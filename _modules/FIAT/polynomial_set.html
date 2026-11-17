@@ -53,6 +53,7 @@
 <span class="c1"># we have an interface for defining sets of functionals (moments against</span>
 <span class="c1"># an entire set of polynomials)</span>
 
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">chain</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">expansions</span>
@@ -279,6 +280,63 @@
     <span class="n">num_sv</span> <span class="o">=</span> <span class="nb">len</span><span class="p">([</span><span class="n">s</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">sig</span> <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">atol</span><span class="p">])</span>
     <span class="n">basis</span> <span class="o">=</span> <span class="n">vt</span><span class="p">[</span><span class="n">num_sv</span><span class="p">:]</span> <span class="k">if</span> <span class="n">nullspace</span> <span class="k">else</span> <span class="n">vt</span><span class="p">[:</span><span class="n">num_sv</span><span class="p">]</span>
     <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">basis</span><span class="p">,</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">*</span><span class="n">A</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:]))</span></div>
+
+
+
+<div class="viewcode-block" id="TaylorConstrainedPolynomialSet">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.polynomial_set.TaylorConstrainedPolynomialSet">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">TaylorConstrainedPolynomialSet</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">constraints</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""Return the subspace whose specified point values follow from support jets.</span>
+
+<span class="sd">    The members :math:`p` of the subspace satisfy</span>
+
+<span class="sd">    .. math::</span>
+
+<span class="sd">        p(x) = \frac{1}{n} \sum_z \sum_{k} c_k \sum_{|\alpha| = k}</span>
+<span class="sd">        \frac{(x - z)^\alpha}{\alpha!} \partial^\alpha p(z),</span>
+
+<span class="sd">    where :math:`z` ranges over the :math:`n` supplied support points for :math:`x`.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    poly_set : PolynomialSet</span>
+<span class="sd">        A scalar-valued polynomial set.</span>
+<span class="sd">    constraints : mapping of point tuples to (support_pts, weights) pairs</span>
+<span class="sd">        Map each constrained point to its support points and the weights</span>
+<span class="sd">        :math:`c_k` of the terms of order :math:`k` in the Taylor expansions</span>
+<span class="sd">        about those points. Average the weighted expansions over the</span>
+<span class="sd">        support points to determine the constrained value.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    PolynomialSet</span>
+<span class="sd">        The subspace of ``poly_set`` that satisfies all point constraints.</span>
+<span class="sd">    """</span>
+    <span class="n">ref_el</span> <span class="o">=</span> <span class="n">poly_set</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span>
+    <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+    <span class="n">points</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="n">order</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">point</span><span class="p">,</span> <span class="p">(</span><span class="n">support_pts</span><span class="p">,</span> <span class="n">weights</span><span class="p">)</span> <span class="ow">in</span> <span class="n">constraints</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">points</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">point</span><span class="p">)</span>
+        <span class="n">points</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="n">support_pts</span><span class="p">))</span>
+        <span class="n">order</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">weights</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">points</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">points</span><span class="p">)</span>
+    <span class="n">point_indices</span> <span class="o">=</span> <span class="p">{</span><span class="n">pt</span><span class="p">:</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">pt</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">points</span><span class="p">)}</span>
+    <span class="n">tab</span> <span class="o">=</span> <span class="n">poly_set</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">order</span><span class="p">)</span>
+    <span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">point</span><span class="p">,</span> <span class="p">(</span><span class="n">support_pts</span><span class="p">,</span> <span class="n">weights</span><span class="p">)</span> <span class="ow">in</span> <span class="n">constraints</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">indices</span> <span class="o">=</span> <span class="p">[</span><span class="n">point_indices</span><span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">)]</span> <span class="k">for</span> <span class="n">pt</span> <span class="ow">in</span> <span class="n">support_pts</span><span class="p">]</span>
+        <span class="n">support_pts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">support_pts</span><span class="p">)</span>
+        <span class="n">constraint</span> <span class="o">=</span> <span class="n">tab</span><span class="p">[(</span><span class="mi">0</span><span class="p">,)</span> <span class="o">*</span> <span class="n">sd</span><span class="p">][:,</span> <span class="n">point_indices</span><span class="p">[</span><span class="n">point</span><span class="p">]]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">weights</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">mis</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">k</span><span class="p">):</span>
+                <span class="n">factors</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">prod</span><span class="p">((</span><span class="n">point</span> <span class="o">-</span> <span class="n">support_pts</span><span class="p">)</span> <span class="o">**</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+                <span class="n">factors</span> <span class="o">*=</span> <span class="n">c</span> <span class="o">/</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">support_pts</span><span class="p">)</span> <span class="o">*</span> <span class="n">numpy</span><span class="o">.</span><span class="n">prod</span><span class="p">([</span><span class="n">math</span><span class="o">.</span><span class="n">factorial</span><span class="p">(</span><span class="n">a</span><span class="p">)</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">alpha</span><span class="p">]))</span>
+                <span class="n">constraint</span> <span class="o">-=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">tab</span><span class="p">[</span><span class="n">alpha</span><span class="p">][:,</span> <span class="n">indices</span><span class="p">],</span> <span class="n">factors</span><span class="p">)</span>
+        <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">constraint</span><span class="p">)</span>
+
+    <span class="n">basis</span> <span class="o">=</span> <span class="n">spanning_basis</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">rows</span><span class="p">),</span> <span class="n">nullspace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">poly_set</span><span class="o">.</span><span class="n">recombine</span><span class="p">(</span><span class="n">basis</span><span class="p">)</span></div>
 
 
 

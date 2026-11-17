@@ -47,7 +47,7 @@
 <a class="viewcode-back" href="../../finat.html#finat.walkington.Walkington">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Walkington</span><span class="p">(</span><span class="n">PhysicallyMappedElement</span><span class="p">,</span> <span class="n">ScalarFiatElement</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">5</span><span class="p">):</span>
-        <span class="n">cite</span><span class="p">(</span><span class="s2">"Walkington2010"</span><span class="p">)</span>
+        <span class="n">cite</span><span class="p">(</span><span class="s2">"Walkington2014"</span><span class="p">)</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">Walkington</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="n">degree</span><span class="p">))</span>
 
     <span class="c1"># FIAT gives a 65 DOF element whose last 20 nodes constrain the edges</span>
@@ -57,6 +57,24 @@
 <a class="viewcode-back" href="../../finat.html#finat.walkington.Walkington.space_dimension">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">space_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="mi">45</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="ReducedWalkington">
+<a class="viewcode-back" href="../../finat.html#finat.walkington.ReducedWalkington">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ReducedWalkington</span><span class="p">(</span><span class="n">PhysicallyMappedElement</span><span class="p">,</span> <span class="n">ScalarFiatElement</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">5</span><span class="p">):</span>
+        <span class="n">cite</span><span class="p">(</span><span class="s2">"Walkington2014"</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">Walkington</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="n">degree</span><span class="p">,</span> <span class="n">reduced</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+
+    <span class="c1"># FIAT gives a 64 DOF element whose last 24 nodes constrain the faces</span>
+    <span class="c1"># and edges, and are used in the transformation.  However, we only</span>
+    <span class="c1"># have a 40 DOF element.</span>
+<div class="viewcode-block" id="ReducedWalkington.space_dimension">
+<a class="viewcode-back" href="../../finat.html#finat.walkington.ReducedWalkington.space_dimension">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">space_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mi">40</span></div>
 </div>
 
 </pre></div>

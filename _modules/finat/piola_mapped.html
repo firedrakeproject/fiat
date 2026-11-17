@@ -43,15 +43,15 @@
 <div class="viewcode-block" id="PiolaBubbleElement">
 <a class="viewcode-back" href="../../finat.html#finat.piola_mapped.PiolaBubbleElement">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">PiolaBubbleElement</span><span class="p">(</span><span class="n">PhysicallyMappedElement</span><span class="p">,</span> <span class="n">FiatElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""A general class to transform Piola-mapped elements with normal facet bubbles."""</span>
+<span class="w">    </span><span class="sd">"""A general class to transform Piola-mapped elements with facet bubbles."""</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fiat_element</span><span class="p">):</span>
         <span class="n">mapping</span><span class="p">,</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">fiat_element</span><span class="o">.</span><span class="n">mapping</span><span class="p">())</span>
-        <span class="k">if</span> <span class="n">mapping</span> <span class="o">!=</span> <span class="s2">"contravariant piola"</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">mapping</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"contravariant piola"</span><span class="p">,</span> <span class="s2">"covariant piola"</span><span class="p">}:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">fiat_element</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> needs to be Piola mapped."</span><span class="p">)</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">fiat_element</span><span class="p">)</span>
 
-        <span class="c1"># On each facet we expect the normal dof followed by the tangential ones</span>
-        <span class="c1"># The tangential dofs should be numbered last, and are constrained to be zero</span>
+        <span class="c1"># On each facet we expose the first dof and constrain the remaining</span>
+        <span class="c1"># facet bubbles to zero.</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
         <span class="n">facet_dofs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">entity_dofs</span><span class="p">()[</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
         <span class="n">reduced_dim</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">dofs</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span> <span class="k">for</span> <span class="n">dofs</span> <span class="ow">in</span> <span class="n">facet_dofs</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
