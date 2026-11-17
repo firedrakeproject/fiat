@@ -715,8 +715,11 @@ class Indexed(Scalar):
                 C, = B.children
                 kk = B.multiindex
                 ff = C.free_indices
-                if not any((j in ff) for j in jj):
-                    # Only replace indices that are not present in C
+                indirect = tuple(i for k in kk if isinstance(k, VariableIndex)
+                                 for i in k.expression.free_indices)
+                if not any((j in ff) or (j in indirect) for j in jj):
+                    # Only replace indices that are not present in C,
+                    # or in the expression of a VariableIndex in kk
                     rep = dict(zip(jj, ii))
                     ll = tuple(rep.get(k, k) for k in kk)
                     aggregate = C

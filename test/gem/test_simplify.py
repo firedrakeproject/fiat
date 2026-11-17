@@ -100,3 +100,13 @@ def test_flatten_indexsum(A):
     result = gem.IndexSum(gem.IndexSum(Aij, (i,)), (j,))
     expected = gem.IndexSum(Aij, (i, j))
     assert result == expected
+
+
+def test_indexed_gather(X):
+    i, j = gem.indices(2)
+    perm = gem.Literal(numpy.array([1, 0]), dtype=gem.uint_type)
+    gathered = gem.ComponentTensor(gem.Indexed(X, (gem.VariableIndex(gem.Indexed(perm, (i,))), j)), (i, j))
+
+    k, l = gem.indices(2)
+    result = gem.Indexed(gathered, (k, l))
+    assert set(result.free_indices) == {k, l}
