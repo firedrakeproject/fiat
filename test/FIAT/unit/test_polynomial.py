@@ -22,6 +22,7 @@ import sympy
 from FIAT import expansions, polynomial_set, reference_element
 from FIAT.quadrature_schemes import create_quadrature
 from itertools import chain
+from unittest.mock import patch
 
 
 @pytest.fixture(params=(1, 2, 3))
@@ -57,13 +58,21 @@ def test_polynomial_set_recombine_requires_one_column_per_polynomial() -> None:
         poly_set.recombine(numpy.eye(len(poly_set) + 1))
 
 
-@pytest.mark.parametrize("dim,constraints", [(2, (1, 1/2)), (3, (1, 2/3, 1/3))])
-def test_taylor_constrained_polynomial_set(dim, constraints):
+@pytest.mark.parametrize("dim,entity_dim,weights", [
+    (2, 2, (1, 1/2)), (3, 3, (1, 2/3, 1/3)), (3, 2, (1, 1/2))])
+def test_taylor_constrained_polynomial_set(dim, entity_dim, weights):
     cell = reference_element.ufc_simplex(dim)
-    degree = len(constraints) + 1
+    degree = len(weights) + 1
     poly_set = polynomial_set.ONPolynomialSet(cell, degree)
-    constrained = polynomial_set.TaylorConstrainedPolynomialSet(poly_set, constraints)
-    assert len(constrained) == len(poly_set) - 1
+    constraints = {}
+    vertices = cell.get_vertices()
+    for entity, indices in cell.get_topology()[entity_dim].items():
+        point, = cell.make_points(entity_dim, entity, entity_dim+1)
+        constraints[point] = ([vertices[v] for v in indices], weights)
+    with patch.object(poly_set, "tabulate", wraps=poly_set.tabulate) as tabulate:
+        constrained = polynomial_set.TaylorConstrainedPolynomialSet(poly_set, constraints)
+    tabulate.assert_called_once()
+    assert len(constrained) == len(poly_set) - len(constraints)
 
     # The constraint is exact on polynomials of one degree less
     pts = cell.make_points(dim, 0, degree + dim + 1)

@@ -166,6 +166,7 @@ def test_rotated_bernardi_raugel(ref_to_phys):
 @pytest.mark.parametrize("element", [
                          finat.Morley,
                          finat.Hermite,
+                         finat.ReducedHermite,
                          finat.Walkington,
                          finat.ReducedWalkington,
                          ])

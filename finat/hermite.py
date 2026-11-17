@@ -12,16 +12,16 @@ class Hermite(PhysicallyMappedElement, ScalarFiatElement):
 
 
 class ReducedHermite(PhysicallyMappedElement, ScalarFiatElement):
-    """The physically mapped reduced cubic Kirchhoff triangle element.
+    """The physically mapped reduced cubic Hermite element.
 
     Parameters
     ----------
     cell : :class:`FIAT.reference_element.Cell`
-        The reference triangle.
+        The reference triangle or tetrahedron.
     degree : int, optional
         The polynomial degree.  Only degree 3 is supported.
     """
 
     def __init__(self, cell, degree=3):
-        cite("Ciarlet1972")
+        cite("Ciarlet1978")
         super().__init__(FIAT.Hermite(cell, degree=degree, reduced=True))

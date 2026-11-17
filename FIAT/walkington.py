@@ -114,6 +114,9 @@ class Walkington(finite_element.CiarletElement):
         ref_complex = macro.AlfeldSplit(ref_el)
         poly_set = BernsteinPolynomialSet(ref_complex, degree, order=1, vorder=4)
         if reduced:
-            poly_set = polynomial_set.TaylorConstrainedPolynomialSet(poly_set, (1, 2/3, 1/3))
+            dim = ref_el.get_spatial_dimension()
+            point, = ref_el.make_points(dim, 0, dim+1)
+            constraints = {point: (ref_el.get_vertices(), (1, 2/3, 1/3))}
+            poly_set = polynomial_set.TaylorConstrainedPolynomialSet(poly_set, constraints)
         dual = WalkingtonDualSet(ref_el, degree, reduced=reduced)
         super().__init__(poly_set, dual, degree)

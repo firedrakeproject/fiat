@@ -6,7 +6,7 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 from FIAT import finite_element, polynomial_set, dual_set, functional
-from FIAT.reference_element import TRIANGLE
+from FIAT.reference_element import TRIANGLE, TETRAHEDRON
 
 
 class HermiteDualSet(dual_set.DualSet):
@@ -56,19 +56,24 @@ class HermiteDualSet(dual_set.DualSet):
 class Hermite(finite_element.CiarletElement):
     """The Hermite finite element.  It has any degree of at least three
     on intervals, and degree three on higher dimensional simplices.  The
-    reduced element on triangles determines the barycenter value from the
-    vertex jets, so that it still contains the quadratics."""
+    reduced element on triangles and tetrahedra determines each triangular
+    face's barycenter value from its vertex jets, so that it still contains
+    the quadratics."""
 
     def __init__(self, ref_el, degree=3, variant=None, reduced=False):
         if ref_el.get_spatial_dimension() > 1 and degree != 3:
             raise ValueError("Hermite elements in more than one dimension must have degree 3.")
-        if reduced and ref_el.get_shape() != TRIANGLE:
-            raise ValueError("Reduced Hermite elements only defined on triangles.")
+        if reduced and ref_el.get_shape() not in (TRIANGLE, TETRAHEDRON):
+            raise ValueError("Reduced Hermite elements only defined on triangles and tetrahedra.")
         if variant is None:
             variant = "gll"
         poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
         if reduced:
-            poly_set = polynomial_set.TaylorConstrainedPolynomialSet(poly_set, (1, 1/2))
+            top = ref_el.get_topology()
+            vertices = ref_el.get_vertices()
+            constraints = {pt: ([vertices[v] for v in top[2][f]], (1, 1/2))
+                           for f in top[2] for pt in ref_el.make_points(2, f, 3)}
+            poly_set = polynomial_set.TaylorConstrainedPolynomialSet(poly_set, constraints)
         dual = HermiteDualSet(ref_el, degree, variant=variant, reduced=reduced)
 
         super().__init__(poly_set, dual, degree)

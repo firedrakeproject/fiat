@@ -192,46 +192,56 @@ def spanning_basis(A, nullspace=False, rtol=1e-10):
 
 
 def TaylorConstrainedPolynomialSet(poly_set, constraints):
-    r"""Return the subspace whose barycenter value is given by the vertex jets.
+    r"""Return the subspace whose specified point values follow from support jets.
 
     The members :math:`p` of the subspace satisfy
 
     .. math::
 
-        p(x_T) = \frac{1}{n} \sum_z \sum_{k} c_k \sum_{|\alpha| = k}
-        \frac{(x_T - z)^\alpha}{\alpha!} \partial^\alpha p(z),
+        p(x) = \frac{1}{n} \sum_z \sum_{k} c_k \sum_{|\alpha| = k}
+        \frac{(x - z)^\alpha}{\alpha!} \partial^\alpha p(z),
 
-    where :math:`x_T` is the barycenter of the cell and :math:`z` ranges over
-    its :math:`n` vertices.
+    where :math:`z` ranges over the :math:`n` supplied support points for :math:`x`.
 
     Parameters
     ----------
     poly_set : PolynomialSet
         A scalar-valued polynomial set.
-    constraints : sequence of float
-        The weights :math:`c_k` of the terms of order :math:`k` in the
-        Taylor expansion about each vertex.
+    constraints : mapping of point tuples to (support_pts, weights) pairs
+        Map each constrained point to its support points and the weights
+        :math:`c_k` of the terms of order :math:`k` in the Taylor expansions
+        about those points. Average the weighted expansions over the
+        support points to determine the constrained value.
 
     Returns
     -------
     PolynomialSet
-        The subspace of ``poly_set`` that satisfies the constraint.
+        The subspace of ``poly_set`` that satisfies all point constraints.
     """
     ref_el = poly_set.get_reference_element()
-    cell = ref_el.get_parent() or ref_el
-    sd = cell.get_spatial_dimension()
-    vertices = numpy.asarray(cell.get_vertices())
-    barycenter = numpy.mean(vertices, axis=0)
+    sd = ref_el.get_spatial_dimension()
+    points = set()
+    order = 0
+    for point, (support_pts, weights) in constraints.items():
+        points.add(point)
+        points.update(map(tuple, support_pts))
+        order = max(order, len(weights) - 1)
+    points = sorted(points)
+    point_indices = {pt: i for i, pt in enumerate(points)}
+    tab = poly_set.tabulate(points, order)
+    rows = []
+    for point, (support_pts, weights) in constraints.items():
+        indices = [point_indices[tuple(pt)] for pt in support_pts]
+        support_pts = numpy.asarray(support_pts)
+        constraint = tab[(0,) * sd][:, point_indices[point]].copy()
+        for k, c in enumerate(weights):
+            for alpha in mis(sd, k):
+                factors = numpy.prod((point - support_pts) ** alpha, axis=1)
+                factors *= c / (len(support_pts) * numpy.prod([math.factorial(a) for a in alpha]))
+                constraint -= numpy.dot(tab[alpha][:, indices], factors)
+        rows.append(constraint)
 
-    tab = poly_set.tabulate(numpy.vstack([vertices, barycenter]), len(constraints) - 1)
-    constraint = tab[(0,) * sd][:, -1]
-    for k, c in enumerate(constraints):
-        for alpha in mis(sd, k):
-            weights = numpy.prod((barycenter - vertices) ** alpha, axis=1)
-            weights *= c / (len(vertices) * numpy.prod([math.factorial(a) for a in alpha]))
-            constraint = constraint - numpy.dot(tab[alpha][:, :-1], weights)
-
-    basis = spanning_basis(constraint[numpy.newaxis, :], nullspace=True)
+    basis = spanning_basis(numpy.array(rows), nullspace=True)
     return poly_set.recombine(basis)
 
 

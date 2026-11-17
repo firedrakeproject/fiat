@@ -7,7 +7,7 @@ from finat.physically_mapped import PhysicallyMappedElement
 
 class Walkington(PhysicallyMappedElement, ScalarFiatElement):
     def __init__(self, cell, degree=5):
-        cite("Walkington2010")
+        cite("Walkington2014")
         super().__init__(FIAT.Walkington(cell, degree=degree))
 
     # FIAT gives a 65 DOF element whose last 20 nodes constrain the edges
@@ -19,7 +19,7 @@ class Walkington(PhysicallyMappedElement, ScalarFiatElement):
 
 class ReducedWalkington(PhysicallyMappedElement, ScalarFiatElement):
     def __init__(self, cell, degree=5):
-        cite("Walkington2010")
+        cite("Walkington2014")
         super().__init__(FIAT.Walkington(cell, degree=degree, reduced=True))
 
     # FIAT gives a 64 DOF element whose last 24 nodes constrain the faces
