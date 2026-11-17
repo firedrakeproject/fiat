@@ -349,6 +349,17 @@ class PointDivergence(Functional):
         super().__init__(ref_el, (len(x),), {}, dpt_dict, "PointDiv")
 
 
+class PointCurlComponent(Functional):
+    """Functional representing a component of the curl of a vector function
+    in three dimensions at a particular point x."""
+    def __init__(self, ref_el, comp, x):
+        sd = ref_el.get_spatial_dimension()
+        alphas = tuple(map(tuple, numpy.eye(sd, dtype=int)))
+        i, j = (comp + 1) % sd, (comp + 2) % sd
+        dpt_dict = {x: [(1.0, alphas[i], (j,)), (-1.0, alphas[j], (i,))]}
+        super().__init__(ref_el, (sd,), {}, dpt_dict, "PointCurlComponent")
+
+
 class IntegralMoment(Functional):
     """Functional representing integral of the input against some tabulated function f.
 
@@ -554,6 +565,16 @@ class IntegralMomentOfDivergence(IntegralMomentOfDerivative):
     def __init__(self, ref_el, Q, f_at_qpts):
         sd = ref_el.get_spatial_dimension()
         super().__init__(ref_el, Q, f_at_qpts, numpy.eye(sd), shp=(sd,), nm="IntegralMomentOfDivergence")
+
+
+class IntegralMomentOfCurl(IntegralMomentOfDerivative):
+    """Functional representing integral of the curl of the input against
+    some tabulated vector function f in three dimensions."""
+    def __init__(self, ref_el, Q, f_at_qpts):
+        sd = ref_el.get_spatial_dimension()
+        # f . curl v = sum_d (f x e_d) . D_d v
+        f_at_qpts = numpy.cross(f_at_qpts[:, None], numpy.eye(sd)[..., None], axis=0)
+        super().__init__(ref_el, Q, f_at_qpts, shp=(sd,), nm="IntegralMomentOfCurl")
 
 
 class IntegralMomentOfTensorDivergence(IntegralMomentOfDerivative):

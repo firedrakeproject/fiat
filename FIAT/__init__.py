@@ -26,6 +26,8 @@ from FIAT.c2_elements import AlfeldC2, BrambleZlamalC2
 from FIAT.alfeld_sorokina import AlfeldSorokina
 from FIAT.arnold_qin import ArnoldQin
 from FIAT.guzman_neilan import GuzmanNeilanFirstKindH1, GuzmanNeilanSecondKindH1, GuzmanNeilanH1div
+from FIAT.fu_guzman_neilan import ReducedFuGuzmanNeilanH1curl
+from FIAT.hu_zhang_zhang import HuZhangZhang
 from FIAT.christiansen_hu import ChristiansenHu
 from FIAT.johnson_mercier import JohnsonMercier
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini
@@ -103,6 +105,8 @@ supported_elements = {"Argyris": Argyris,
                       "Guzman-Neilan 1st kind H1": GuzmanNeilanFirstKindH1,
                       "Guzman-Neilan 2nd kind H1": GuzmanNeilanSecondKindH1,
                       "Guzman-Neilan H1(div)": GuzmanNeilanH1div,
+                      "Reduced-Fu-Guzman-Neilan H1(curl)": ReducedFuGuzmanNeilanH1curl,
+                      "Hu-Zhang-Zhang": HuZhangZhang,
                       "Johnson-Mercier": JohnsonMercier,
                       "Lagrange": Lagrange,
                       "Kong-Mulder-Veldhuizen": KongMulderVeldhuizen,
