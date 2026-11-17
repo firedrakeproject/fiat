@@ -80,7 +80,16 @@ if petsctools is not None:
   volume =       46,
   number =       3,
   pages =        {177-199},
-  doi =          {10.1007/BF0025245}
+  doi =          {10.1007/BF00252458}
+}""")
+    petsctools.add_citation("Ciarlet1978", """
+@Book{Ciarlet1978,
+  author =       {P. G. Ciarlet},
+  title =        {The Finite Element Method for Elliptic Problems},
+  publisher =    {North-Holland},
+  year =         1978,
+  series =       {Studies in Mathematics and its Applications},
+  volume =       4
 }""")
     petsctools.add_citation("Morley1971", """
 @Article{Morley1971,
@@ -259,8 +268,8 @@ if petsctools is not None:
  doi={https://doi.org/10.1023/A:1004420829610},
 }
 """)
-    petsctools.add_citation("Walkington2010", """
-@article{Walkington2010,
+    petsctools.add_citation("Walkington2014", """
+@article{Walkington2014,
   author = {Walkington, Noel J.},
   title = {{A \\$C^1\\$ Tetrahedral Finite Element without Edge Degrees of Freedom}},
   journal = {SIAM Journal on Numerical Analysis},
