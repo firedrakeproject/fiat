@@ -122,7 +122,7 @@ class TensorProductElement(FiniteElementBase):
         if hasattr(self, "_triple"):
             return TensorProductElement(
                 *(e.reconstruct(degree=d, **kwargs) for d, e in zip(degrees, self.factor_elements)),
-                cell=celli, triple=self._triple)
+                cell=cell, triple=self._triple)
         return TensorProductElement(
             *(e.reconstruct(degree=d, **kwargs) for d, e in zip(degrees, self.factor_elements)),
             cell=cell)
