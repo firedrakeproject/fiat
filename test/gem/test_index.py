@@ -75,6 +75,13 @@ def test_number_operand_takes_the_dtype_of_an_integer_node(build, dtype, expecte
     assert numpy.array_equal(result.arr, expected)
 
 
+def test_negation_of_an_untyped_node_uses_negative_one() -> None:
+    """Negating an untyped node multiplies it by floating-point negative one."""
+    x = gem.Variable("x", ())
+    assert -x == gem.Product(gem.Literal(-1.0), x)
+    assert gem.Literal(-1) == gem.Literal(-1.0)
+
+
 def test_number_operand_of_an_untyped_node_is_float():
     """A number with an untyped node converts to a float literal."""
     expression = gem.Variable("x", ()) - 3
