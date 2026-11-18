@@ -104,3 +104,21 @@ def test_refactorise_cancels_deltas():
     assert factored == Monomial((), (A_pj, A_pj), gem.Literal(1))
     assert nested == Monomial((), (), gem.Product(C_p, B_p))
     assert under_sum.sum_indices == (q,)
+
+
+def test_distributed_contraction_counts_constant_summands():
+    """A summand constant along a reduction still counts every index value."""
+    import numpy
+    from gem.coffee import monomial_sum_to_expression
+    from gem.interpreter import evaluate
+
+    i, j, k = gem.indices(3)
+    a = gem.Literal(numpy.ones((2, 3)))[i, k]
+    b = gem.Literal(numpy.full(2, 2.))[i]
+    c = gem.Literal(numpy.ones(2))[j]
+    expression = gem.IndexSum((a + b) * c, (k,))
+    monomials, = collect_monomials([expression], partial(classify, {a, b, c}))
+    result = monomial_sum_to_expression(monomials)
+    actual, expected = evaluate([gem.ComponentTensor(e, (i, j))
+                                for e in (result, expression)])
+    assert numpy.array_equal(actual.arr, expected.arr)

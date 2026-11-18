@@ -9,7 +9,7 @@ from sys import intern
 from gem.node import Memoizer, MemoizerArg, traversal
 from gem.gem import (Node, Conditional, IndexSum, Zero, Product, Sum,
                      Indexed, ListTensor, one, MathFunction)
-from gem.optimise import (delta_elimination, filtered_replace_indices,
+from gem.optimise import (delta_elimination, filtered_replace_indices, index_space_literal,
                           remove_componenttensors, sum_factorise,
                           traverse_product, traverse_sum, unroll_indexsum,
                           make_rename_map, make_renamer)
@@ -231,6 +231,12 @@ def _collect_monomials(expression, self):
         # All free indices that appear in the other terms
         other_indices = {index for factor in rest_factors
                          for index in factor.free_indices}
+
+        # A distributed summand may be constant along a contracted axis.
+        # Its sum still contributes the cardinality of that axis.
+        missing = tuple(index for index in all_indices
+                        if index not in atomic_indices | other_indices)
+        rest_factors.append(index_space_literal(missing))
 
         # Sum indices that appear in atomic terms
         # (will go to the result :py:class:`Monomial`)
