@@ -27,6 +27,13 @@ def test_triangle_basic(ufl_element):
     assert isinstance(element, supported_elements[ufl_element.family()])
 
 
+@pytest.mark.parametrize("cell", [ufl.triangle, ufl.tetrahedron])
+def test_reduced_hermite(cell):
+    element = create_element(finat.ufl.FiniteElement("HER-red", cell, 3))
+    assert isinstance(element, finat.ReducedHermite)
+    assert element.space_dimension() == (cell.topological_dimension + 1)**2
+
+
 @pytest.fixture
 def ufl_vector_element(triangle_names):
     return finat.ufl.VectorElement(triangle_names, ufl.triangle, 2)

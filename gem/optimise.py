@@ -282,16 +282,25 @@ def _selection_indices(multiindex, expressions):
     return tuple(Index(extent=index.extent) for index in multiindex)
 
 
-def _select_expression(expressions, self, index):
+def _select_expression(expressions, index, cache):
     """Helper function to select an expression from a list of
     expressions with an index.  This function expect sanitised input,
     one should normally call :py:func:`select_expression` instead.
 
-    :arg expressions: a list of expressions
-    :arg self: memoizer sharing selections of repeated subexpressions
+    :arg expressions: a tuple of expressions
     :arg index: an index (free, fixed or variable)
+    :arg cache: a dict from the tuples of expressions already selected
+        with this index to their selection, so that subexpressions shared
+        within the DAGs are selected once
     :returns: an expression
     """
+    try:
+        return cache[expressions]
+    except KeyError:
+        return cache.setdefault(expressions, _select_expression_uncached(expressions, index, cache))
+
+
+def _select_expression_uncached(expressions, index, cache):
     expr = expressions[0]
     if all(e == expr for e in expressions):
         return expr
@@ -307,7 +316,7 @@ def _select_expression(expressions, self, index):
                 return expression.children[0]
             elif isinstance(expression, Zero):
                 return Zero(shape)
-        return Indexed(self(tuple(map(child, expressions)), index), multiindex)
+        return Indexed(_select_expression(tuple(map(child, expressions)), index, cache), multiindex)
 
     if types <= {Literal, Zero, Failure}:
         return partial_indexed(ListTensor(expressions), (index,))
@@ -318,7 +327,7 @@ def _select_expression(expressions, self, index):
             next(e.multiindex for e in expressions
                  if isinstance(e, ComponentTensor)), expressions)
         children = remove_componenttensors([Indexed(e, multiindex) for e in expressions])
-        return ComponentTensor(self(tuple(children), index), multiindex)
+        return ComponentTensor(_select_expression(tuple(children), index, cache), multiindex)
 
     if types == {Delta}:
         if all(e.i == k and e.j == expr.j for k, e in enumerate(expressions)):
@@ -333,7 +342,7 @@ def _select_expression(expressions, self, index):
             summands = [Indexed(ComponentTensor(e.children[0], e.multiindex),
                                 multiindex)
                         for e in expressions]
-            return IndexSum(self(tuple(summands), index), multiindex)
+            return IndexSum(_select_expression(tuple(summands), index, cache), multiindex)
 
     if len(types) == 1:
         cls, = types
@@ -344,7 +353,7 @@ def _select_expression(expressions, self, index):
                         for name in attributes)
                 for e in expressions)):
             return expr.reconstruct(*(
-                self(nth_children, index)
+                _select_expression(nth_children, index, cache)
                 for nth_children in zip(*(e.children for e in expressions))))
 
     # Different facet expressions can always be selected as tensor entries.
@@ -376,7 +385,7 @@ def select_expression(expressions, index):
     exprs = remove_componenttensors([Indexed(e, alpha) for e in expressions])
 
     # Factor the expressions recursively and convert result
-    selected = MemoizerArg(_select_expression)(tuple(exprs), index)
+    selected = _select_expression(tuple(exprs), index, {})
     return ComponentTensor(selected, alpha)
 
 
