@@ -10,7 +10,7 @@ import numpy
 from itertools import chain
 from collections import defaultdict
 
-from FIAT import polynomial_set, functional
+from FIAT import functional
 from FIAT.reference_element import compute_unflattening_map
 
 
@@ -156,109 +156,47 @@ class DualSet:
         of functions it takes, and the number of members of the
         expansion set.
         """
-
-        # This rather technical code queries the low-level information
-        # in pt_dict and deriv_dict
-        # for each functional to find out where it evaluates its
-        # inputs and/or their derivatives.  Then, it tabulates the
-        # expansion set one time for all the function values and
-        # another for all of the derivatives.  This circumvents
-        # needing to call the to_riesz method of each functional and
-        # also limits the number of different calls to tabulate.
-
         tshape = self.nodes[0].target_shape
-        num_nodes = len(self.nodes)
+        sd = self.ref_el.get_spatial_dimension()
         es = poly_set.get_expansion_set()
         ed = poly_set.get_embedded_degree()
-        num_exp = es.get_num_members(poly_set.get_embedded_degree())
+        num_exp = es.get_num_members(ed)
+        points = defaultdict(dict)
+        weights = defaultdict(dict)
+        for node_id, node in enumerate(self.nodes):
+            for order in node.orders:
+                pts, wts = node.get_order_tensors(order)
+                points[order][node_id] = pts
+                weights[order][node_id] = wts
 
-        riesz_shape = (num_nodes, *tshape, num_exp)
-        mat = numpy.zeros(riesz_shape, "d")
+        # Tabulate the expansion set one time for all the values and another
+        # for all the derivatives, and contract nodes with the same point set
+        # in a single product.
+        mat = numpy.zeros((len(self.nodes), *tshape, num_exp))
+        all_orders = set(points)
+        for orders in (all_orders & {0}, all_orders - {0}):
+            if not orders:
+                continue
+            pts = sorted(set(chain.from_iterable(
+                node_points for order in orders for node_points in points[order].values())))
+            point_index = {pt: j for j, pt in enumerate(pts)}
+            tabulation = es._tabulate(ed, pts, max(orders))
+            for order in sorted(orders):
+                # D^order phi with axes (j, gamma, point)
+                dshape = (sd,) * order
+                dphi = numpy.zeros((num_exp, *dshape, len(pts)))
+                for index in numpy.ndindex(dshape):
+                    dphi[:, *index] = tabulation[tuple(map(index.count, range(sd)))]
 
-        def map_quadratures_to_points(nodes, deriv=False):
-            Qs_to_ells = defaultdict(list)
-            for i, ell in enumerate(nodes):
-                if deriv and len(ell.deriv_dict) == 0:
-                    continue
-                elif not deriv and len(ell.pt_dict) == 0:
-                    continue
-                if isinstance(ell, (functional.IntegralMoment, functional.IntegralMomentOfDerivative)):
-                    Q = ell.Q
-                else:
-                    Q = None
-                Qs_to_ells[Q].append(i)
-            pts = set()
-            Qs_to_pts = {}
-            for Q in Qs_to_ells:
-                if Q is None:
-                    if deriv:
-                        cur_pts = chain.from_iterable(nodes[i].deriv_dict.keys() for i in Qs_to_ells[None])
-                    else:
-                        cur_pts = chain.from_iterable(nodes[i].pt_dict.keys() for i in Qs_to_ells[None])
-                    cur_pts = tuple(set(cur_pts))
-                else:
-                    cur_pts = tuple(map(tuple, Q.pts))
-                Qs_to_pts[Q] = cur_pts
-                pts.update(cur_pts)
-            pts = list(sorted(pts))
-            return Qs_to_ells, Qs_to_pts, pts
-
-        # Now tabulate the function values
-        Qs_to_ells, Qs_to_pts, pts = map_quadratures_to_points(self.nodes)
-        expansion_values = numpy.transpose(es.tabulate(ed, pts))
-        for Q in Qs_to_ells:
-            ells = Qs_to_ells[Q]
-            cur_pts = Qs_to_pts[Q]
-            indices = list(map(pts.index, cur_pts))
-            wshape = (len(ells), *tshape, len(cur_pts))
-            wts = numpy.zeros(wshape, "d")
-            if Q is None:
-                for i, k in enumerate(ells):
-                    ell = self.nodes[k]
-                    for pt, wc_list in ell.pt_dict.items():
-                        j = cur_pts.index(pt)
-                        for (w, c) in wc_list:
-                            wts[i][c][j] = w
-            else:
-                for i, k in enumerate(ells):
-                    ell = self.nodes[k]
-                    wts[i][ell.comp][:] = ell.f_at_qpts
-                qwts = Q.get_weights()
-                wts = numpy.multiply(wts, qwts, out=wts)
-            mat[ells] += numpy.dot(wts, expansion_values[indices])
-
-        # Tabulate the derivative values that are needed
-        max_deriv_order = max(ell.max_deriv_order for ell in self.nodes)
-        if max_deriv_order > 0:
-            Qs_to_ells, Qs_to_pts, pts = map_quadratures_to_points(self.nodes, deriv=True)
-            # It's easiest/most efficient to get derivatives of the
-            # expansion set through the polynomial set interface.
-            # This is creating a short-lived set to do just this.
-            coeffs = numpy.eye(num_exp)
-            expansion = polynomial_set.PolynomialSet(self.ref_el, ed, ed, es, coeffs)
-            dexpansion_values = expansion.tabulate(pts, max_deriv_order)
-            for Q in Qs_to_ells:
-                ells = Qs_to_ells[Q]
-                cur_pts = Qs_to_pts[Q]
-                indices = list(map(pts.index, cur_pts))
-                wshape = (len(ells), *tshape, len(cur_pts))
-                dwts = {alpha: numpy.zeros(wshape, "d") for alpha in dexpansion_values if sum(alpha) > 0}
-                if Q is None:
-                    for i, k in enumerate(ells):
-                        ell = self.nodes[k]
-                        for pt, wac_list in ell.deriv_dict.items():
-                            j = cur_pts.index(pt)
-                            for (w, alpha, c) in wac_list:
-                                dwts[alpha][i][c][j] = w
-                else:
-                    for i, k in enumerate(ells):
-                        ell = self.nodes[k]
-                        for alpha in ell.weights:
-                            dwts[alpha][i][ell.comp][:] = ell.weights[alpha]
-                for alpha in dwts:
-                    wts = dwts[alpha]
-                    expansion_values = dexpansion_values[alpha].T
-                    mat[ells] += numpy.dot(wts, expansion_values[indices])
+                point_groups = defaultdict(list)
+                for node_id, node_points in points[order].items():
+                    point_groups[node_points].append(node_id)
+                for node_points, node_ids in point_groups.items():
+                    wts = numpy.stack([weights[order][node_id] for node_id in node_ids])
+                    indices = [point_index[pt] for pt in node_points]
+                    # Contract the derivative axes and the points
+                    axes = range(-order - 1, 0)
+                    mat[node_ids] += numpy.tensordot(wts, dphi[..., indices], axes=(axes, axes))
         coeffs = self.get_coeffs()
         if coeffs is not None:
             mat = numpy.tensordot(coeffs, mat, axes=(1, 0))

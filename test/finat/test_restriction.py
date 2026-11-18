@@ -3,7 +3,7 @@ import finat
 import numpy
 import pytest
 from finat.point_set import PointSet
-from finat.restricted import r_to_codim
+from finat.restricted import null_element, r_to_codim, restrict
 from gem.interpreter import evaluate
 from finat.physically_mapped import NeedsCoordinateMappingElement
 from .conftest import MyMapping
@@ -162,3 +162,15 @@ def zany_element(cell):
 
 def test_zany_restriction(zany_element, restriction, ps):
     run_restriction(zany_element, restriction, ps)
+
+
+@pytest.mark.parametrize("restriction, take_closure, expected", [
+    ("vertex", True, "parent"),
+    ("facet", True, "parent"),
+    ("facet", False, "null"),
+])
+def test_bell_restriction(restriction, take_closure, expected):
+    """Bell has no physical edge dofs, so restriction counts only its exposed dofs."""
+    element = finat.Bell(FIAT.ufc_simplex(2))
+    restricted = restrict(element, restriction, take_closure)
+    assert restricted is {"parent": element, "null": null_element}[expected]
