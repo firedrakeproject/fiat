@@ -491,22 +491,6 @@ def test_sum_factorise_jagged_distribution():
     assert value.arr == 12
 
 
-def test_literal_distinguishes_dtypes():
-    """Tell an index literal apart from a value literal.
-
-    An index table holds unsigned integers and a coefficient table holds
-    floats. GEM memoizes on node identity, so the two must not compare
-    equal when they happen to hold the same number.
-    """
-    index = gem.Literal(numpy.uint32(3), dtype=gem.uint_type)
-    value = gem.Literal(3.0)
-
-    assert index.dtype != value.dtype
-    assert index != value
-    assert hash(index) != hash(value)
-    assert {index: "index"}.get(value) is None
-
-
 def test_rename_index_under_variable_index():
     """Renaming a bound index must reach the lookup of an indirect gather."""
     values = gem.Literal(numpy.array([10.0, 20.0, 30.0]))
@@ -608,6 +592,24 @@ def test_distribute_sum_conditions_on_free_parent():
     distributed = gem.Sum(*distribute_sum(expression, lambda node: isinstance(node, gem.Sum)))
     actual, = evaluate([distributed])
     assert numpy.array_equal(actual.arr, [6., 4., 2.])
+
+
+@pytest.mark.parametrize("values", [3.0, [3.0, 4.0]])
+@pytest.mark.parametrize("dtype", [numpy.float32, numpy.float64, numpy.complex128])
+def test_literal_distinguishes_dtypes(values: float | list[float], dtype: type) -> None:
+    """Keep index and value literals distinct in expression caches."""
+    index = gem.Literal(values, dtype=gem.uint_type)
+    value = gem.Literal(values, dtype=dtype)
+    copy = gem.Literal(values, dtype=gem.uint_type)
+
+    assert index.dtype != value.dtype
+    assert not index.is_equal(value)
+    assert index != value
+    assert hash(index) != hash(value)
+    assert {index: "index"}.get(value) is None
+    assert index == copy
+    assert hash(index) == hash(copy)
+    assert {index: "index"}[copy] == "index"
 
 
 @pytest.mark.parametrize('kind', ['abs', 'mixed'])

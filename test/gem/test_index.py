@@ -75,10 +75,22 @@ def test_number_operand_takes_the_dtype_of_an_integer_node(build, dtype, expecte
     assert numpy.array_equal(result.arr, expected)
 
 
-def test_negation_of_an_untyped_node_uses_negative_one():
-    """Negating an untyped node multiplies it by negative one."""
+def test_negation_of_an_untyped_node_uses_negative_one() -> None:
+    """Negating an untyped node multiplies it by floating-point negative one."""
     x = gem.Variable("x", ())
-    assert -x == gem.Product(gem.Literal(-1), x)
+    assert -x == gem.Product(gem.Literal(-1.0), x)
+    assert gem.Literal(-1) == gem.Literal(-1.0)
+
+
+@pytest.mark.parametrize("dtype", [
+    None, numpy.dtype("float32"), numpy.dtype("float64"),
+    numpy.dtype("complex128"), gem.uint_type,
+])
+def test_negation_shares_negative_one_by_dtype(dtype: numpy.dtype | None) -> None:
+    """Reuse the same negative-one node for operands of the same dtype."""
+    x = gem.Variable("x", (), dtype=dtype)
+    y = gem.Variable("y", (), dtype=dtype)
+    assert (-x).children[0] is (-y).children[0]
 
 
 def test_number_operand_of_an_untyped_node_is_float():
