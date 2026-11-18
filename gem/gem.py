@@ -643,6 +643,10 @@ class Conditional(Scalar):
         self.dtype = Node.inherit_dtype_from_children((then, else_))
         return self
 
+    @property
+    def free_indices(self):
+        return unique(chain.from_iterable(c.free_indices for c in self.children))
+
 
 class IndexBase(Scalar, Terminal):
 # class IndexBase(Terminal):

@@ -9,8 +9,8 @@ import collections
 from functools import singledispatch
 from itertools import chain, groupby
 
-from gem.node import traversal, collect_refcount
-from gem import gem, impero as imp, optimise, scheduling
+from gem.node import collect_refcount, pre_traversal, traversal
+from gem import gem, impero as imp, optimise, replace, scheduling
 
 
 # ImperoC is named tuple for C code generation.
@@ -467,3 +467,58 @@ def temp_refcount(temporaries, op):
         raise AssertionError("unhandled operation: %s" % type(op))
 
     return counter
+
+
+@singledispatch
+def map_terminals(node, function, loops=()):
+    """Rebuild an Impero tree with ``function(loops, terminal)`` in place of each terminal.
+
+    :arg node: the root of the Impero tree.
+    :arg function: a callable that takes the enclosing :class:`~.For` nodes of a
+        terminal, outermost first, and the terminal, and returns the node that
+        replaces the terminal.
+    :arg loops: the :class:`~.For` nodes that enclose ``node``.
+    """
+    return node.reconstruct(*(map_terminals(child, function, loops) for child in node.children))
+
+
+@map_terminals.register(imp.Block)
+def map_terminals_block(node, function, loops=()):
+    return imp.Block(map_terminals(child, function, loops) for child in node.children)
+
+
+@map_terminals.register(imp.For)
+def map_terminals_for(node, function, loops=()):
+    return node.reconstruct(map_terminals(node.statement, function, (*loops, node)))
+
+
+@map_terminals.register(imp.Terminal)
+def map_terminals_terminal(node, function, loops=()):
+    return function(loops, node)
+
+
+def terminals(node):
+    """Return each terminal below an Impero node with its enclosing :class:`~.For` nodes, in execution order."""
+    found = []
+
+    def visit(loops, terminal):
+        found.append((loops, terminal))
+        return terminal
+
+    map_terminals(node, visit)
+    return found
+
+
+def rewrite_terminal(terminal, mapping):
+    """Return an Impero terminal with :func:`gem.replace` by ``mapping`` applied to each of its GEM expressions."""
+    def rewrite(value):
+        return replace(value, mapping) if isinstance(value, gem.Node) else value
+
+    return type(terminal)(*(rewrite(getattr(terminal, slot)) for slot in terminal.__slots__))
+
+
+def gem_nodes(*nodes):
+    """Return an iterator over every GEM node that the terminals below the Impero ``nodes`` refer to."""
+    found = (n for n in pre_traversal(nodes) if isinstance(n, imp.Terminal))
+    values = (getattr(t, slot) for t in found for slot in t.__slots__)
+    return pre_traversal([v for v in values if isinstance(v, gem.Node)])
