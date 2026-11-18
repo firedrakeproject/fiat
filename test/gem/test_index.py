@@ -90,7 +90,10 @@ def test_negation_shares_negative_one_by_dtype(dtype: numpy.dtype | None) -> Non
     """Reuse the same negative-one node for operands of the same dtype."""
     x = gem.Variable("x", (), dtype=dtype)
     y = gem.Variable("y", (), dtype=dtype)
-    assert (-x).children[0] is (-y).children[0]
+    neg_x, neg_y = -x, -y
+    assert isinstance(neg_x, gem.Product)
+    assert isinstance(neg_y, gem.Product)
+    assert neg_x.children[0] is neg_y.children[0]
 
 
 def test_number_operand_of_an_untyped_node_is_float():
