@@ -102,6 +102,24 @@ def test_flatten_indexsum(A):
     assert result == expected
 
 
+@pytest.mark.parametrize("values", [3.0, [3.0, 4.0]])
+@pytest.mark.parametrize("dtype", [numpy.float32, numpy.float64, numpy.complex128])
+def test_literal_distinguishes_dtypes(values: float | list[float], dtype: type) -> None:
+    """Keep index and value literals distinct in expression caches."""
+    index = gem.Literal(values, dtype=gem.uint_type)
+    value = gem.Literal(values, dtype=dtype)
+    copy = gem.Literal(values, dtype=gem.uint_type)
+
+    assert index.dtype != value.dtype
+    assert not index.is_equal(value)
+    assert index != value
+    assert hash(index) != hash(value)
+    assert {index: "index"}.get(value) is None
+    assert index == copy
+    assert hash(index) == hash(copy)
+    assert {index: "index"}[copy] == "index"
+
+
 @pytest.mark.parametrize('kind', ['abs', 'mixed'])
 def test_select_facet_expression(kind):
     """Facet selection preserves node parameters and differing structures."""
