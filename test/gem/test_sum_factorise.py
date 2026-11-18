@@ -1,3 +1,4 @@
+from functools import partial, reduce
 from itertools import chain, combinations, islice
 
 import numpy
@@ -5,9 +6,12 @@ import pytest
 
 import gem
 from gem.interpreter import evaluate
-from gem import optimise
+from gem import cost, optimise
 from gem.node import traversal
 from gem.optimise import sum_factorise
+from gem.coffee import optimise_monomial_sum
+from gem.refactorise import (ATOMIC, COMPOUND, OTHER,
+                             collect_monomials)
 
 
 def contraction(nfactors, ndims, extent=2):
@@ -166,6 +170,118 @@ def test_contractions_joined_by_a_shared_index():
     assert numpy.allclose(result.arr, evaluations[0].dot(evaluations[1]))
 
 
+def laplacian(ndofs=4, ndims=2):
+    """Build a Laplacian element tensor from a mapped gradient table.
+
+    The physical gradient of each basis function is the reference gradient
+    mapped by the inverse Jacobian.  Test and trial functions apply the same
+    map, over their own argument index.
+    """
+    numpy.random.seed(0)
+    i = gem.Index(extent=ndofs)
+    j = gem.Index(extent=ndofs)
+    k = gem.Index(extent=ndims)
+    reference = gem.Literal(numpy.random.rand(ndofs, ndims))
+    jacobian = gem.Literal(numpy.random.rand(ndims, ndims))
+
+    def gradient(argument):
+        # The pullback is a contraction over the topological dimension,
+        # which reaches factorisation already unrolled into a sum.
+        return reduce(gem.Sum, [
+            gem.Product(gem.Indexed(reference, (argument, l)),
+                        gem.Indexed(jacobian, (l, k)))
+            for l in range(ndims)])
+
+    expression = gem.IndexSum(
+        gem.Product(gradient(i), gradient(j)), (k,))
+    expected = numpy.einsum(
+        "il,lk,jm,mk->ij", reference.array, jacobian.array,
+        reference.array, jacobian.array)
+    return (i, j), expression, expected
+
+
+def monomial_sum(linear_indices):
+    """Collect the Laplacian into monomials, with or without preservation."""
+    arguments, expression, expected = laplacian()
+    classifier = partial(_classify, frozenset(arguments))
+    result, = collect_monomials(
+        [expression], classifier,
+        arguments if linear_indices else ())
+    return arguments, result, expected
+
+
+def _classify(arguments, expression):
+    shared = arguments.intersection(expression.free_indices)
+    if not shared:
+        return OTHER
+    if len(shared) == 1 and isinstance(expression, gem.Indexed):
+        return ATOMIC
+    return COMPOUND
+
+
+def test_linear_map_is_preserved():
+    # Distributing the map expands it into the product of its entries, so
+    # preserving it leaves strictly fewer monomials to factorise.
+    _, preserved, _ = monomial_sum(linear_indices=True)
+    _, expanded, _ = monomial_sum(linear_indices=False)
+    assert len(list(preserved)) < len(list(expanded))
+    assert len(list(preserved)) == 1
+
+
+def test_preserved_linear_map_is_shared():
+    # Test and trial apply the same map over different indices.  COFFEE
+    # materialises it once, so one tensor carries both.
+    arguments, preserved, expected = monomial_sum(linear_indices=True)
+    expression = optimise_monomial_sum(preserved, arguments)
+    tensors = [node for node in traversal((expression,))
+               if isinstance(node, gem.ComponentTensor)]
+    assert len(tensors) == 1
+
+    i, j = arguments
+    result, = evaluate([gem.ComponentTensor(expression, (i, j))])
+    assert numpy.allclose(result.arr, expected)
+
+
+def test_expanded_and_preserved_agree():
+    arguments, expanded, expected = monomial_sum(linear_indices=False)
+    expression = optimise_monomial_sum(expanded, arguments)
+    result, = evaluate([gem.ComponentTensor(expression, arguments)])
+    assert numpy.allclose(result.arr, expected)
+
+
+def test_has_linear_maps_detects_preservable_maps():
+    arguments, expression, _ = laplacian()
+    assert optimise.has_linear_maps([expression], arguments)
+    # With no argument axis declared, nothing is a linear map.
+    assert not optimise.has_linear_maps([expression], ())
+
+
+def test_estimate_cost_counts_the_contraction():
+    _, expression, _ = laplacian(ndofs=4, ndims=2)
+    flops, storage, largest, nodes = cost.estimate_cost([expression])
+    # Two mapped gradients over (argument, k, l) and their contraction
+    # over k, all counted over their own domains.
+    assert flops > 0
+    assert storage >= largest > 0
+    assert nodes > 0
+
+
+@pytest.mark.parametrize("extent", [2, 3, 5])
+def test_distributed_linear_map_preserves_multiplicity(extent):
+    i, j = gem.Index(extent=2), gem.Index(extent=2)
+    k = gem.Index(extent=extent)
+    a = gem.Indexed(gem.Literal(numpy.ones((2, extent))), (i, k))
+    b = gem.Indexed(gem.Literal(numpy.ones(2)), (i,))
+    c = gem.Indexed(gem.Literal(numpy.ones(2)), (j,))
+    expression = gem.IndexSum((a + b) * c + b * c, (k,))
+    arguments = (i, j)
+    monomials, = collect_monomials(
+        [expression], partial(_classify, frozenset(arguments)), arguments)
+    optimized = optimise_monomial_sum(monomials, arguments)
+    actual, = evaluate([gem.ComponentTensor(optimized, arguments)])
+    assert numpy.array_equal(actual.arr, numpy.full((2, 2), 3 * extent))
+
+
 def test_equal_cost_contraction_follows_axis_order():
     """Equal-work plans retain the axis order used by streaming loops."""
     i, j, k, p, q, r = gem.indices(6)
@@ -212,3 +328,45 @@ def test_contraction_counts_index_absent_from_factors():
     result, = evaluate([expression])
 
     assert result.arr == 2 * numpy.arange(3.0).sum()
+
+
+def test_linear_maps_with_reused_bound_index():
+    """Separate reductions may use the same bound index in their maps."""
+    i, j, k = gem.indices(3)
+    a = gem.Literal(numpy.arange(6.).reshape(2, 3))
+    b = gem.Literal(numpy.ones((2, 3)))
+    left = gem.IndexSum(a[i, k] + b[i, k], (k,))
+    right = gem.IndexSum(a[j, k] + b[j, k], (k,))
+    expression = left * right
+    arguments = (i, j)
+    monomials, = collect_monomials(
+        [expression], partial(_classify, frozenset(arguments)), arguments)
+    assert len(monomials) == 1
+    result = optimise_monomial_sum(monomials, arguments)
+    actual, expected = evaluate([gem.ComponentTensor(e, arguments)
+                                for e in (result, expression)])
+    assert numpy.array_equal(actual.arr, expected.arr)
+
+
+def test_linear_map_contraction_remains_atomic():
+    """A mapped basis is one linear operand, including its sparse row sum."""
+    i, j, k, q = gem.indices(4)
+    matrix = gem.Literal(numpy.arange(6.).reshape(2, 3))
+    table = gem.Literal(numpy.arange(12.).reshape(3, 4))
+    left = gem.IndexSum(matrix[i, k] * table[k, q], (k,))
+    right = gem.IndexSum(matrix[j, k] * table[k, q], (k,))
+    monomials, = collect_monomials(
+        [left * right], partial(_classify, frozenset((i, j))), (i, j))
+    monomial, = monomials
+    assert monomial.sum_indices == ()
+    assert len(monomial.atomics) == 2
+    assert all(isinstance(a, gem.IndexSum) for a in monomial.atomics)
+
+
+def test_estimate_cost_counts_tabulation_storage():
+    """A shared shaped tabulation occupies its complete tensor domain."""
+    i, q = gem.indices(2)
+    table = gem.Literal(numpy.arange(6.).reshape(2, 3))
+    mapped = gem.ComponentTensor(table[i, q] + gem.Literal(1.), (i,))
+    _, storage, largest, _ = cost.estimate_cost([mapped])
+    assert storage == largest == 6
