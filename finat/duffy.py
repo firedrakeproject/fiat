@@ -1,11 +1,11 @@
-from functools import reduce
+from functools import partial, reduce
 
 import numpy
 
 import gem
 
 from FIAT.expansions import C0_basis
-from finat.physically_mapped import MappedTabulation
+from finat.physically_mapped import MappedTabulation, literal_array, sparse_dense_matmul
 from finat.point_set import CollapsedTensorProductPointSet
 
 
@@ -109,5 +109,5 @@ class DuffyElement:
         tabulation = {
             alpha: gem.FlattenedTensor(expr, multiindex)
             for alpha, expr in result.items()}
-        return MappedTabulation(
-            coefficients, tabulation, {cell_dim: {0: range(coefficients.shape[1])}})
+        transform = partial(sparse_dense_matmul, literal_array(coefficients.array))
+        return MappedTabulation(transform, tabulation)

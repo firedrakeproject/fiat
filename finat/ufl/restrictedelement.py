@@ -62,6 +62,16 @@ class RestrictedElement(FiniteElementBase):
         """Doc."""
         return self._element.sobolev_space
 
+    @property
+    def embedded_superdegree(self) -> int | None:
+        """The degree of the smallest Lagrange space that contains this element."""
+        return self._element.embedded_superdegree
+
+    @property
+    def embedded_subdegree(self) -> int:
+        """The degree of the largest Lagrange space that this element contains."""
+        raise NotImplementedError("Not clear how to do this one!")
+
     def is_cellwise_constant(self):
         """Return whether the basis functions of this element is spatially constant over each cell."""
         return self._element.is_cellwise_constant()

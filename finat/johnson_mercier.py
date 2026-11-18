@@ -1,29 +1,11 @@
 import FIAT
-from gem import ListTensor
 
-from finat.aw import _facet_transform
 from finat.citations import cite
 from finat.fiat_elements import FiatElement
-from finat.physically_mapped import identity, PhysicallyMappedElement
+from finat.physically_mapped import PhysicallyMappedElement
 
 
 class JohnsonMercier(PhysicallyMappedElement, FiatElement):  # symmetric matrix valued
     def __init__(self, cell, degree=1, variant=None, quad_scheme=None):
         cite("Gopalakrishnan2024")
-        self._indices = slice(None, None)
         super().__init__(FIAT.JohnsonMercier(cell, degree, variant=variant, quad_scheme=quad_scheme))
-
-    def basis_transformation(self, coordinate_mapping):
-        numbf = self._element.space_dimension()
-        ndof = self.space_dimension()
-
-        V = identity(numbf, ndof)
-        Vsub = _facet_transform(self.cell, 1, coordinate_mapping)
-        Vsub = Vsub[:, self._indices]
-        m, n = Vsub.shape
-        V[:m, :n] = Vsub
-
-        # Note: that the edge DOFs are scaled by edge lengths in FIAT implies
-        # that they are already have the necessary rescaling to improve
-        # conditioning.
-        return ListTensor(V.T)
