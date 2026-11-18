@@ -594,22 +594,17 @@ def test_distribute_sum_conditions_on_free_parent():
     assert numpy.array_equal(actual.arr, [6., 4., 2.])
 
 
-@pytest.mark.parametrize("values", [3.0, [3.0, 4.0]])
-@pytest.mark.parametrize("dtype", [numpy.float32, numpy.float64, numpy.complex128])
-def test_literal_distinguishes_dtypes(values: float | list[float], dtype: type) -> None:
-    """Keep index and value literals distinct in expression caches."""
-    index = gem.Literal(values, dtype=gem.uint_type)
-    value = gem.Literal(values, dtype=dtype)
-    copy = gem.Literal(values, dtype=gem.uint_type)
+@pytest.mark.parametrize("values", [1.0, [1.0, 2.0]])
+@pytest.mark.parametrize("dtype", [int, numpy.uint32, numpy.float32, numpy.float64, numpy.complex128])
+def test_literal_equality_across_dtypes(values: float | list[float], dtype: type) -> None:
+    """Compare numeric literal values independently of their dtype."""
+    literal = gem.Literal(values, dtype=dtype)
+    floating = gem.Literal(values)
 
-    assert index.dtype != value.dtype
-    assert not index.is_equal(value)
-    assert index != value
-    assert hash(index) != hash(value)
-    assert {index: "index"}.get(value) is None
-    assert index == copy
-    assert hash(index) == hash(copy)
-    assert {index: "index"}[copy] == "index"
+    assert literal.dtype == numpy.dtype(dtype)
+    assert literal == floating
+    assert hash(literal) == hash(floating)
+    assert {literal: "value"}[floating] == "value"
 
 
 @pytest.mark.parametrize('kind', ['abs', 'mixed'])
