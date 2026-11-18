@@ -312,12 +312,12 @@ class Literal(Constant):
     def is_equal(self, other):
         if type(self) is not type(other):
             return False
-        if self.shape != other.shape or self.dtype != other.dtype:
+        if self.shape != other.shape:
             return False
         return numpy.array_equal(self.array, other.array)
 
     def get_hash(self):
-        return hash((type(self), self.shape, self.dtype, tuple(self.array.flat)))
+        return hash((type(self), self.shape, tuple(self.array.flat)))
 
     @property
     def value(self):
