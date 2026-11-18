@@ -89,7 +89,10 @@ class Node(NodeBase, metaclass=NodeMeta):
         return Indexed(self, indices)
 
     def __neg__(self):
-        return componentwise(Product, as_gem(-1, dtype=self.dtype), self)
+        dtype = self.dtype
+        if dtype not in minus:
+            minus[dtype] = as_gem(-1, dtype=dtype)
+        return componentwise(Product, minus[dtype], self)
 
     def __add__(self, other):
         return componentwise(Sum, self, as_gem(other, dtype=self.dtype))
@@ -1287,6 +1290,7 @@ def view(expression, *slices):
 
 # Static one object for quicker constant folding
 one = Literal(1)
+minus = {}
 
 
 # Syntax sugar
