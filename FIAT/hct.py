@@ -10,6 +10,7 @@ from FIAT.functional import (PointEvaluation, PointDerivative,
                              IntegralMoment, IntegralMomentOfDerivative,
                              IntegralMomentOfNormalDerivative)
 from FIAT import finite_element, dual_set, macro, polynomial_set
+from FIAT.bernstein import BernsteinPolynomialSet
 from FIAT.check_format_variant import parse_quadrature_scheme
 from FIAT.reference_element import TRIANGLE, ufc_simplex
 from FIAT.quadrature import FacetQuadratureRule
@@ -83,6 +84,6 @@ class HsiehCloughTocher(finite_element.CiarletElement):
     def __init__(self, ref_el, degree=3, reduced=False, quad_scheme=None):
         ref_complex = macro.AlfeldSplit(ref_el)
         dual = HCTDualSet(ref_complex, degree, reduced=reduced, quad_scheme=quad_scheme)
-        poly_set = macro.CkPolynomialSet(ref_complex, degree, order=1, vorder=degree-1, variant="bubble")
+        poly_set = BernsteinPolynomialSet(ref_complex, degree, order=1, vorder=degree-1)
         formdegree = 0
         super().__init__(poly_set, dual, degree, formdegree=formdegree)

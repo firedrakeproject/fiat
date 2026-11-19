@@ -407,6 +407,15 @@ def test_C2_double_alfeld():
     assert P.get_num_members() == 27
 
 
+@pytest.mark.parametrize("degree, vorder", ((1, 1), (2, 1), (2, 2), (4, 3)))
+def test_C0_vertex_supersmoothness(degree, vorder):
+    # Theorem 9.7 of Lai & Schumaker for C0 splines on the Clough-Tocher split
+    A = AlfeldSplit(ufc_simplex(2))
+    P = CkPolynomialSet(A, degree, order=0, vorder=vorder)
+    expected = math.comb(vorder + 2, 2) + 3 * (math.comb(degree + 1, 2) - math.comb(vorder + 1, 2))
+    assert P.get_num_members() == expected
+
+
 def test_distance_to_point_l1(cell):
     A = AlfeldSplit(cell)
     dim = A.get_spatial_dimension()

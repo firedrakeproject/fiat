@@ -22,12 +22,64 @@ import sympy
 from FIAT import expansions, polynomial_set, reference_element
 from FIAT.quadrature_schemes import create_quadrature
 from itertools import chain
+from unittest.mock import patch
 
 
 @pytest.fixture(params=(1, 2, 3))
 def cell(request):
     dim = request.param
     return reference_element.default_simplex(dim)
+
+
+@pytest.mark.parametrize("dim", range(4))
+def test_negative_polynomial_dimension(dim):
+    cell = reference_element.default_simplex(dim)
+    assert expansions.polynomial_dimension(cell, -1) == 0
+
+
+@pytest.mark.parametrize("shape", [(), (2,), (2, 2)])
+def test_polynomial_set_recombine(shape: tuple) -> None:
+    cell = reference_element.default_simplex(2)
+    poly_set = polynomial_set.ONPolynomialSet(cell, 1, shape=shape)
+    coefficients = numpy.arange(2 * len(poly_set), dtype=float).reshape(2, len(poly_set))
+
+    recombined = poly_set.recombine(coefficients)
+    expected = numpy.tensordot(coefficients, poly_set.get_coeffs(), axes=(1, 0))
+
+    assert recombined.get_shape() == shape
+    assert numpy.array_equal(recombined.get_coeffs(), expected)
+
+
+def test_polynomial_set_recombine_requires_one_column_per_polynomial() -> None:
+    cell = reference_element.default_simplex(2)
+    poly_set = polynomial_set.ONPolynomialSet(cell, 1)
+
+    with pytest.raises(ValueError, match="one column per polynomial"):
+        poly_set.recombine(numpy.eye(len(poly_set) + 1))
+
+
+@pytest.mark.parametrize("dim,entity_dim,weights", [
+    (2, 2, (1, 1/2)), (3, 3, (1, 2/3, 1/3)), (3, 2, (1, 1/2))])
+def test_taylor_constrained_polynomial_set(dim, entity_dim, weights):
+    cell = reference_element.ufc_simplex(dim)
+    degree = len(weights) + 1
+    poly_set = polynomial_set.ONPolynomialSet(cell, degree)
+    constraints = {}
+    vertices = cell.get_vertices()
+    for entity, indices in cell.get_topology()[entity_dim].items():
+        point, = cell.make_points(entity_dim, entity, entity_dim+1)
+        constraints[point] = ([vertices[v] for v in indices], weights)
+    with patch.object(poly_set, "tabulate", wraps=poly_set.tabulate) as tabulate:
+        constrained = polynomial_set.TaylorConstrainedPolynomialSet(poly_set, constraints)
+    tabulate.assert_called_once()
+    assert len(constrained) == len(poly_set) - len(constraints)
+
+    # The constraint is exact on polynomials of one degree less
+    pts = cell.make_points(dim, 0, degree + dim + 1)
+    V = constrained.tabulate(pts)[(0,) * dim]
+    P = polynomial_set.ONPolynomialSet(cell, degree - 1).tabulate(pts)[(0,) * dim]
+    coeffs, *_ = numpy.linalg.lstsq(V.T, P.T, rcond=None)
+    assert numpy.allclose(V.T @ coeffs, P.T)
 
 
 @pytest.mark.parametrize("degree", [10])
@@ -123,16 +175,20 @@ def test_expansion_orthonormality(cell, degree):
 @pytest.mark.parametrize("degree", [10])
 def test_bubble_duality(cell, degree):
     sd = cell.get_spatial_dimension()
-    B = polynomial_set.make_bubbles(cell, degree)
+    B = polynomial_set.make_bubbles(cell, degree, scale=None)
+    D = polynomial_set.ONPolynomialSet(cell, degree-sd-1, variant="dual")
 
-    Q = create_quadrature(cell, 2*B.degree - sd - 1)
+    Q = create_quadrature(cell, B.degree + D.degree)
     qpts, qwts = Q.get_points(), Q.get_weights()
     phi = B.tabulate(qpts)[(0,) * sd]
-    phi_dual = phi / abs(phi[0])
-    scale = 2 ** sd
-    results = scale * numpy.dot(numpy.multiply(phi_dual, qwts), phi.T)
-    assert numpy.allclose(results, numpy.diag(numpy.diag(results)))
-    assert numpy.allclose(numpy.diag(results), 1.0)
+    phi_dual = D.tabulate(qpts)[(0,) * sd]
+
+    pairing = numpy.dot(numpy.multiply(phi_dual, qwts), phi.T)
+    ordering = numpy.argmax(numpy.abs(pairing), axis=0)
+    assert numpy.array_equal(numpy.sort(ordering), numpy.arange(len(phi)))
+
+    expected = numpy.eye(len(phi))
+    assert numpy.allclose(pairing[ordering], expected)
 
 
 @pytest.mark.parametrize("degree", [10])

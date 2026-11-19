@@ -396,6 +396,14 @@ class ExpansionSet(object):
         elif n == 0 and sd > 1 and len(self.affine_mappings) == 1:
             # return 1 for n=0 to make regression tests pass
             scale = 1
+        if self.variant in ("bubble", "dual"):
+            factor = 2**sd / math.sqrt(math.prod(range(3, 2*sd + 2, 2)))
+            scale *= factor if self.variant == "bubble" else 1 / factor
+        if self.variant == "dual":
+            factor = (-1)**sd * 2**sd
+            if n > 0:
+                factor /= math.prod(range(3, 2 * sd + 2, 2))
+            scale *= factor
         return scale
 
     def get_num_members(self, n):
@@ -698,6 +706,8 @@ class TetrahedronExpansionSet(ExpansionSet):
 def polynomial_dimension(ref_el, n, continuity=None):
     """Returns the dimension of the space of polynomials of degree no
     greater than n on the reference complex."""
+    if n < 0:
+        return 0
     if ref_el.get_shape() == reference_element.POINT:
         if n > 0:
             raise ValueError("Only degree zero polynomials supported on point elements.")

@@ -15,6 +15,7 @@
 # we have an interface for defining sets of functionals (moments against
 # an entire set of polynomials)
 
+import math
 import numpy
 from itertools import chain
 from FIAT import expansions
@@ -97,6 +98,28 @@ class PolynomialSet(object):
         scalar (2,) a vector of length 2, etc"""
         return self.coeffs.shape[1:-1]
 
+    def recombine(self, coefficients: numpy.ndarray) -> "PolynomialSet":
+        """Return a polynomial set formed from linear combinations.
+
+        Parameters
+        ----------
+        coefficients : numpy.ndarray
+            A matrix whose rows contain the coefficients of the new
+            polynomials in the current polynomial basis.
+
+        Returns
+        -------
+        PolynomialSet
+            A polynomial set with the same reference element, degree,
+            expansion set, and value shape as this set.
+        """
+        coefficients = numpy.asarray(coefficients)
+        if coefficients.ndim != 2 or coefficients.shape[1] != len(self):
+            raise ValueError("Polynomial recombination must have one column per polynomial")
+        new_coeffs = numpy.tensordot(coefficients, self.coeffs, axes=(1, 0))
+        return PolynomialSet(self.ref_el, self.degree, self.embedded_degree,
+                             self.expansion_set, new_coeffs)
+
     def take(self, items):
         """Extracts subset of polynomials given by items."""
         new_coeffs = numpy.take(self.get_coeffs(), items, 0)
@@ -166,6 +189,60 @@ def spanning_basis(A, nullspace=False, rtol=1e-10):
     num_sv = len([s for s in sig if abs(s) > atol])
     basis = vt[num_sv:] if nullspace else vt[:num_sv]
     return numpy.reshape(basis, (-1, *A.shape[1:]))
+
+
+def TaylorConstrainedPolynomialSet(poly_set, constraints):
+    r"""Return the subspace whose specified point values follow from support jets.
+
+    The members :math:`p` of the subspace satisfy
+
+    .. math::
+
+        p(x) = \frac{1}{n} \sum_z \sum_{k} c_k \sum_{|\alpha| = k}
+        \frac{(x - z)^\alpha}{\alpha!} \partial^\alpha p(z),
+
+    where :math:`z` ranges over the :math:`n` supplied support points for :math:`x`.
+
+    Parameters
+    ----------
+    poly_set : PolynomialSet
+        A scalar-valued polynomial set.
+    constraints : mapping of point tuples to (support_pts, weights) pairs
+        Map each constrained point to its support points and the weights
+        :math:`c_k` of the terms of order :math:`k` in the Taylor expansions
+        about those points. Average the weighted expansions over the
+        support points to determine the constrained value.
+
+    Returns
+    -------
+    PolynomialSet
+        The subspace of ``poly_set`` that satisfies all point constraints.
+    """
+    ref_el = poly_set.get_reference_element()
+    sd = ref_el.get_spatial_dimension()
+    points = set()
+    order = 0
+    for point, (support_pts, weights) in constraints.items():
+        points.add(point)
+        points.update(map(tuple, support_pts))
+        order = max(order, len(weights) - 1)
+    points = sorted(points)
+    point_indices = {pt: i for i, pt in enumerate(points)}
+    tab = poly_set.tabulate(points, order)
+    rows = []
+    for point, (support_pts, weights) in constraints.items():
+        indices = [point_indices[tuple(pt)] for pt in support_pts]
+        support_pts = numpy.asarray(support_pts)
+        constraint = tab[(0,) * sd][:, point_indices[point]].copy()
+        for k, c in enumerate(weights):
+            for alpha in mis(sd, k):
+                factors = numpy.prod((point - support_pts) ** alpha, axis=1)
+                factors *= c / (len(support_pts) * numpy.prod([math.factorial(a) for a in alpha]))
+                constraint -= numpy.dot(tab[alpha][:, indices], factors)
+        rows.append(constraint)
+
+    basis = spanning_basis(numpy.array(rows), nullspace=True)
+    return poly_set.recombine(basis)
 
 
 def polynomial_set_union_normalized(A, B):
