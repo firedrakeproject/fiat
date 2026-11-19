@@ -142,7 +142,7 @@ def make_prefix_ordering(indices, prefix_ordering):
     def visit(k):
         if k not in seen:
             seen.add(k)
-            for parent in getattr(k, 'parents', ()):
+            for parent in k.parents:
                 if parent in ordering:
                     visit(parent)
             result.append(k)

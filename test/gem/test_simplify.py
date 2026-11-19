@@ -9,9 +9,10 @@ from gem.impero_utils import (collect_temporaries, compile_gem,
                               place_declarations)
 from gem.node import traversal
 from gem.interpreter import evaluate
-from gem.driver import contraction, unflatten_returns
+from gem.jagged import unflatten_returns
 from gem.optimise import (
     cancel_indirect_deltas,
+    contraction,
     distribute_sum,
 )
 from gem.refactorise import (ATOMIC, COMPOUND, OTHER,

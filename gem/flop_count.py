@@ -9,7 +9,7 @@ from contextvars import ContextVar
 from functools import singledispatch
 import numpy
 
-from gem.cost import node_cost
+from gem.cost import iteration_count, node_cost
 
 
 @singledispatch
@@ -166,9 +166,7 @@ def flops_componenttensor(expr, temporaries):
     control = _control_indices.get().intersection(implicit_indices)
     if not control and not any(
             index.parents for index in implicit_indices):
-        extent = numpy.prod(
-            [index.extent for index in implicit_indices], dtype=int)
-        return extent * expression_flops(body, temporaries)
+        return iteration_count(implicit_indices) * expression_flops(body, temporaries)
 
     def count(position):
         if position == len(implicit_indices):

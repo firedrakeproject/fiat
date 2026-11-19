@@ -18,9 +18,12 @@ from gem.gem import (ComponentTensor, Delta, FlattenedTensor, Index, IndexSum,
                      Indexed, JaggedIndex, Literal, Node, Sum, VariableIndex,
                      jagged_lattice, jagged_layout, lattice_points, uint_type)
 from gem.node import Memoizer, MemoizerArg, reuse_if_untouched, traversal
-from gem.optimise import (_distributed_indexsum_term, delta_elimination, distribute_sum,
-                          filtered_replace_indices, make_sum, sum_factorise,
-                          traverse_product, traverse_sum)
+from gem.optimise import (_distributed_indexsum_term, cancel_indirect_deltas, contraction,
+                          delta_elimination, distribute_sum, filtered_replace_indices,
+                          make_sum, sum_factorise, traverse_product, traverse_sum)
+from gem.coffee import optimise_monomial_sum
+from gem.cost import iteration_count
+from gem.refactorise import ATOMIC, COMPOUND, OTHER, FactorisationError, collect_monomials
 
 
 def _index_components(indices: tuple[Index, ...]) -> tuple[tuple, ...]:
@@ -108,7 +111,7 @@ def _compact_extent(component: tuple[Index, ...]) -> int | None:
     if not _is_simplex_lattice(component):
         return None
     points = len(jagged_lattice(component))
-    if points >= numpy.prod([index.extent for index in component]):
+    if points >= iteration_count(component):
         return None
     return points
 
@@ -459,3 +462,109 @@ def replace_flattened(expressions):
     """Lower remaining flattened tensors to indirect flat-index gathers."""
     mapper = Memoizer(_replace_flattened)
     return [mapper(expression) for expression in expressions]
+
+
+def _refactor_unflattened_outputs(
+        outputs: list[tuple[Node, Node]]) -> list[tuple[Node, Node]] | None:
+    r"""Recover sum factorisation after exposing every argument lattice.
+
+    Consider a bilinear form whose argument tabulations are transformed by
+    sparse matrices,
+
+    .. math::
+
+        A_{ij} = \sum_q (S B(q))_i\,G(q)\,(T C(q))_j.
+
+    Sparse-delta cancellation moves rows of ``S`` and ``T`` into the return
+    scatter.  Both flat argument indices must then be replaced by their
+    jagged lattice multiindices *before* expanding derivative sums.  Expanding
+    after only one replacement duplicates the second lattice once per
+    summand, producing many equivalent loop nests.
+
+    The refactorisation is valid when the non-tabulation part of every
+    monomial is independent of the argument indices.  This condition says
+    exactly that the sparse transforms have been absorbed by the scatter.
+    Dense or otherwise residual transforms use the conservative legacy path.
+    """
+    candidates = []
+    has_nontrivial_sum = False
+    for variable, expression in outputs:
+        argument_indices = frozenset(variable.free_indices)
+        contraction_indices = frozenset(
+            index
+            for node in traversal((expression,))
+            if isinstance(node, IndexSum)
+            for index in node.multiindex)
+
+        def classify(node):
+            involved = argument_indices.intersection(node.free_indices)
+            if not involved:
+                return OTHER
+            if isinstance(node, Indexed):
+                return ATOMIC if contraction_indices.intersection(
+                    node.free_indices) else OTHER
+            return COMPOUND
+
+        try:
+            monomial_sum, = collect_monomials([expression], classify)
+        except FactorisationError:
+            return None
+
+        monomials = tuple(monomial_sum)
+        if any(argument_indices.intersection(monomial.rest.free_indices)
+               for monomial in monomials):
+            return None
+        has_nontrivial_sum |= len(monomials) > 1
+        sum_indices = tuple(OrderedDict.fromkeys(
+            index
+            for monomial in monomials
+            for index in monomial.sum_indices))
+        candidates.append((variable, monomial_sum, sum_indices))
+
+    if not has_nontrivial_sum:
+        return None
+    return [
+        (variable, optimise_monomial_sum(
+            monomial_sum, variable.index_ordering(), sum_indices))
+        for variable, monomial_sum, sum_indices in candidates
+    ]
+
+
+def unflatten_returns(
+        pairs: Iterable[tuple[Node, Node]]) -> list[tuple[Node, Node]]:
+    """Unflatten free argument indices in assignment pairs.
+
+    Every compatible argument lattice is exposed jointly.  Bilinear
+    expressions are then refactorised as monomial sums so that sparse
+    argument transforms remain in the output scatter while quadrature
+    contractions recover their one-dimensional factors.  Expressions with
+    residual argument-dependent transforms retain the established local
+    distribution strategy.
+    """
+    pairs = list(pairs)
+    if not any(isinstance(node, FlattenedTensor)
+               for _, expression in pairs
+               for node in traversal((expression,))):
+        return pairs
+
+    result = []
+    for variable, expression in pairs:
+        expression = cancel_indirect_deltas(expression)
+        joint_outputs, changed = unflatten_free_indices(
+            variable, expression, split_separable_sums=False)
+        if changed:
+            refactored = _refactor_unflattened_outputs(joint_outputs)
+            if refactored is not None:
+                result.extend(refactored)
+                continue
+            outputs, changed = unflatten_free_indices(
+                variable, expression, split_separable_sums=True)
+        else:
+            outputs = joint_outputs
+        if changed or any(isinstance(node, Delta)
+                          for _, output in outputs
+                          for node in traversal((output,))):
+            outputs = [(output_variable, contraction(output))
+                       for output_variable, output in outputs]
+        result.extend(outputs)
+    return result

@@ -2,8 +2,8 @@
 expressions."""
 
 from collections import Counter, OrderedDict, defaultdict
-from functools import lru_cache, singledispatch, partial
-from itertools import combinations, permutations
+from functools import singledispatch, partial
+from itertools import combinations, permutations, zip_longest
 from numbers import Integral
 
 import numpy
@@ -100,13 +100,7 @@ replace_indices.register(Node)(reuse_if_untouched_arg)
 def _replace_indices_atomic(i, self, subst):
     if isinstance(i, VariableIndex):
         new_expr = self(i.expression, subst)
-        if new_expr == i.expression:
-            return i
-        # A variable index that substitution has made constant is a fixed
-        # index, and folding it lets the lookup itself be evaluated.
-        if isinstance(new_expr, Literal) and not new_expr.shape:
-            return int(new_expr.array)
-        return VariableIndex(new_expr)
+        return i if new_expr == i.expression else VariableIndex(new_expr)
     else:
         substitute = dict(subst)
         return substitute.get(i, i)
@@ -183,37 +177,6 @@ def filtered_replace_indices(node, self, subst):
         raise NotImplementedError("Can not replace VariableIndex (will need inverse)")
     filtered_subst = tuple((k, v) for k, v in subst if k in node.free_indices)
     return replace_indices(node, self, filtered_subst)
-
-
-@lru_cache(maxsize=None)
-def _canonical_index(depth, extent):
-    """The bound index at a binding depth in every canonical form."""
-    return Index(extent=extent)
-
-
-def canonical_bound_indices(expression):
-    """Rename the bound indices of an expression by their binding depth.
-
-    Expressions that differ only in the names of their bound indices have
-    equal canonical forms, so the canonical form can identify an expression.
-    All canonical forms share their bound indices, so they are not meant for
-    code generation.
-
-    :arg expression: a GEM expression
-    :returns: the expression with canonically named bound indices
-    """
-    replacer = MemoizerArg(filtered_replace_indices)
-
-    def canonicalise(node, self, depth):
-        if isinstance(node, (ComponentTensor, IndexSum)):
-            multiindex = tuple(_canonical_index(depth + position, index.extent)
-                               for position, index in enumerate(node.multiindex))
-            child, = node.children
-            child = replacer(child, tuple(zip(node.multiindex, multiindex)))
-            return type(node)(self(child, depth + len(multiindex)), multiindex)
-        return reuse_if_untouched_arg(node, self, depth)
-
-    return MemoizerArg(canonicalise)(expression, 0)
 
 
 def remove_componenttensors(expressions, subst=()):
@@ -867,6 +830,121 @@ def traverse_sum(expression, stop_at=None):
     return result
 
 
+def _contract_listtensor(expression):
+    """Collect geometry before tabulation in a contraction of tensor entries.
+
+    Contracting a tensor assembled from local basis blocks can hide a common
+    reference tabulation. Expand the contracted tensor axis and constant
+    gathers, then collect equal point-dependent factors. The remaining
+    coefficient expressions can be evaluated independently of the points.
+
+    :arg expression: contraction with ComponentTensors removed
+    :returns: a refactorised expression, or the input when no tensor is contracted
+    """
+    from gem.refactorise import ATOMIC, COMPOUND, OTHER, FactorisationError, collect_monomials
+
+    nodes = tuple(traversal((expression,)))
+    bound = {i for node in nodes if isinstance(node, IndexSum) for i in node.multiindex}
+    axes = {i for node in nodes if isinstance(node, Indexed)
+            and isinstance(node.children[0], ListTensor)
+            for i in node.multiindex if i in bound}
+    if not axes:
+        return expression
+    for node in nodes:
+        if isinstance(node, Indexed):
+            for index in node.multiindex:
+                lookup = _constant_map(index)
+                if lookup is not None:
+                    axes.update(i for i in lookup[1] if i in bound)
+    expanded, = unroll_indexsum((expression,), predicate=lambda i: i in axes)
+
+    def classify(node):
+        if not set(node.free_indices).intersection(expression.free_indices):
+            return OTHER
+        return ATOMIC if isinstance(node, (Indexed, FlexiblyIndexed)) else COMPOUND
+
+    try:
+        monomials, = collect_monomials((expanded,), classify)
+    except FactorisationError:
+        return expression
+    return make_sum(sum_factorise(m.sum_indices, (*m.atomics, m.rest)) for m in monomials)
+
+
+def contraction(expression):
+    """Optimise the contractions of the tensor product at the root of
+    the expression, including:
+
+    - IndexSum-Delta cancellation
+    - Sum factorisation
+
+    This routine was designed with finite element coefficient
+    evaluation in mind.
+    """
+
+    from gem.jagged import unflatten
+
+    # Common memoizer to remove ComponentTensors
+    index_replacer = MemoizerArg(filtered_replace_indices)
+
+    # Eliminate annoying ComponentTensors
+    expression = index_replacer(expression, ())
+
+    def flatten(root):
+        """Break the product tree at ``root`` up and cancel its Deltas."""
+        # The contraction at the root is always broken up, as that is the
+        # one being optimised
+        keep = repeated_contractions(root)
+        sum_indices, factors = traverse_product(
+            root, index_replacer=index_replacer,
+            stop_at=lambda e: e is not root and e in keep)
+        sum_indices, factors = pull_back_indirect_delta(
+            sum_indices, factors, index_replacer)
+        sum_indices, factors = delta_elimination(
+            sum_indices, factors, index_replacer=index_replacer)
+        return sum_indices, [index_replacer(f, ()) for f in factors]
+
+    def rebuild(expression):
+        sum_indices, factors = flatten(expression)
+        flattened = IndexSum(Product(*factors), sum_indices)
+        unflattened = unflatten(flattened)
+        if unflattened is not flattened:
+            sum_indices, factors = flatten(unflattened)
+        result = sum_factorise(sum_indices, factors)
+        expanded = _contract_listtensor(expression)
+        # Expanding tables trades loops for scalar expressions. Limit both
+        # storage and expression growth when reducing the arithmetic.
+        old_cost, new_cost = estimate_cost((result,)), estimate_cost((expanded,))
+        if all(new <= old for new, old in zip(new_cost, old_cost)):
+            return expanded
+        return result
+
+    # Sometimes the value shape is composed as a ListTensor, which
+    # could get in the way of decomposing factors.  In particular,
+    # this is the case for H(div) and H(curl) conforming tensor
+    # product elements.  So if ListTensors are used, they are pulled
+    # out to be outermost, so we can straightforwardly factorise each
+    # of its entries.
+    lt_fis = OrderedDict()  # ListTensor free indices
+    for node in traversal((expression,)):
+        if isinstance(node, Indexed):
+            child, = node.children
+            if isinstance(child, ListTensor):
+                lt_fis.update(zip_longest(node.multiindex, ()))
+    lt_fis = tuple(index for index in lt_fis if index in expression.free_indices)
+
+    if lt_fis:
+        # Rebuild each split component
+        tensor = ComponentTensor(expression, lt_fis)
+        entries = [Indexed(tensor, zeta) for zeta in numpy.ndindex(tensor.shape)]
+        entries = [index_replacer(e, ()) for e in entries]
+        return Indexed(ListTensor(
+            numpy.array(list(map(rebuild, entries))).reshape(tensor.shape)
+        ), lt_fis)
+    else:
+        # Rebuild whole expression at once
+        return rebuild(expression)
+
+
 def _distributed_indexsum_term(term, indices):
     """Preserve a joint contraction domain after distributing one term."""
     active = tuple(index for index in indices if index in term.free_indices)
@@ -925,8 +1003,8 @@ def distribute_sum(expr, predicate):
             stack.append((node, True))
             stack.extend((c, False) for c in node.children)
             continue
-        active[key] = predicate(node) or any(
-            active[id(child)] for child in node.children)
+        active[key] = any(
+            active[id(child)] for child in node.children) or predicate(node)
         if active[key] and isinstance(node, (Sum, IndexSum, Product)):
             if isinstance(node, Sum):
                 results[key] = [
