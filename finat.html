@@ -1358,6 +1358,22 @@ free indices are arbitrary.</p></li>
 </dd></dl>
 
 <dl class="py property">
+<dt class="sig sig-object py" id="finat.enriched.EnrichedElement.summands">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">summands</span></span><a class="headerlink" href="#finat.enriched.EnrichedElement.summands" title="Link to this definition">¶</a></dt>
+<dd><p>Return the leaves of the direct-sum decomposition.</p>
+<p>For <code class="docutils literal notranslate"><span class="pre">E</span> <span class="pre">=</span> <span class="pre">E_1</span> <span class="pre">⊕</span> <span class="pre">...</span> <span class="pre">⊕</span> <span class="pre">E_n</span></code>, return <code class="docutils literal notranslate"><span class="pre">(E_1,</span> <span class="pre">...,</span> <span class="pre">E_n)</span></code>.  For an
+element that is not a direct sum, return <code class="docutils literal notranslate"><span class="pre">(E,)</span></code>.  The summands are
+in basis order.</p>
+<section id="returns">
+<h3>Returns<a class="headerlink" href="#returns" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>tuple</dt><dd><p>The direct-sum leaves on this element’s cell.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.enriched.EnrichedElement.value_shape">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">value_shape</span></span><a class="headerlink" href="#finat.enriched.EnrichedElement.value_shape" title="Link to this definition">¶</a></dt>
 <dd><p>A tuple indicating the shape of the element.</p>
@@ -1412,13 +1428,12 @@ sum.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="finat.enriched.as_enriched_quadrature_element">
 <span class="sig-prename descclassname"><span class="pre">finat.enriched.</span></span><span class="sig-name descname"><span class="pre">as_enriched_quadrature_element</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/enriched.html#as_enriched_quadrature_element"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.enriched.as_enriched_quadrature_element" title="Link to this definition">¶</a></dt>
-<dd><p>Rewrite a rule on a union of point sets as a sum of one rule each.</p>
-</dd></dl>
+<dd></dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="finat.enriched.as_enriched_tensor_product">
 <span class="sig-prename descclassname"><span class="pre">finat.enriched.</span></span><span class="sig-name descname"><span class="pre">as_enriched_tensor_product</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/enriched.html#as_enriched_tensor_product"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.enriched.as_enriched_tensor_product" title="Link to this definition">¶</a></dt>
-<dd><p>Distribute the product over the sum its first factor is.</p>
+<dd><p>Expand a product of sums into a sum of products.</p>
 <p>The summands of a sum in the first factor own a contiguous range of the
 flat basis index, so they stack in the order the product already numbers
 them.  A sum in any later factor would interleave with the factors before
@@ -1428,8 +1443,7 @@ it, and stacking would renumber the degrees of freedom.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="finat.enriched.as_enriched_wrapper">
 <span class="sig-prename descclassname"><span class="pre">finat.enriched.</span></span><span class="sig-name descname"><span class="pre">as_enriched_wrapper</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/enriched.html#as_enriched_wrapper"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.enriched.as_enriched_wrapper" title="Link to this definition">¶</a></dt>
-<dd><p>Distribute the pullback over the sum the wrapped element is.</p>
-</dd></dl>
+<dd></dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="finat.enriched.concatenate_entity_dofs">
@@ -2280,6 +2294,22 @@ provides physical geometry callbacks (may be None).</p></li>
 <dt class="sig sig-object py" id="finat.finiteelementbase.FiniteElementBase.space_dimension">
 <span class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">space_dimension</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/finiteelementbase.html#FiniteElementBase.space_dimension"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.finiteelementbase.FiniteElementBase.space_dimension" title="Link to this definition">¶</a></dt>
 <dd><p>Return the dimension of the finite element space.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="finat.finiteelementbase.FiniteElementBase.summands">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">summands</span></span><a class="headerlink" href="#finat.finiteelementbase.FiniteElementBase.summands" title="Link to this definition">¶</a></dt>
+<dd><p>Return the leaves of the direct-sum decomposition.</p>
+<p>For <code class="docutils literal notranslate"><span class="pre">E</span> <span class="pre">=</span> <span class="pre">E_1</span> <span class="pre">⊕</span> <span class="pre">...</span> <span class="pre">⊕</span> <span class="pre">E_n</span></code>, return <code class="docutils literal notranslate"><span class="pre">(E_1,</span> <span class="pre">...,</span> <span class="pre">E_n)</span></code>.  For an
+element that is not a direct sum, return <code class="docutils literal notranslate"><span class="pre">(E,)</span></code>.  The summands are
+in basis order.</p>
+<section id="id1">
+<h3>Returns<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>tuple</dt><dd><p>The direct-sum leaves on this element’s cell.</p>
+</dd>
+</dl>
+</section>
 </dd></dl>
 
 <dl class="py property">
@@ -3852,8 +3882,8 @@ object with shape (# of points, point dimension).</p>
 <p>A point set on facets.</p>
 <p>A FacetPointSet is constructed by mapping a lower-dimensional PointSet
 onto all facets of a higher-dimensional cell.</p>
-<section id="id1">
-<h3>Parameters<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h3>
+<section id="id2">
+<h3>Parameters<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>cell<span class="classifier">FIAT.Cell</span></dt><dd><p>The cell.</p>
 </dd>
@@ -4113,8 +4143,8 @@ eo (extrinsic orientation).</p>
 <dt class="sig sig-object py" id="finat.quadrature.AbstractQuadratureRule.intrinsic_orientation_permutation_map_tuple">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">intrinsic_orientation_permutation_map_tuple</span></span><a class="headerlink" href="#finat.quadrature.AbstractQuadratureRule.intrinsic_orientation_permutation_map_tuple" title="Link to this definition">¶</a></dt>
 <dd><p>A tuple of maps from intrinsic orientations to corresponding point permutations for each reference cell axis.</p>
-<section id="id2">
-<h3>Notes<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h3>
+<section id="id3">
+<h3>Notes<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h3>
 <p>result[axis][io] gives the physical point-reference point permutation array corresponding to
 io (intrinsic orientation) on <code class="docutils literal notranslate"><span class="pre">axis</span></code>.</p>
 </section>
@@ -5637,6 +5667,7 @@ provides physical geometry callbacks (may be None).</p></li>
 <li><a class="reference internal" href="#finat.enriched.EnrichedElement.mapping"><code class="docutils literal notranslate"><span class="pre">EnrichedElement.mapping</span></code></a></li>
 <li><a class="reference internal" href="#finat.enriched.EnrichedElement.point_evaluation"><code class="docutils literal notranslate"><span class="pre">EnrichedElement.point_evaluation()</span></code></a></li>
 <li><a class="reference internal" href="#finat.enriched.EnrichedElement.space_dimension"><code class="docutils literal notranslate"><span class="pre">EnrichedElement.space_dimension()</span></code></a></li>
+<li><a class="reference internal" href="#finat.enriched.EnrichedElement.summands"><code class="docutils literal notranslate"><span class="pre">EnrichedElement.summands</span></code></a></li>
 <li><a class="reference internal" href="#finat.enriched.EnrichedElement.value_shape"><code class="docutils literal notranslate"><span class="pre">EnrichedElement.value_shape</span></code></a></li>
 </ul>
 </li>
@@ -5750,6 +5781,7 @@ provides physical geometry callbacks (may be None).</p></li>
 <li><a class="reference internal" href="#finat.finiteelementbase.FiniteElementBase.mapping"><code class="docutils literal notranslate"><span class="pre">FiniteElementBase.mapping</span></code></a></li>
 <li><a class="reference internal" href="#finat.finiteelementbase.FiniteElementBase.point_evaluation"><code class="docutils literal notranslate"><span class="pre">FiniteElementBase.point_evaluation()</span></code></a></li>
 <li><a class="reference internal" href="#finat.finiteelementbase.FiniteElementBase.space_dimension"><code class="docutils literal notranslate"><span class="pre">FiniteElementBase.space_dimension()</span></code></a></li>
+<li><a class="reference internal" href="#finat.finiteelementbase.FiniteElementBase.summands"><code class="docutils literal notranslate"><span class="pre">FiniteElementBase.summands</span></code></a></li>
 <li><a class="reference internal" href="#finat.finiteelementbase.FiniteElementBase.value_shape"><code class="docutils literal notranslate"><span class="pre">FiniteElementBase.value_shape</span></code></a></li>
 </ul>
 </li>

@@ -93,15 +93,16 @@
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">gem.node</span><span class="w"> </span><span class="kn">import</span> <span class="n">Memoizer</span><span class="p">,</span> <span class="n">reuse_if_untouched</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gem.node</span><span class="w"> </span><span class="kn">import</span> <span class="n">Memoizer</span><span class="p">,</span> <span class="n">reuse_if_untouched</span><span class="p">,</span> <span class="n">traversal</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">gem.gem</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">ComponentTensor</span><span class="p">,</span> <span class="n">Concatenate</span><span class="p">,</span> <span class="n">FlexiblyIndexed</span><span class="p">,</span>
-                     <span class="n">Index</span><span class="p">,</span> <span class="n">Indexed</span><span class="p">,</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">Node</span><span class="p">,</span> <span class="n">partial_indexed</span><span class="p">,</span>
-                     <span class="n">reshape</span><span class="p">,</span> <span class="n">view</span><span class="p">)</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">gem.optimise</span><span class="w"> </span><span class="kn">import</span> <span class="n">remove_componenttensors</span>
+                     <span class="n">Index</span><span class="p">,</span> <span class="n">IndexSum</span><span class="p">,</span> <span class="n">Indexed</span><span class="p">,</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">MathFunction</span><span class="p">,</span> <span class="n">Node</span><span class="p">,</span>
+                     <span class="n">Product</span><span class="p">,</span> <span class="n">Variable</span><span class="p">,</span> <span class="n">partial_indexed</span><span class="p">,</span> <span class="n">reshape</span><span class="p">,</span> <span class="n">view</span><span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gem.optimise</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">make_rename_map</span><span class="p">,</span> <span class="n">make_renamer</span><span class="p">,</span>
+                          <span class="n">remove_componenttensors</span><span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">gem.interpreter</span><span class="w"> </span><span class="kn">import</span> <span class="n">evaluate</span>
 
 
-<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">'flatten'</span><span class="p">,</span> <span class="s1">'unconcatenate'</span><span class="p">]</span>
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">'flatten'</span><span class="p">,</span> <span class="s1">'split_contraction'</span><span class="p">,</span> <span class="s1">'unconcatenate'</span><span class="p">]</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">find_group</span><span class="p">(</span><span class="n">expressions</span><span class="p">,</span> <span class="n">splittable_indices</span><span class="p">):</span>
@@ -153,16 +154,60 @@
     <span class="k">return</span> <span class="n">index</span> <span class="ow">and</span> <span class="n">nodes</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">split_variable</span><span class="p">(</span><span class="n">variable_ref</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">multiindices</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Splits a flexibly indexed variable along a concatenation index.</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">is_variable_view</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">Node</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Whether a node indexes into a variable, which split_variable can slice."""</span>
+    <span class="k">return</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">FlexiblyIndexed</span><span class="p">)</span>
+            <span class="ow">or</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">Indexed</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">Variable</span><span class="p">)))</span>
 
-<span class="sd">    :param variable_ref: flexibly indexed variable to split</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">find_views</span><span class="p">(</span><span class="n">expressions</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Node</span><span class="p">],</span> <span class="n">index</span><span class="p">:</span> <span class="n">Index</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Node</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Finds the indexed variables that carry a concatenation index.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    expressions</span>
+<span class="sd">        A multi-root GEM expression DAG.</span>
+<span class="sd">    index</span>
+<span class="sd">        The :py:class:`Concatenate` index to split along.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    list</span>
+<span class="sd">        The variable views, as :py:func:`is_variable_view` defines them, whose</span>
+<span class="sd">        free indices include ``index``.</span>
+<span class="sd">    """</span>
+    <span class="n">views</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">seen</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="n">lifo</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">root</span> <span class="ow">in</span> <span class="n">expressions</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">root</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
+            <span class="n">seen</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">root</span><span class="p">)</span>
+            <span class="n">lifo</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">root</span><span class="p">)</span>
+
+    <span class="k">while</span> <span class="n">lifo</span><span class="p">:</span>
+        <span class="n">node</span> <span class="o">=</span> <span class="n">lifo</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">index</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">free_indices</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="n">is_variable_view</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
+            <span class="n">views</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+            <span class="k">continue</span>
+        <span class="k">for</span> <span class="n">child</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">children</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">child</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
+                <span class="n">seen</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">child</span><span class="p">)</span>
+                <span class="n">lifo</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">child</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">views</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">split_variable</span><span class="p">(</span><span class="n">variable_ref</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">multiindices</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Splits an indexed variable along a concatenation index.</span>
+
+<span class="sd">    :param variable_ref: indexed variable to split</span>
 <span class="sd">    :param index: :py:class:`Concatenate` index to split along</span>
 <span class="sd">    :param multiindices: one multiindex for each split variable</span>
 
 <span class="sd">    :returns: generator of split indexed variables</span>
 <span class="sd">    """</span>
-    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">variable_ref</span><span class="p">,</span> <span class="n">FlexiblyIndexed</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">is_variable_view</span><span class="p">(</span><span class="n">variable_ref</span><span class="p">)</span>
     <span class="n">other_indices</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">variable_ref</span><span class="o">.</span><span class="n">index_ordering</span><span class="p">())</span>
     <span class="n">other_indices</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">index</span><span class="p">)</span>
     <span class="n">other_indices</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">other_indices</span><span class="p">)</span>
@@ -213,16 +258,24 @@
     <span class="k">return</span> <span class="n">mapper</span><span class="p">(</span><span class="n">expression</span><span class="p">)</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">_unconcatenate</span><span class="p">(</span><span class="n">cache</span><span class="p">,</span> <span class="n">pairs</span><span class="p">):</span>
-    <span class="c1"># Tail-call recursive core of unconcatenate.</span>
-    <span class="c1"># Assumes that input has already been sanitised.</span>
-    <span class="c1"># Only an index carried by an assignment variable can be split against it.</span>
-    <span class="n">splittable</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span><span class="o">.</span><span class="n">union</span><span class="p">(</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">v</span><span class="o">.</span><span class="n">free_indices</span> <span class="k">for</span> <span class="n">v</span><span class="p">,</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">pairs</span><span class="p">]))</span>
-    <span class="n">concat_group</span> <span class="o">=</span> <span class="n">find_group</span><span class="p">([</span><span class="n">e</span> <span class="k">for</span> <span class="n">v</span><span class="p">,</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">pairs</span><span class="p">],</span> <span class="n">splittable</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">concat_group</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">pairs</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">split_group</span><span class="p">(</span><span class="n">cache</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">concat_group</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Node</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Index</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">"""Splits a group of indexed Concatenate nodes into their blocks.</span>
 
-    <span class="c1"># Get the index split</span>
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    cache</span>
+<span class="sd">        Index splitting cache :py:class:`dict`.</span>
+<span class="sd">    concat_group</span>
+<span class="sd">        A group of indexed :py:class:`Concatenate` nodes, as</span>
+<span class="sd">        :py:func:`find_group` returns.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    tuple</span>
+<span class="sd">        The index that the group shares, one multiindex for each block, and</span>
+<span class="sd">        one substitution for each block.  A substitution replaces every node</span>
+<span class="sd">        of the group by that block of it.</span>
+<span class="sd">    """</span>
     <span class="n">concat_ref</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">concat_group</span><span class="p">))</span>
     <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">concat_ref</span><span class="p">,</span> <span class="n">Indexed</span><span class="p">)</span>
     <span class="n">concat_expr</span><span class="p">,</span> <span class="o">=</span> <span class="n">concat_ref</span><span class="o">.</span><span class="n">children</span>
@@ -235,27 +288,46 @@
                              <span class="k">for</span> <span class="n">child</span> <span class="ow">in</span> <span class="n">concat_expr</span><span class="o">.</span><span class="n">children</span><span class="p">)</span>
         <span class="n">cache</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">multiindices</span>
 
+    <span class="n">mappings</span> <span class="o">=</span> <span class="p">[{}</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">multiindices</span><span class="p">))]</span>
+    <span class="k">for</span> <span class="n">concat_ref</span> <span class="ow">in</span> <span class="n">concat_group</span><span class="p">:</span>
+        <span class="n">concat_expr</span><span class="p">,</span> <span class="o">=</span> <span class="n">concat_ref</span><span class="o">.</span><span class="n">children</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">multiindex</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">multiindices</span><span class="p">):</span>
+            <span class="n">sub_ref</span> <span class="o">=</span> <span class="n">Indexed</span><span class="p">(</span><span class="n">concat_expr</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">multiindex</span><span class="p">)</span>
+            <span class="n">sub_ref</span><span class="p">,</span> <span class="o">=</span> <span class="n">remove_componenttensors</span><span class="p">((</span><span class="n">sub_ref</span><span class="p">,))</span>
+            <span class="n">mappings</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">concat_ref</span><span class="p">]</span> <span class="o">=</span> <span class="n">sub_ref</span>
+    <span class="k">return</span> <span class="n">index</span><span class="p">,</span> <span class="n">multiindices</span><span class="p">,</span> <span class="n">mappings</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_unconcatenate</span><span class="p">(</span><span class="n">cache</span><span class="p">,</span> <span class="n">pairs</span><span class="p">):</span>
+    <span class="c1"># Tail-call recursive core of unconcatenate.</span>
+    <span class="c1"># Assumes that input has already been sanitised.</span>
+    <span class="c1"># Only an index carried by an assignment variable can be split against it.</span>
+    <span class="n">splittable</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span><span class="o">.</span><span class="n">union</span><span class="p">(</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">v</span><span class="o">.</span><span class="n">free_indices</span> <span class="k">for</span> <span class="n">v</span><span class="p">,</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">pairs</span><span class="p">]))</span>
+    <span class="n">concat_group</span> <span class="o">=</span> <span class="n">find_group</span><span class="p">([</span><span class="n">v</span> <span class="k">for</span> <span class="n">v</span><span class="p">,</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">pairs</span><span class="p">]</span> <span class="o">+</span> <span class="p">[</span><span class="n">e</span> <span class="k">for</span> <span class="n">v</span><span class="p">,</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">pairs</span><span class="p">],</span> <span class="n">splittable</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">concat_group</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">pairs</span>
+
+    <span class="n">index</span><span class="p">,</span> <span class="n">multiindices</span><span class="p">,</span> <span class="n">mappings</span> <span class="o">=</span> <span class="n">split_group</span><span class="p">(</span><span class="n">cache</span><span class="p">,</span> <span class="n">concat_group</span><span class="p">)</span>
+
     <span class="k">def</span><span class="w"> </span><span class="nf">cut</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">"""No need to rebuild expression of independent of the</span>
 <span class="sd">        relevant concatenation index."""</span>
         <span class="k">return</span> <span class="n">index</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">free_indices</span>
-
-    <span class="c1"># Build Concatenate node replacement mappings</span>
-    <span class="n">mappings</span> <span class="o">=</span> <span class="p">[{}</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">multiindices</span><span class="p">))]</span>
-    <span class="k">for</span> <span class="n">concat_ref</span> <span class="ow">in</span> <span class="n">concat_group</span><span class="p">:</span>
-        <span class="n">concat_expr</span><span class="p">,</span> <span class="o">=</span> <span class="n">concat_ref</span><span class="o">.</span><span class="n">children</span>
-        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">multiindices</span><span class="p">)):</span>
-            <span class="n">sub_ref</span> <span class="o">=</span> <span class="n">Indexed</span><span class="p">(</span><span class="n">concat_expr</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">multiindices</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
-            <span class="n">sub_ref</span><span class="p">,</span> <span class="o">=</span> <span class="n">remove_componenttensors</span><span class="p">((</span><span class="n">sub_ref</span><span class="p">,))</span>
-            <span class="n">mappings</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">concat_ref</span><span class="p">]</span> <span class="o">=</span> <span class="n">sub_ref</span>
 
     <span class="c1"># Finally, split assignment pairs</span>
     <span class="n">split_pairs</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">for</span> <span class="n">var</span><span class="p">,</span> <span class="n">expr</span> <span class="ow">in</span> <span class="n">pairs</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">index</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">var</span><span class="o">.</span><span class="n">free_indices</span><span class="p">:</span>
             <span class="n">split_pairs</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">var</span><span class="p">,</span> <span class="n">expr</span><span class="p">))</span>
-        <span class="k">else</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="n">FlexiblyIndexed</span><span class="p">):</span>
             <span class="k">for</span> <span class="n">v</span><span class="p">,</span> <span class="n">m</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">split_variable</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">multiindices</span><span class="p">),</span> <span class="n">mappings</span><span class="p">):</span>
+                <span class="n">split_pairs</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">v</span><span class="p">,</span> <span class="n">replace_node</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">m</span><span class="p">,</span> <span class="n">cut</span><span class="p">)))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># A computed variable is split along its own Concatenate nodes</span>
+            <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">mappings</span><span class="p">:</span>
+                <span class="n">v</span> <span class="o">=</span> <span class="n">replace_node</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="n">m</span><span class="p">,</span> <span class="n">cut</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">v</span><span class="o">.</span><span class="n">free_indices</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Cannot split </span><span class="si">{</span><span class="n">index</span><span class="si">}</span><span class="s2"> out of </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">var</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
                 <span class="n">split_pairs</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">v</span><span class="p">,</span> <span class="n">replace_node</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">m</span><span class="p">,</span> <span class="n">cut</span><span class="p">)))</span>
 
     <span class="c1"># Run again, there may be other Concatenate groups</span>
@@ -264,14 +336,30 @@
 
 <div class="viewcode-block" id="unconcatenate">
 <a class="viewcode-back" href="../../gem.html#gem.unconcatenate.unconcatenate">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">unconcatenate</span><span class="p">(</span><span class="n">pairs</span><span class="p">,</span> <span class="n">cache</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Splits a list of (indexed variable, expression) pairs along</span>
-<span class="sd">    :py:class:`Concatenate` nodes embedded in the expressions.</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">unconcatenate</span><span class="p">(</span><span class="n">pairs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Node</span><span class="p">,</span> <span class="n">Node</span><span class="p">]],</span> <span class="n">cache</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Node</span><span class="p">,</span> <span class="n">Node</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">"""Splits (indexed variable, expression) pairs along :py:class:`Concatenate` nodes.</span>
 
-<span class="sd">    :param pairs: list of (indexed variable, expression) pairs</span>
-<span class="sd">    :param cache: index splitting cache :py:class:`dict` (optional)</span>
+<span class="sd">    Each pair is split into one pair per block of the Concatenate nodes</span>
+<span class="sd">    indexed by an index that its variable carries.  A split pair replaces</span>
+<span class="sd">    those nodes by one of their blocks, indexed by fresh indices, and its</span>
+<span class="sd">    variable by the slice for that block, reshaped to the block's shape:</span>
 
-<span class="sd">    :returns: list of (indexed variable, expression) pairs</span>
+<span class="sd">        v_j = f(Concatenate(A, B)_j)  ==&gt;  v_ja = f(A_ja),  v_jb = f(B_jb).</span>
+
+<span class="sd">    The split repeats until no such Concatenate is left.  A computed variable</span>
+<span class="sd">    is split along its own Concatenate nodes rather than sliced.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    pairs</span>
+<span class="sd">        The (indexed variable, expression) pairs.</span>
+<span class="sd">    cache</span>
+<span class="sd">        Index splitting cache :py:class:`dict` (optional).</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    list</span>
+<span class="sd">        The split (indexed variable, expression) pairs.</span>
 <span class="sd">    """</span>
     <span class="c1"># Set up cache</span>
     <span class="k">if</span> <span class="n">cache</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -282,6 +370,116 @@
     <span class="n">pairs</span> <span class="o">=</span> <span class="p">[(</span><span class="n">v</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span> <span class="k">for</span> <span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">_</span><span class="p">),</span> <span class="n">e</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">pairs</span><span class="p">,</span> <span class="n">exprs</span><span class="p">)]</span>
 
     <span class="k">return</span> <span class="n">_unconcatenate</span><span class="p">(</span><span class="n">cache</span><span class="p">,</span> <span class="n">pairs</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_split_contraction</span><span class="p">(</span><span class="n">cache</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">expression</span><span class="p">:</span> <span class="n">Node</span><span class="p">,</span> <span class="n">indices</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Index</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+                       <span class="n">contractions</span><span class="p">:</span> <span class="nb">set</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Node</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Index</span><span class="p">,</span> <span class="o">...</span><span class="p">]]]:</span>
+    <span class="c1"># Recursive core of split_contraction.</span>
+    <span class="c1"># Assumes that input has already been sanitised.</span>
+    <span class="n">concat_group</span> <span class="o">=</span> <span class="n">find_group</span><span class="p">([</span><span class="n">expression</span><span class="p">],</span> <span class="nb">set</span><span class="p">(</span><span class="n">indices</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">concat_group</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[(</span><span class="n">expression</span><span class="p">,</span> <span class="n">indices</span><span class="p">)]</span>
+
+    <span class="n">index</span><span class="p">,</span> <span class="n">multiindices</span><span class="p">,</span> <span class="n">mappings</span> <span class="o">=</span> <span class="n">split_group</span><span class="p">(</span><span class="n">cache</span><span class="p">,</span> <span class="n">concat_group</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">variable_ref</span> <span class="ow">in</span> <span class="n">find_views</span><span class="p">([</span><span class="n">expression</span><span class="p">],</span> <span class="n">index</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">mapping</span><span class="p">,</span> <span class="n">sub_ref</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">mappings</span><span class="p">,</span> <span class="n">split_variable</span><span class="p">(</span><span class="n">variable_ref</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">multiindices</span><span class="p">)):</span>
+            <span class="n">mapping</span><span class="p">[</span><span class="n">variable_ref</span><span class="p">]</span> <span class="o">=</span> <span class="n">sub_ref</span>
+    <span class="n">contractions</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">block</span><span class="o">.</span><span class="n">multiindex</span>
+                        <span class="k">for</span> <span class="n">mapping</span> <span class="ow">in</span> <span class="n">mappings</span> <span class="k">for</span> <span class="n">block</span> <span class="ow">in</span> <span class="n">mapping</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+                        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">block</span><span class="p">,</span> <span class="n">IndexSum</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">cut</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Do not rebuild nodes independent of the concatenation index."""</span>
+        <span class="k">return</span> <span class="n">index</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">free_indices</span>
+
+    <span class="n">rest</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">indices</span> <span class="k">if</span> <span class="n">i</span> <span class="o">!=</span> <span class="n">index</span><span class="p">)</span>
+    <span class="n">terms</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">multiindex</span><span class="p">,</span> <span class="n">mapping</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">multiindices</span><span class="p">,</span> <span class="n">mappings</span><span class="p">):</span>
+        <span class="n">term</span> <span class="o">=</span> <span class="n">replace_node</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">mapping</span><span class="p">,</span> <span class="n">cut</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">term</span><span class="o">.</span><span class="n">free_indices</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Cannot split </span><span class="si">{</span><span class="n">index</span><span class="si">}</span><span class="s2">: it indexes a node that is "</span>
+                             <span class="s2">"neither a Concatenate nor a variable view."</span><span class="p">)</span>
+        <span class="n">terms</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">_split_contraction</span><span class="p">(</span><span class="n">cache</span><span class="p">,</span> <span class="n">term</span><span class="p">,</span> <span class="n">rest</span> <span class="o">+</span> <span class="n">multiindex</span><span class="p">,</span> <span class="n">contractions</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">terms</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_lift_contractions</span><span class="p">(</span><span class="n">expression</span><span class="p">:</span> <span class="n">Node</span><span class="p">,</span> <span class="n">contractions</span><span class="p">:</span> <span class="nb">set</span><span class="p">,</span> <span class="n">renamer</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Index</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">Node</span><span class="p">]:</span>
+    <span class="c1"># Pull the block contractions out of the product tree of expression,</span>
+    <span class="c1"># through conj.  A contraction anywhere else is not a factor of the</span>
+    <span class="c1"># term, so it stays in place.</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">IndexSum</span><span class="p">)</span> <span class="ow">and</span> <span class="n">expression</span><span class="o">.</span><span class="n">multiindex</span> <span class="ow">in</span> <span class="n">contractions</span><span class="p">:</span>
+        <span class="n">indices</span><span class="p">,</span> <span class="n">applier</span> <span class="o">=</span> <span class="n">renamer</span><span class="p">(</span><span class="n">expression</span><span class="o">.</span><span class="n">multiindex</span><span class="p">)</span>
+        <span class="n">body</span><span class="p">,</span> <span class="o">=</span> <span class="n">remove_componenttensors</span><span class="p">([</span><span class="n">applier</span><span class="p">(</span><span class="n">expression</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">])])</span>
+        <span class="n">lifted</span><span class="p">,</span> <span class="n">body</span> <span class="o">=</span> <span class="n">_lift_contractions</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">contractions</span><span class="p">,</span> <span class="n">renamer</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">indices</span> <span class="o">+</span> <span class="n">lifted</span><span class="p">,</span> <span class="n">body</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">Product</span><span class="p">):</span>
+        <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="n">expression</span><span class="o">.</span><span class="n">children</span>
+        <span class="n">lifted_a</span><span class="p">,</span> <span class="n">a</span> <span class="o">=</span> <span class="n">_lift_contractions</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">contractions</span><span class="p">,</span> <span class="n">renamer</span><span class="p">)</span>
+        <span class="n">lifted_b</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="n">_lift_contractions</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">contractions</span><span class="p">,</span> <span class="n">renamer</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">lifted_a</span> <span class="ow">or</span> <span class="n">lifted_b</span><span class="p">:</span>
+            <span class="n">expression</span> <span class="o">=</span> <span class="n">Product</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">lifted_a</span> <span class="o">+</span> <span class="n">lifted_b</span><span class="p">,</span> <span class="n">expression</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">MathFunction</span><span class="p">)</span> <span class="ow">and</span> <span class="n">expression</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">"conj"</span><span class="p">:</span>
+        <span class="n">lifted</span><span class="p">,</span> <span class="n">child</span> <span class="o">=</span> <span class="n">_lift_contractions</span><span class="p">(</span><span class="n">expression</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">contractions</span><span class="p">,</span> <span class="n">renamer</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">lifted</span><span class="p">:</span>
+            <span class="n">expression</span> <span class="o">=</span> <span class="n">MathFunction</span><span class="p">(</span><span class="s2">"conj"</span><span class="p">,</span> <span class="n">child</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">lifted</span><span class="p">,</span> <span class="n">expression</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">(),</span> <span class="n">expression</span>
+
+
+<div class="viewcode-block" id="split_contraction">
+<a class="viewcode-back" href="../../gem.html#gem.unconcatenate.split_contraction">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">split_contraction</span><span class="p">(</span><span class="n">expression</span><span class="p">:</span> <span class="n">Node</span><span class="p">,</span> <span class="n">indices</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Index</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+                      <span class="n">cache</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Node</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Index</span><span class="p">,</span> <span class="o">...</span><span class="p">]]]:</span>
+<span class="w">    </span><span class="sd">"""Splits a contraction along the :py:class:`Concatenate` nodes it sums over.</span>
+
+<span class="sd">    The sum is split into one sum per block of the Concatenate nodes indexed</span>
+<span class="sd">    by a summed index.  A split term replaces those nodes by one of their</span>
+<span class="sd">    blocks, indexed by fresh indices, and sums over those indices instead:</span>
+
+<span class="sd">        sum_j f(Concatenate(A, B)_j)  ==&gt;  sum_ja f(A_ja) + sum_jb f(B_jb).</span>
+
+<span class="sd">    The split repeats until no such Concatenate is left.  A variable view</span>
+<span class="sd">    carrying the split index is sliced into the same blocks.  A block that is</span>
+<span class="sd">    itself a sum, as in the dual evaluation of a direct sum, has its summation</span>
+<span class="sd">    indices moved to its term when the block is a factor of the term.  They</span>
+<span class="sd">    come first in the term's indices, as points come before basis functions.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    expression</span>
+<span class="sd">        A scalar GEM expression.</span>
+<span class="sd">    indices</span>
+<span class="sd">        The indices that ``expression`` is summed over.</span>
+<span class="sd">    cache</span>
+<span class="sd">        Index splitting cache :py:class:`dict` (optional).</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    list</span>
+<span class="sd">        (expression, indices) pairs whose sums add up to the sum of</span>
+<span class="sd">        ``expression`` over ``indices``.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">cache</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">cache</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">expression</span><span class="p">,</span> <span class="o">=</span> <span class="n">remove_componenttensors</span><span class="p">([</span><span class="n">expression</span><span class="p">])</span>
+    <span class="n">contractions</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="n">terms</span> <span class="o">=</span> <span class="n">_split_contraction</span><span class="p">(</span><span class="n">cache</span><span class="p">,</span> <span class="n">expression</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">indices</span><span class="p">),</span> <span class="n">contractions</span><span class="p">)</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">term</span><span class="p">,</span> <span class="n">summed</span> <span class="ow">in</span> <span class="n">terms</span><span class="p">:</span>
+        <span class="c1"># A lifted index must differ from every index in the term, free or</span>
+        <span class="c1"># bound, so that it neither aliases nor shadows one of them.</span>
+        <span class="n">taken</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">summed</span><span class="p">)</span><span class="o">.</span><span class="n">union</span><span class="p">(</span><span class="n">term</span><span class="o">.</span><span class="n">free_indices</span><span class="p">)</span>
+        <span class="n">taken</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">chain</span><span class="o">.</span><span class="n">from_iterable</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">multiindex</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">traversal</span><span class="p">([</span><span class="n">term</span><span class="p">])</span>
+                                         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">IndexSum</span><span class="p">)))</span>
+        <span class="n">renamer</span> <span class="o">=</span> <span class="n">make_renamer</span><span class="p">(</span><span class="n">make_rename_map</span><span class="p">())</span>
+        <span class="n">renamer</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">taken</span><span class="p">))</span>
+        <span class="n">lifted</span><span class="p">,</span> <span class="n">term</span> <span class="o">=</span> <span class="n">_lift_contractions</span><span class="p">(</span><span class="n">term</span><span class="p">,</span> <span class="n">contractions</span><span class="p">,</span> <span class="n">renamer</span><span class="p">)</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">term</span><span class="p">,</span> <span class="n">lifted</span> <span class="o">+</span> <span class="n">summed</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">result</span></div>
 
 
 

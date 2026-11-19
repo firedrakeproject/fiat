@@ -2286,21 +2286,70 @@ unconcatenation, and then add up the results.</p>
 </dd></dl>
 
 <dl class="py function">
-<dt class="sig sig-object py" id="gem.unconcatenate.unconcatenate">
-<span class="sig-prename descclassname"><span class="pre">gem.unconcatenate.</span></span><span class="sig-name descname"><span class="pre">unconcatenate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pairs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cache</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gem/unconcatenate.html#unconcatenate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.unconcatenate.unconcatenate" title="Link to this definition">¶</a></dt>
-<dd><p>Splits a list of (indexed variable, expression) pairs along
-<code class="xref py py-class docutils literal notranslate"><span class="pre">Concatenate</span></code> nodes embedded in the expressions.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>pairs</strong> – list of (indexed variable, expression) pairs</p></li>
-<li><p><strong>cache</strong> – index splitting cache <a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a> (optional)</p></li>
-</ul>
+<dt class="sig sig-object py" id="gem.unconcatenate.split_contraction">
+<span class="sig-prename descclassname"><span class="pre">gem.unconcatenate.</span></span><span class="sig-name descname"><span class="pre">split_contraction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">expression</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#gem.gem.Node" title="gem.gem.Node"><span class="pre">Node</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">indices</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#gem.gem.Index" title="gem.gem.Index"><span class="pre">Index</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cache</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.15)"><span class="pre">dict</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.15)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#gem.gem.Node" title="gem.gem.Node"><span class="pre">Node</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#gem.gem.Index" title="gem.gem.Index"><span class="pre">Index</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/gem/unconcatenate.html#split_contraction"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.unconcatenate.split_contraction" title="Link to this definition">¶</a></dt>
+<dd><p>Splits a contraction along the <code class="xref py py-class docutils literal notranslate"><span class="pre">Concatenate</span></code> nodes it sums over.</p>
+<p>The sum is split into one sum per block of the Concatenate nodes indexed
+by a summed index.  A split term replaces those nodes by one of their
+blocks, indexed by fresh indices, and sums over those indices instead:</p>
+<blockquote>
+<div><p>sum_j f(Concatenate(A, B)_j)  ==&gt;  sum_ja f(A_ja) + sum_jb f(B_jb).</p>
+</div></blockquote>
+<p>The split repeats until no such Concatenate is left.  A variable view
+carrying the split index is sliced into the same blocks.  A block that is
+itself a sum, as in the dual evaluation of a direct sum, has its summation
+indices moved to its term when the block is a factor of the term.  They
+come first in the term’s indices, as points come before basis functions.</p>
+<section id="id25">
+<h3>Parameters<a class="headerlink" href="#id25" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>expression</dt><dd><p>A scalar GEM expression.</p>
 </dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>list of (indexed variable, expression) pairs</p>
+<dt>indices</dt><dd><p>The indices that <code class="docutils literal notranslate"><span class="pre">expression</span></code> is summed over.</p>
+</dd>
+<dt>cache</dt><dd><p>Index splitting cache <a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a> (optional).</p>
 </dd>
 </dl>
+</section>
+<section id="id26">
+<h3>Returns<a class="headerlink" href="#id26" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>list</dt><dd><p>(expression, indices) pairs whose sums add up to the sum of
+<code class="docutils literal notranslate"><span class="pre">expression</span></code> over <code class="docutils literal notranslate"><span class="pre">indices</span></code>.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="gem.unconcatenate.unconcatenate">
+<span class="sig-prename descclassname"><span class="pre">gem.unconcatenate.</span></span><span class="sig-name descname"><span class="pre">unconcatenate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pairs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.15)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#gem.gem.Node" title="gem.gem.Node"><span class="pre">Node</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#gem.gem.Node" title="gem.gem.Node"><span class="pre">Node</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cache</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.15)"><span class="pre">dict</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.15)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#gem.gem.Node" title="gem.gem.Node"><span class="pre">Node</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#gem.gem.Node" title="gem.gem.Node"><span class="pre">Node</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/gem/unconcatenate.html#unconcatenate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.unconcatenate.unconcatenate" title="Link to this definition">¶</a></dt>
+<dd><p>Splits (indexed variable, expression) pairs along <code class="xref py py-class docutils literal notranslate"><span class="pre">Concatenate</span></code> nodes.</p>
+<p>Each pair is split into one pair per block of the Concatenate nodes
+indexed by an index that its variable carries.  A split pair replaces
+those nodes by one of their blocks, indexed by fresh indices, and its
+variable by the slice for that block, reshaped to the block’s shape:</p>
+<blockquote>
+<div><p>v_j = f(Concatenate(A, B)_j)  ==&gt;  v_ja = f(A_ja),  v_jb = f(B_jb).</p>
+</div></blockquote>
+<p>The split repeats until no such Concatenate is left.  A computed variable
+is split along its own Concatenate nodes rather than sliced.</p>
+<section id="id27">
+<h3>Parameters<a class="headerlink" href="#id27" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>pairs</dt><dd><p>The (indexed variable, expression) pairs.</p>
+</dd>
+<dt>cache</dt><dd><p>Index splitting cache <a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a> (optional).</p>
+</dd>
+</dl>
+</section>
+<section id="id28">
+<h3>Returns<a class="headerlink" href="#id28" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>list</dt><dd><p>The split (indexed variable, expression) pairs.</p>
+</dd>
+</dl>
+</section>
 </dd></dl>
 
 </section>
@@ -2376,15 +2425,15 @@ unconcatenation, and then add up the results.</p>
 <dt class="sig sig-object py">
 <span class="sig-prename descclassname"><span class="pre">gem.utils.</span></span><span class="sig-name descname"><span class="pre">safe_repr</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tuple_</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><span class="pre">tuple</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a></span></span></dt>
 <dd><p>Return a ‘safe’ repr for an object, accounting for floating point error.</p>
-<section id="id25">
-<h3>Parameters<a class="headerlink" href="#id25" title="Link to this heading">¶</a></h3>
+<section id="id29">
+<h3>Parameters<a class="headerlink" href="#id29" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>obj :</dt><dd><p>The object to produce a repr for.</p>
 </dd>
 </dl>
 </section>
-<section id="id26">
-<h3>Returns<a class="headerlink" href="#id26" title="Link to this heading">¶</a></h3>
+<section id="id30">
+<h3>Returns<a class="headerlink" href="#id30" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>str :</dt><dd><p>A repr for the object.</p>
 </dd>
@@ -2789,6 +2838,7 @@ unconcatenation, and then add up the results.</p>
 </li>
 <li><a class="reference internal" href="#module-gem.unconcatenate">gem.unconcatenate module</a><ul>
 <li><a class="reference internal" href="#gem.unconcatenate.flatten"><code class="docutils literal notranslate"><span class="pre">flatten()</span></code></a></li>
+<li><a class="reference internal" href="#gem.unconcatenate.split_contraction"><code class="docutils literal notranslate"><span class="pre">split_contraction()</span></code></a></li>
 <li><a class="reference internal" href="#gem.unconcatenate.unconcatenate"><code class="docutils literal notranslate"><span class="pre">unconcatenate()</span></code></a></li>
 </ul>
 </li>

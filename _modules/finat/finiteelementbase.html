@@ -361,6 +361,25 @@
             <span class="sa">f</span><span class="s2">"Dual basis not defined for element </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">"</span>
         <span class="p">)</span>
 
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">summands</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Return the leaves of the direct-sum decomposition.</span>
+
+<span class="sd">        For ``E = E_1 ⊕ ... ⊕ E_n``, return ``(E_1, ..., E_n)``.  For an</span>
+<span class="sd">        element that is not a direct sum, return ``(E,)``.  The summands are</span>
+<span class="sd">        in basis order.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        tuple</span>
+<span class="sd">            The direct-sum leaves on this element's cell.</span>
+<span class="sd">        """</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">finat.enriched</span><span class="w"> </span><span class="kn">import</span> <span class="n">as_enriched</span>  <span class="c1"># Avoid circular import</span>
+        <span class="n">enriched</span> <span class="o">=</span> <span class="n">as_enriched</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">enriched</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">enriched</span><span class="o">.</span><span class="n">summands</span>
+
 <div class="viewcode-block" id="FiniteElementBase.dual_evaluation">
 <a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.FiniteElementBase.dual_evaluation">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">dual_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fn</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>

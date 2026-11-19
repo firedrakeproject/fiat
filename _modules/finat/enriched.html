@@ -161,7 +161,7 @@
             <span class="n">tables</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">tables</span><span class="p">)</span>
             <span class="n">zeta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_value_indices</span><span class="p">()</span>
             <span class="n">tensors</span> <span class="o">=</span> <span class="p">[]</span>
-            <span class="k">for</span> <span class="n">elem</span><span class="p">,</span> <span class="n">table</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">elements</span><span class="p">,</span> <span class="n">tables</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">elem</span><span class="p">,</span> <span class="n">table</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">summands</span><span class="p">,</span> <span class="n">tables</span><span class="p">):</span>
                 <span class="n">beta_i</span> <span class="o">=</span> <span class="n">elem</span><span class="o">.</span><span class="n">get_indices</span><span class="p">()</span>
                 <span class="n">tensors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">ComponentTensor</span><span class="p">(</span>
                     <span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">table</span><span class="p">,</span> <span class="n">beta_i</span> <span class="o">+</span> <span class="n">zeta</span><span class="p">),</span>
@@ -186,7 +186,7 @@
 <span class="sd">        :param entity: the cell entity on which to tabulate.</span>
 <span class="sd">        '''</span>
         <span class="n">results</span> <span class="o">=</span> <span class="p">[</span><span class="n">element</span><span class="o">.</span><span class="n">basis_evaluation</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">ps</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="n">coordinate_mapping</span><span class="p">)</span>
-                   <span class="k">for</span> <span class="n">element</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">elements</span><span class="p">]</span>
+                   <span class="k">for</span> <span class="n">element</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">summands</span><span class="p">]</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compose_evaluations</span><span class="p">(</span><span class="n">results</span><span class="p">)</span></div>
 
 
@@ -204,7 +204,7 @@
 <span class="sd">        :param entity: the cell entity on which to tabulate.</span>
 <span class="sd">        '''</span>
         <span class="n">results</span> <span class="o">=</span> <span class="p">[</span><span class="n">element</span><span class="o">.</span><span class="n">point_evaluation</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">refcoords</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="p">)</span>
-                   <span class="k">for</span> <span class="n">element</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">elements</span><span class="p">]</span>
+                   <span class="k">for</span> <span class="n">element</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">summands</span><span class="p">]</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compose_evaluations</span><span class="p">(</span><span class="n">results</span><span class="p">)</span></div>
 
 
@@ -218,20 +218,20 @@
             <span class="k">return</span> <span class="n">result</span>
 
     <span class="nd">@cached_property</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">_summands</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">"""The summands that are not themselves direct sums, in basis order.</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">summands</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Return the leaves of the direct-sum decomposition.</span>
 
-<span class="sd">        An element is brought out as a direct sum one level at a time, so a</span>
-<span class="sd">        summand may be a direct sum in turn.  These are the elements that</span>
-<span class="sd">        evaluate their dual basis on their own points, and whose points make</span>
-<span class="sd">        up the union that :attr:`dual_basis` works against.</span>
+<span class="sd">        For ``E = E_1 ⊕ ... ⊕ E_n``, return ``(E_1, ..., E_n)``.  For an</span>
+<span class="sd">        element that is not a direct sum, return ``(E,)``.  The summands are</span>
+<span class="sd">        in basis order.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        tuple</span>
+<span class="sd">            The direct-sum leaves on this element's cell.</span>
 <span class="sd">        """</span>
-        <span class="n">summands</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">for</span> <span class="n">element</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">elements</span><span class="p">:</span>
-            <span class="n">expanded</span> <span class="o">=</span> <span class="n">as_enriched</span><span class="p">(</span><span class="n">element</span><span class="p">)</span>
-            <span class="n">summands</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">expanded</span><span class="o">.</span><span class="n">_summands</span> <span class="k">if</span> <span class="n">expanded</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-                            <span class="k">else</span> <span class="p">[</span><span class="n">element</span><span class="p">])</span>
-        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">summands</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">chain</span><span class="o">.</span><span class="n">from_iterable</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">summands</span>
+                                         <span class="k">for</span> <span class="n">element</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">elements</span><span class="p">))</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">dual_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -257,12 +257,12 @@
                 <span class="sa">f</span><span class="s2">"Dual basis not defined for non-nodal </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">"</span>
             <span class="p">)</span>
         <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="o">.</span><span class="n">dual_transformation</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">FiniteElementBase</span><span class="o">.</span><span class="n">dual_transformation</span>
-               <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_summands</span><span class="p">):</span>
+               <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">summands</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
                 <span class="sa">f</span><span class="s2">"dual_basis not defined for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> with a summand"</span>
                 <span class="s2">" that has its own dual_transformation; use dual_evaluation instead"</span>
             <span class="p">)</span>
-        <span class="n">duals</span> <span class="o">=</span> <span class="p">[</span><span class="n">element</span><span class="o">.</span><span class="n">dual_basis</span> <span class="k">for</span> <span class="n">element</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_summands</span><span class="p">]</span>
+        <span class="n">duals</span> <span class="o">=</span> <span class="p">[</span><span class="n">element</span><span class="o">.</span><span class="n">dual_basis</span> <span class="k">for</span> <span class="n">element</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">summands</span><span class="p">]</span>
         <span class="n">x</span> <span class="o">=</span> <span class="n">UnionPointSet</span><span class="p">([</span><span class="n">xk</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">xk</span> <span class="ow">in</span> <span class="n">duals</span><span class="p">])</span>
         <span class="n">p</span><span class="p">,</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">indices</span>
         <span class="n">zeta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_value_indices</span><span class="p">()</span>
@@ -271,7 +271,7 @@
         <span class="n">shapes</span> <span class="o">=</span> <span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">extent</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">xk</span><span class="o">.</span><span class="n">indices</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">xk</span> <span class="ow">in</span> <span class="n">duals</span><span class="p">]</span>
 
         <span class="n">blocks</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="p">(</span><span class="n">Q</span><span class="p">,</span> <span class="n">xk</span><span class="p">))</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_summands</span><span class="p">,</span> <span class="n">duals</span><span class="p">)):</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="p">(</span><span class="n">Q</span><span class="p">,</span> <span class="n">xk</span><span class="p">))</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">summands</span><span class="p">,</span> <span class="n">duals</span><span class="p">)):</span>
             <span class="n">alpha</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">get_indices</span><span class="p">()</span>
             <span class="c1"># Turn this summand's point indices into a shape, so that its</span>
             <span class="c1"># weights can be embedded at its own offset in the union.</span>
@@ -309,17 +309,30 @@
             <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
                 <span class="sa">f</span><span class="s2">"Dual evaluation not defined for non-nodal </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">"</span>
             <span class="p">)</span>
-        <span class="c1"># Each summand contracts through its own dual_basis, so a non-nodal</span>
-        <span class="c1"># sum has to be refused here as well as in dual_basis: this path</span>
-        <span class="c1"># never asks self for one.</span>
         <span class="n">evals</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">for</span> <span class="n">element</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">elements</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">element</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">summands</span><span class="p">:</span>
+            <span class="c1"># Enrichments of non-nodal elements raise NotImplementedError</span>
             <span class="n">expr</span><span class="p">,</span> <span class="n">point_indices</span><span class="p">,</span> <span class="n">indices</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">dual_evaluation</span><span class="p">(</span>
                 <span class="n">fn</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="n">coordinate_mapping</span><span class="p">)</span>
             <span class="n">evals</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">broadcast_tensor</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">IndexSum</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">point_indices</span><span class="p">),</span> <span class="n">indices</span><span class="p">))</span>
 
         <span class="n">beta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_indices</span><span class="p">()</span>
         <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Concatenate</span><span class="p">(</span><span class="o">*</span><span class="n">evals</span><span class="p">),</span> <span class="n">beta</span><span class="p">),</span> <span class="p">(),</span> <span class="n">beta</span></div>
+
+
+
+<div class="viewcode-block" id="distribute_over_sum">
+<a class="viewcode-back" href="../../finat.html#finat.enriched.distribute_over_sum">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">distribute_over_sum</span><span class="p">(</span><span class="n">reconstruct</span><span class="p">,</span> <span class="n">summands</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Rebuild each summand of a direct sum, keeping its nodality.</span>
+
+<span class="sd">    :arg reconstruct: called on each of ``summands.elements`` to rebuild it</span>
+<span class="sd">        inside whatever wraps the sum.</span>
+<span class="sd">    :arg summands: an :class:`EnrichedElement`.</span>
+<span class="sd">    :returns: an :class:`EnrichedElement` of the rebuilt summands.</span>
+<span class="sd">    """</span>
+    <span class="k">return</span> <span class="n">EnrichedElement</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">reconstruct</span><span class="p">,</span> <span class="n">summands</span><span class="o">.</span><span class="n">elements</span><span class="p">)),</span>
+                           <span class="n">is_nodal_enriched</span><span class="o">=</span><span class="n">summands</span><span class="o">.</span><span class="n">is_nodal_enriched</span><span class="p">)</span></div>
 
 
 
@@ -351,7 +364,10 @@
 <a class="viewcode-back" href="../../finat.html#finat.enriched.as_enriched_flattened">[docs]</a>
 <span class="nd">@as_enriched</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">FlattenedDimensions</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">as_enriched_flattened</span><span class="p">(</span><span class="n">element</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">as_enriched</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">product</span><span class="p">)</span></div>
+    <span class="n">summands</span> <span class="o">=</span> <span class="n">as_enriched</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">product</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">summands</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="n">distribute_over_sum</span><span class="p">(</span><span class="n">FlattenedDimensions</span><span class="p">,</span> <span class="n">summands</span><span class="p">)</span></div>
 
 
 
@@ -363,26 +379,10 @@
 
 
 
-<div class="viewcode-block" id="distribute_over_sum">
-<a class="viewcode-back" href="../../finat.html#finat.enriched.distribute_over_sum">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">distribute_over_sum</span><span class="p">(</span><span class="n">reconstruct</span><span class="p">,</span> <span class="n">summands</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Rebuild each summand of a direct sum, keeping its nodality.</span>
-
-<span class="sd">    :arg reconstruct: called on each of ``summands.elements`` to rebuild it</span>
-<span class="sd">        inside whatever wraps the sum.</span>
-<span class="sd">    :arg summands: an :class:`EnrichedElement`.</span>
-<span class="sd">    :returns: an :class:`EnrichedElement` of the rebuilt summands.</span>
-<span class="sd">    """</span>
-    <span class="k">return</span> <span class="n">EnrichedElement</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">reconstruct</span><span class="p">,</span> <span class="n">summands</span><span class="o">.</span><span class="n">elements</span><span class="p">)),</span>
-                           <span class="n">is_nodal_enriched</span><span class="o">=</span><span class="n">summands</span><span class="o">.</span><span class="n">is_nodal_enriched</span><span class="p">)</span></div>
-
-
-
 <div class="viewcode-block" id="as_enriched_wrapper">
 <a class="viewcode-back" href="../../finat.html#finat.enriched.as_enriched_wrapper">[docs]</a>
 <span class="nd">@as_enriched</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">WrapperElementBase</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">as_enriched_wrapper</span><span class="p">(</span><span class="n">element</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Distribute the pullback over the sum the wrapped element is."""</span>
     <span class="n">summands</span> <span class="o">=</span> <span class="n">as_enriched</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">wrappee</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">summands</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="kc">None</span>
@@ -394,7 +394,6 @@
 <a class="viewcode-back" href="../../finat.html#finat.enriched.as_enriched_quadrature_element">[docs]</a>
 <span class="nd">@as_enriched</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">QuadratureElement</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">as_enriched_quadrature_element</span><span class="p">(</span><span class="n">element</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Rewrite a rule on a union of point sets as a sum of one rule each."""</span>
     <span class="n">rules</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">_summand_rules</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">rules</span><span class="p">:</span>
         <span class="k">return</span> <span class="kc">None</span>
@@ -408,7 +407,7 @@
 <a class="viewcode-back" href="../../finat.html#finat.enriched.as_enriched_tensor_product">[docs]</a>
 <span class="nd">@as_enriched</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">TensorProductElement</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">as_enriched_tensor_product</span><span class="p">(</span><span class="n">element</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Distribute the product over the sum its first factor is.</span>
+<span class="w">    </span><span class="sd">"""Expand a product of sums into a sum of products.</span>
 
 <span class="sd">    The summands of a sum in the first factor own a contiguous range of the</span>
 <span class="sd">    flat basis index, so they stack in the order the product already numbers</span>
