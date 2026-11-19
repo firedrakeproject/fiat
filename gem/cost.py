@@ -11,8 +11,6 @@ live here.
 import math
 from functools import singledispatch
 
-import numpy
-
 from gem.gem import (Comparison, ComponentTensor, Division, IndexSum, Inverse, Literal,
                      MathFunction, MaxValue, MinValue, Power, Product,
                      Solve, Sum)
@@ -82,7 +80,7 @@ def iteration_count(indices):
     :arg indices: indices an operation depends on
     :returns: the number of executions of the operation
     """
-    return int(numpy.prod([index.extent for index in indices], dtype=int))
+    return math.prod(index.extent for index in indices)
 
 
 def index_space_literal(indices):

@@ -18,6 +18,38 @@ from FIAT.polynomial_set import PolynomialSet, mis
 from FIAT.reference_element import multiindex_equal
 
 
+def _bernstein_factors(n, eta):
+    """Tabulate univariate Bernstein factors for a collapsed simplex axis.
+
+    Parameters
+    ----------
+    n : int
+        The total polynomial degree.
+    eta : numpy.ndarray
+        Points on ``[-1, 1]``.
+
+    Returns
+    -------
+    tuple[numpy.ndarray, ...]
+        Value, degree-lowered, and degree-and-index-lowered tables.
+
+    """
+    eta = numpy.asarray(eta)
+    z = 0.5 * (1.0 + eta)
+    shape = (n + 1, n + 1, len(eta))
+    values = numpy.zeros(shape, dtype=z.dtype)
+    lower = numpy.zeros(shape, dtype=z.dtype)
+    shifted = numpy.zeros(shape, dtype=z.dtype)
+    for m in range(n + 1):
+        degree = n - m
+        for i in range(degree + 1):
+            values[m, i] = math.comb(degree, i) * z**i * (1.0 - z)**(degree-i)
+        for i in range(degree):
+            lower[m, i] = math.comb(degree - 1, i) * z**i * (1.0 - z)**(degree-1-i)
+            shifted[m, i+1] = lower[m, i]
+    return values, lower, shifted
+
+
 class BernsteinExpansionSet(ExpansionSet):
     """Bernstein polynomial expansion set on a simplex."""
 
@@ -25,6 +57,11 @@ class BernsteinExpansionSet(ExpansionSet):
         if not (ref_el.is_simplex() or ref_el.is_macrocell()):
             raise ValueError("Bernstein expansion sets require a simplex or macrocell")
         super().__init__(ref_el, scale=1.0)
+
+    def get_duffy_permutation(self, n):
+        """Map Duffy lattice positions to Bernstein expansion members."""
+        dim = self.ref_el.get_spatial_dimension()
+        return numpy.arange(math.comb(n + dim, dim))
 
     def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
         """Tabulate the expansion set and its derivatives on one cell."""
@@ -59,6 +96,49 @@ class BernsteinExpansionSet(ExpansionSet):
         }
         for (alpha, i), vec in raw_result.items():
             result[alpha][i] = vec
+        return result
+
+    def tabulate_duffy(self, n, eta_pts, order=0, cell=0):
+        """Tabulate Bernstein polynomials in separable collapsed form.
+
+        The raw lattice multi-index ``j`` represents the barycentric exponent
+        tuple ``(n - sum(j), *reversed(j))``. Reversing the collapsed axes
+        gives the product from Ainsworth et al.,
+        ``prod_t B[j_t, n - sum(j[:t])]``.
+        """
+        if order > 1:
+            raise NotImplementedError("tabulate_duffy is limited to first derivatives")
+
+        dim = self.ref_el.get_spatial_dimension()
+        assert len(eta_pts) == dim
+        A, _ = self.affine_mappings[cell]
+        axes = tuple(reversed(range(dim)))
+        tables = tuple(_bernstein_factors(n, eta_pts[axis]) for axis in axes)
+        values = tuple(table[0] for table in tables)
+        result = {(0,) * dim: [(1.0, tuple(zip(axes, values)))]}
+
+        if order:
+            lower = tuple(table[1] for table in tables)
+            # On the default (-1, 1) simplex,
+            # d/dxi_l B_alpha^n = n/2 * (B_{alpha-e_{l+1}}^{n-1}
+            #                            - B_{alpha-e_0}^{n-1}).
+            # Both degree-lowered terms retain the separable product form.
+            for k in range(dim):
+                terms = []
+                for ell in range(dim):
+                    coeff = 0.5 * n * A[ell, k]
+                    if coeff == 0.0:
+                        continue
+                    s = dim - 1 - ell
+                    shifted = tuple(table[1] if t < s else
+                                    table[2] if t == s else table[0]
+                                    for t, table in enumerate(tables))
+                    terms.extend(((coeff, tuple(zip(axes, shifted))),
+                                  (-coeff, tuple(zip(axes, lower)))))
+                if not terms:
+                    terms.append((0.0, tuple(zip(axes, values))))
+                alpha = tuple(int(i == k) for i in range(dim))
+                result[alpha] = terms
         return result
 
 
@@ -132,9 +212,9 @@ def bernstein_db(points, ks, alpha=None):
 
     ls = ks - alpha
     if any(k < 0 for k in ls):
-        return numpy.zeros(len(points))
+        return numpy.zeros(points.shape[:-1])
     elif all(k == 0 for k in ls):
-        return numpy.ones(len(points))
+        return numpy.ones(points.shape[:-1])
     else:
         # Calculate coefficient
         coeff = math.factorial(ks.sum())
