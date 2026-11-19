@@ -49,12 +49,13 @@ class AbstractPointSet(abc.ABC):
         """GEM expression describing the points, with free indices
         ``self.indices`` and shape (point dimension,)."""
 
-    def almost_equal(self, other, tolerance=1e-12):
+    def almost_equal(self, other, tolerance=None):
         """Approximate numerical equality of point sets."""
-        tolerance = calibrate_tolerance(tolerance, self.points.dtype)
-        return type(self) is type(other) and \
-            self.points.shape == other.points.shape and \
-            numpy.allclose(self.points, other.points, rtol=0, atol=tolerance)
+        if type(self) is not type(other) or self.points.shape != other.points.shape:
+            return False
+        if tolerance is None:
+            tolerance = calibrate_tolerance(1e-12, self.points.dtype)
+        return numpy.allclose(self.points, other.points, rtol=0, atol=tolerance)
 
     @cached_property
     def point_sets(self):
@@ -237,7 +238,7 @@ class TensorPointSet(AbstractPointSet):
                 result.append(gem.Indexed(point_set.expression, (i,)))
         return gem.ListTensor(result)
 
-    def almost_equal(self, other, tolerance=1e-12):
+    def almost_equal(self, other, tolerance=None):
         """Approximate numerical equality of point sets"""
         return type(self) is type(other) and \
             len(self.factors) == len(other.factors) and \
@@ -314,7 +315,7 @@ class FacetPointSet(AbstractPointSet):
     def expression(self):
         raise NotImplementedError("Symbolic point expression is not yet implemented for FacetPointSet.")
 
-    def almost_equal(self, other, tolerance=1e-12):
+    def almost_equal(self, other, tolerance=None):
         """Approximate numerical equality of point sets"""
         return type(self) is type(other) and \
             self.cell == other.cell and \

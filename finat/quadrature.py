@@ -66,7 +66,6 @@ def make_quadrature(ref_el, degree, scheme="default"):
     else:
         fiat_rule = fiat_scheme(ref_el, degree, scheme)
         if ref_el.get_spatial_dimension() == 0:
-            # A rule on a point is that point, with nothing to index over.
             point_set = PointSingleton(fiat_rule.get_points()[0])
         else:
             point_set = PointSet(fiat_rule.get_points())
@@ -156,7 +155,9 @@ class QuadratureRule(AbstractQuadratureRule):
 
     @cached_property
     def weight_expression(self):
-        return gem.Indexed(gem.Literal(self.weights), self.point_set.indices)
+        indices = self.point_set.indices
+        shape = tuple(i.extent for i in indices)
+        return gem.Indexed(gem.Literal(self.weights.reshape(shape)), indices)
 
 
 class TensorProductQuadratureRule(AbstractQuadratureRule):
