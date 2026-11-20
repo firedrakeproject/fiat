@@ -19,6 +19,10 @@ class FlattenedDimensions(FiniteElementBase):
         self.product = element
         self._unflatten = compute_unflattening_map(element.cell.get_topology())
 
+    @property
+    def needs_coordinate_mapping(self):
+        return self.product.needs_coordinate_mapping
+
     @cached_property
     def cell(self):
         dim = self.product.cell.get_spatial_dimension()
@@ -75,7 +79,8 @@ class FlattenedDimensions(FiniteElementBase):
         if entity is None:
             entity = (self.cell.get_spatial_dimension(), 0)
 
-        return self.product.basis_evaluation(order, ps, self._unflatten[entity])
+        return self.product.basis_evaluation(order, ps, self._unflatten[entity],
+                                             coordinate_mapping=coordinate_mapping)
 
     def point_evaluation(self, order, point, entity=None, coordinate_mapping=None):
         if entity is None:

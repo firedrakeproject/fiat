@@ -39,6 +39,10 @@ class EnrichedElement(FiniteElementBase):
             self.is_nodal_enriched = is_nodal_enriched
             return self
 
+    @property
+    def needs_coordinate_mapping(self):
+        return any(element.needs_coordinate_mapping for element in self.elements)
+
     @cached_property
     def cell(self):
         result, = set(elem.cell for elem in self.elements)

@@ -5,13 +5,12 @@ import pytest
 from finat.point_set import PointSet
 from finat.restricted import null_element, r_to_codim, restrict
 from gem.interpreter import evaluate
-from finat.physically_mapped import NeedsCoordinateMappingElement
 from .conftest import MyMapping
 
 
 def tabulate(element, ps):
     coordinate_mapping = None
-    if isinstance(element, NeedsCoordinateMappingElement):
+    if element.needs_coordinate_mapping:
         ref_el = element.cell
         sd = ref_el.get_spatial_dimension()
         phys_el = FIAT.reference_element.symmetric_simplex(sd)
