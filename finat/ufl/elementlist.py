@@ -22,7 +22,7 @@ import warnings
 from numpy import asarray
 
 from ufl.cell import Cell, TensorProductCell
-from ufl.sobolevspace import H1, H2, H3, L2, HCurl, HDiv, HDivDiv, HCurlDiv, HEin, HInf
+from ufl.sobolevspace import H1, H1Div, H2, H3, L2, HCurl, HDiv, HDivDiv, HCurlDiv, HEin, HInf
 from ufl.utils.formatting import istr
 
 # List of valid elements
@@ -136,11 +136,11 @@ register_element("Alfeld C2", "ALF-C2", 0, H3, "custom", (5, None), ("triangle",
 register_element("Arnold-Qin", "AQ", 1, H1, "identity", (2, 2), ("triangle",))
 register_element("Reduced-Arnold-Qin", "AQ-red", 1, H1, "contravariant Piola", (2, 2), ("triangle",))
 register_element("Christiansen-Hu", "CH", 1, H1, "contravariant Piola", (1, 1), simplices[1:])
-register_element("Alfeld-Sorokina", "AS", 1, H1, "contravariant Piola", (2, 2), simplices[1:])
+register_element("Alfeld-Sorokina", "AS", 1, H1Div, "contravariant Piola", (2, 2), simplices[1:])
 
 register_element("Guzman-Neilan 1st kind H1", "GN", 1, H1, "contravariant Piola", (1, None), simplices[1:])
 register_element("Guzman-Neilan 2nd kind H1", "GN2", 1, H1, "contravariant Piola", (1, None), simplices[1:])
-register_element("Guzman-Neilan H1(div)", "GNH1div", 1, H1, "contravariant Piola", (2, None), simplices[1:])
+register_element("Guzman-Neilan H1(div)", "GNH1div", 1, H1Div, "contravariant Piola", (2, None), simplices[1:])
 register_element("Guzman-Neilan Bubble", "GNB", 1, H1, "contravariant Piola", (None, None), simplices[1:])
 
 # Special elements
