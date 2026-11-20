@@ -34,6 +34,10 @@ class MixedSubElement(FiniteElementBase):
         self.offset = offset
 
     @property
+    def needs_coordinate_mapping(self):
+        return self.element.needs_coordinate_mapping
+
+    @property
     def cell(self):
         return self.element.cell
 
@@ -92,7 +96,7 @@ class MixedSubElement(FiniteElementBase):
         return self._transform_evaluation(core_eval)
 
     def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
-        core_eval = self.element.point_evaluation(order, refcoords, entity)
+        core_eval = self.element.point_evaluation(order, refcoords, entity, coordinate_mapping)
         return self._transform_evaluation(core_eval)
 
     def dual_evaluation(self, fn, coordinate_mapping=None):
