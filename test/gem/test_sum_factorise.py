@@ -1,9 +1,11 @@
+from itertools import combinations
+
 import numpy
 import pytest
 
 import gem
 from gem.interpreter import evaluate
-from gem.optimise import sum_factorise
+from gem.optimise import contraction as optimise_contraction, sum_factorise
 
 
 def contraction(nfactors, ndims, extent=2):
@@ -60,3 +62,49 @@ def test_greedy_contraction():
 
     result, = evaluate([expression])
     assert numpy.allclose(result.arr, numpy.sum(table * coefficient))
+
+
+def test_list_tensor_broadcast_reduction():
+    i, j, k = gem.indices(3)
+    a, b = gem.Literal([2, 3]), gem.Literal([7, 11])
+    table = gem.ListTensor([a[j], b[k]])
+    expression = gem.IndexSum(table[i], (j, k))
+
+    result, = evaluate([optimise_contraction(expression)])
+    numpy.testing.assert_array_equal(result.arr, [10, 36])
+
+
+def test_delta_substitution_under_sum():
+    i, j = gem.indices(2)
+    table = gem.Literal([[1, 2], [8, 16]])
+    a = gem.Literal([2, 3])
+    expression = gem.IndexSum(gem.Delta(i, j) * (gem.IndexSum(table[i, j], (j,)) + a[i]), (i,))
+
+    result, = evaluate([optimise_contraction(expression)])
+    assert result.fids == (j,)
+    numpy.testing.assert_array_equal(result.arr, [5, 27])
+
+
+def test_delta_trace():
+    i, j = (gem.Index(extent=2) for _ in range(2))
+    expression = gem.IndexSum(gem.Delta(i, j), (i, j))
+
+    result, = evaluate([optimise_contraction(expression)])
+    assert result.arr == 2
+
+
+def test_large_product():
+    i, *axes = gem.indices(6)
+    x = gem.Variable("x", ())
+    table = gem.ListTensor([x, 2 * x])
+    factors = [table[i]]
+    for size in range(len(axes) + 1):
+        independent = gem.Literal(numpy.full((2,) * size, 2))
+        dependent = gem.Literal(numpy.full((2,) * (size + 1), 2))
+        for subset in combinations(axes, size):
+            factors.extend([independent[subset], dependent[i, *subset]])
+    expression = gem.Product(*factors)
+
+    expected, result = evaluate([expression, optimise_contraction(expression)],
+                                bindings={x: numpy.array(2)})
+    numpy.testing.assert_array_equal(result.broadcast(expected.fids), expected.arr)
