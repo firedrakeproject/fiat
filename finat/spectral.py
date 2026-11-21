@@ -67,16 +67,16 @@ class KongMulderVeldhuizen(SpectralElement, ScalarFiatElement):
 class Legendre(ScalarFiatElement):
     """DG element with Legendre polynomials."""
 
-    def __init__(self, cell, degree, variant=None):
-        fiat_element = FIAT.Legendre(cell, degree, variant=variant)
+    def __init__(self, cell, degree, variant=None, quad_scheme=None):
+        fiat_element = FIAT.Legendre(cell, degree, variant=variant, quad_scheme=quad_scheme)
         super().__init__(fiat_element)
 
 
 class IntegratedLegendre(ScalarFiatElement):
     """CG element with integrated Legendre polynomials."""
 
-    def __init__(self, cell, degree, variant=None):
-        fiat_element = FIAT.IntegratedLegendre(cell, degree, variant=variant)
+    def __init__(self, cell, degree, variant=None, quad_scheme=None):
+        fiat_element = FIAT.IntegratedLegendre(cell, degree, variant=variant, quad_scheme=quad_scheme)
         super().__init__(fiat_element)
 
 
