@@ -13,6 +13,10 @@ class DiscontinuousElement(FiniteElementBase):
         self.element = element
 
     @property
+    def needs_coordinate_mapping(self):
+        return self.element.needs_coordinate_mapping
+
+    @property
     def cell(self):
         return self.element.cell
 

@@ -26,6 +26,10 @@ class WrapperElementBase(FiniteElementBase):
         result, and returns the component that index selects."""
 
     @property
+    def needs_coordinate_mapping(self):
+        return self.wrappee.needs_coordinate_mapping
+
+    @property
     def cell(self):
         return self.wrappee.cell
 
@@ -74,11 +78,11 @@ class WrapperElementBase(FiniteElementBase):
                 for alpha, table in core_eval.items()}
 
     def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
-        core_eval = self.wrappee.basis_evaluation(order, ps, entity)
+        core_eval = self.wrappee.basis_evaluation(order, ps, entity, coordinate_mapping=coordinate_mapping)
         return self._transform_evaluation(core_eval)
 
     def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
-        core_eval = self.wrappee.point_evaluation(order, refcoords, entity)
+        core_eval = self.wrappee.point_evaluation(order, refcoords, entity, coordinate_mapping)
         return self._transform_evaluation(core_eval)
 
     @property
