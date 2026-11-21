@@ -113,6 +113,9 @@ class MonomialSum(object):
         result = MonomialSum()
         for monomials in product(*args):
             renamer = make_renamer(rename_map)
+            free = dict.fromkeys(i for s, a, r in monomials for factor in (*a, r)
+                                 for i in factor.free_indices if i not in s)
+            renamer(free)
             sum_indices = []
             atomics = []
             rest = one
@@ -214,7 +217,7 @@ def _collect_monomials(expression, self):
     result = MonomialSum()
     for s, a, r in MonomialSum.product(*sums, rename_map=self.rename_map):
         renamer = make_renamer(self.rename_map)
-        renamer(common_indices)  # update current_set
+        renamer((*expression.free_indices, *common_indices))
         s_, applier = renamer(s)
 
         all_indices = common_indices + s_
@@ -228,19 +231,15 @@ def _collect_monomials(expression, self):
         atomic_indices = {index for atomic in atomics
                           for index in atomic.free_indices}
 
-        # All free indices that appear in the other terms
-        other_indices = {index for factor in rest_factors
-                         for index in factor.free_indices}
-
         # Sum indices that appear in atomic terms
         # (will go to the result :py:class:`Monomial`)
         sum_indices = tuple(index for index in all_indices
                             if index in atomic_indices)
 
-        # Sum indices that appear in the other terms alone
-        # (can factorise them over atomic terms immediately)
+        # Factor all other reductions immediately, including indices over
+        # which the factors have become invariant after Delta cancellation.
         rest_indices = tuple(index for index in all_indices
-                             if index in other_indices - atomic_indices)
+                             if index not in atomic_indices)
 
         # Not really sum factorisation, but rather just an optimised
         # way of building a product.
