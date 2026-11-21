@@ -696,9 +696,16 @@ def contraction(expression):
     # Eliminate annoying ComponentTensors
     expression = index_replacer(expression, ())
 
-    # Flatten product tree, eliminate deltas, sum factorise
-    def rebuild(expression):
-        sum_indices, factors = traverse_product(expression, index_replacer=index_replacer)
+    # Flatten product tree into a list of factors and summation indices.
+    def decompose(expression):
+        # Summation indices are renamed if they clash with free indices
+        # of the expression.
+        renamer = make_renamer(make_rename_map())
+        renamer(expression.free_indices)
+        return traverse_product(expression, renamer=renamer, index_replacer=index_replacer)
+
+    # Eliminate deltas, sum factorise
+    def rebuild(sum_indices, factors):
         sum_indices, factors = delta_elimination(sum_indices, factors, index_replacer=index_replacer)
         factors = [index_replacer(f, ()) for f in factors]
         return sum_factorise(sum_indices, factors)
@@ -717,17 +724,33 @@ def contraction(expression):
                 lt_fis.update(zip_longest(node.multiindex, ()))
     lt_fis = tuple(index for index in lt_fis if index in expression.free_indices)
 
-    if lt_fis:
-        # Rebuild each split component
-        tensor = ComponentTensor(expression, lt_fis)
-        entries = [Indexed(tensor, zeta) for zeta in numpy.ndindex(tensor.shape)]
-        entries = [index_replacer(e, ()) for e in entries]
-        return Indexed(ListTensor(
-            numpy.array(list(map(rebuild, entries))).reshape(tensor.shape)
-        ), lt_fis)
-    else:
+    sum_indices, factors = decompose(expression)
+    if not lt_fis:
         # Rebuild whole expression at once
-        return rebuild(expression)
+        return rebuild(sum_indices, factors)
+
+    # Only pull out the factors that depend on a ListTensor index,
+    # either directly or through a summation index shared with another
+    # such factor.  The remaining factors stay outside the ListTensor.
+    # For example, the Delta of a vector-valued Argument must stay
+    # outside, otherwise the argument factorisation cannot find it.
+    groups, terms = _independent_contractions((*lt_fis, *sum_indices), factors)
+    for indices, group in groups:
+        group_lt_fis = tuple(i for i in indices if i in lt_fis)
+        group_sum_indices = tuple(i for i in indices if i not in lt_fis)
+        if not group_lt_fis:
+            # No ListTensor index involved: rebuild as a whole
+            terms.append(rebuild(group_sum_indices, group))
+            continue
+
+        # Rebuild each split component
+        tensor = ComponentTensor(IndexSum(Product(*group), group_sum_indices), group_lt_fis)
+        entries = [index_replacer(Indexed(tensor, zeta), ()) for zeta in numpy.ndindex(tensor.shape)]
+        entries = [rebuild(*decompose(e)) for e in entries]
+        terms.append(Indexed(ListTensor(
+            numpy.array(entries).reshape(tensor.shape)
+        ), group_lt_fis))
+    return sum_factorise((), terms)
 
 
 @singledispatch

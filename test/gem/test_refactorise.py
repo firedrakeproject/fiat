@@ -1,9 +1,12 @@
 from functools import partial
 
+import numpy
 import pytest
 
 import gem
+from gem.interpreter import evaluate
 from gem.node import traversal
+from gem.optimise import contraction
 from gem.refactorise import ATOMIC, COMPOUND, OTHER, Monomial, collect_monomials
 
 
@@ -16,6 +19,32 @@ def classify(atomics_set, expression):
             return COMPOUND
 
     return OTHER
+
+
+@pytest.mark.parametrize("same_index", (False, True))
+def test_refactorise_contracted_list_tensor(same_index):
+    """A Delta that does not depend on the ListTensor index must stay
+    outside the ListTensor, so that collect_monomials can find it."""
+    i, q, source, target = (gem.Index(extent=2) for _ in range(4))
+    component = i if same_index else gem.Index(extent=2)
+    values = gem.Variable("values", (2,))
+    value = values[q]
+    table = gem.ListTensor([value, 2 * value])
+    weights = gem.Literal([3, 5])
+    tabulation = gem.IndexSum(table[i] * weights[q], (q,))
+    selector = gem.IndexSum(gem.Delta(source, component) * gem.Delta(component, target), (component,))
+    expression = tabulation * selector
+
+    delta = gem.Delta(source, target)
+    classifier = partial(classify, {delta})
+    monomials, = collect_monomials([contraction(expression)], classifier)
+    monomial, = monomials
+    assert monomial.atomics == (delta,)
+    assert monomial.sum_indices == ()
+    result = gem.Product(*monomial.atomics, monomial.rest)
+    tensor = gem.ComponentTensor(result, (i, source, target))
+    actual, = evaluate([tensor], bindings={values: numpy.array([2, 7])})
+    numpy.testing.assert_array_equal(actual.arr, [41 * numpy.eye(2), 82 * numpy.eye(2)])
 
 
 def test_refactorise_rebound_sum_index():
