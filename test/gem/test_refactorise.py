@@ -67,6 +67,22 @@ def test_refactorise_list_tensor_selector(lookup):
     numpy.testing.assert_array_equal(result.broadcast(original.fids), original.arr)
 
 
+def test_refactorise_list_tensor_with_coupled_selector():
+    row, component, value = (gem.Index(extent=2) for _ in range(3))
+    point = gem.Index()
+    weights = gem.Literal([2, 3])[point]
+    table = gem.ListTensor([weights, 2 * weights])
+    selector = gem.Delta(component, value)
+    expression = gem.IndexSum(table[row] * (weights * selector + 1), (point,))
+
+    monomials, = collect_monomials([contraction(expression)], partial(classify, {selector}))
+    assert any(selector in monomial.atomics for monomial in monomials)
+    result = gem.Sum(*(gem.IndexSum(gem.Product(*m.atomics, m.rest), m.sum_indices)
+                       for m in monomials))
+    expected, actual = evaluate([expression, result])
+    numpy.testing.assert_array_equal(actual.broadcast(expected.fids), expected.arr)
+
+
 @pytest.mark.parametrize("nested", (False, True))
 def test_refactorise_free_sum_index(nested):
     i, = gem.indices(1)

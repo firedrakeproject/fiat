@@ -74,6 +74,21 @@ def test_list_tensor_broadcast_reduction():
     numpy.testing.assert_array_equal(result.arr, [10, 36])
 
 
+def test_list_tensor_specialisation_with_independent_selector():
+    row, source, target = (gem.Index(extent=2) for _ in range(3))
+    point = gem.Index()
+    weights = gem.Literal([2, 3])[point]
+    values = gem.Variable("values", (2,))[point]
+    table = gem.ListTensor([values, 2 * values])
+    expression = gem.IndexSum(table[row] * weights, (point,))
+    selector = gem.Delta(source, target)
+
+    specialised = optimise_contraction(expression)
+    result = optimise_contraction(expression * selector)
+    assert isinstance(result, gem.Product)
+    assert set(result.children) == {specialised, selector}
+
+
 def test_delta_substitution_under_sum():
     i, j = gem.indices(2)
     table = gem.Literal([[1, 2], [8, 16]])
