@@ -60,7 +60,7 @@ from gem.node import Memoizer, reuse_if_untouched, traversal
 from gem.gem import (ComponentTensor, Concatenate, Delta, FlexiblyIndexed,
                      Index, IndexSum, Indexed, Literal, MathFunction, Node,
                      Product, Variable, VariableIndex, partial_indexed, reshape, view)
-from gem.optimise import (delta_elimination, make_rename_map, make_renamer,
+from gem.optimise import (contraction, delta_elimination, make_rename_map, make_renamer,
                           remove_componenttensors, traverse_product)
 from gem.interpreter import evaluate
 
@@ -204,20 +204,36 @@ def _replace_node(node, self):
     try:
         return self.mapping[node]
     except KeyError:
-        return reuse_if_untouched(node, self)
+        result = reuse_if_untouched(node, self)
+    if self.contract and isinstance(result, IndexSum) and result is not node:
+        # A product of tables (indexed Literals) and coefficient values
+        # (variable views) was sum factorised by contraction while its
+        # tables were still Indexed(Concatenate(...), (j,)).  With each
+        # table replaced by one block, the best contraction order may differ
+        # between blocks, so it is chosen again.
+        _, factors = traverse_product(result)
+        if all(is_variable_view(f)
+               or (isinstance(f, Indexed) and isinstance(f.children[0], Literal))
+               for f in factors):
+            result = contraction(result)
+    return result
 
 
-def replace_node(expression, mapping, cut=None):
+def replace_node(expression, mapping, cut=None, contract=False):
     """Replace subexpressions using a given mapping.
 
     :param expression: a GEM expression
     :param mapping: a :py:class:`dict` containing the substitutions
     :param cut: cutting predicate; if returns true, it is assumed that
                 no replacements would take place in the subexpression.
+    :param contract: whether to apply :py:func:`gem.optimise.contraction`
+                to each rebuilt :py:class:`IndexSum` whose factors are all
+                indexed :py:class:`Literal` nodes or variable views.
     """
     mapper = Memoizer(_replace_node)
     mapper.mapping = mapping
     mapper.cut = cut or (lambda node: False)
+    mapper.contract = contract
     return mapper(expression)
 
 
@@ -284,7 +300,7 @@ def _unconcatenate(cache, pairs):
             split_pairs.append((var, expr))
         elif isinstance(var, FlexiblyIndexed):
             for v, m in zip(split_variable(var, index, multiindices), mappings):
-                split_pairs.append((v, replace_node(expr, m, cut)))
+                split_pairs.append((v, replace_node(expr, m, cut, contract=True)))
         else:
             # A computed variable is split along its own Concatenate nodes
             for m in mappings:
@@ -308,7 +324,9 @@ def unconcatenate(pairs: list[tuple[Node, Node]], cache: dict | None = None) -> 
         v_j = f(Concatenate(A, B)_j)  ==>  v_ja = f(A_ja),  v_jb = f(B_jb).
 
     The split repeats until no such Concatenate is left.  A computed variable
-    is split along its own Concatenate nodes rather than sliced.
+    is split along its own Concatenate nodes rather than sliced.  A split
+    product of tables and coefficient values is contracted again, as
+    :py:func:`replace_node` describes, so that its order suits the block.
 
     Parameters
     ----------
