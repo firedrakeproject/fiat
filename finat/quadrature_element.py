@@ -200,25 +200,14 @@ class QuadratureElement(FiniteElementBase):
     def _dual_evaluation(self, fn, coordinate_mapping=None):
         """Evaluate the dual basis while preserving the quadrature point layout."""
         point_set = self._point_set
-        if isinstance(point_set, UnionPointSet):
-            # A single summand still uses the flat basis index of the union.
-            points, = point_set.point_sets
-            point_indices = points.indices
-            local_indices = tuple(gem.Index(extent=i.extent) for i in point_indices)
-            delta = gem.Delta(point_indices, local_indices)
-            expr = gem.IndexSum(delta * fn(points), point_indices)
-            block = gem.ComponentTensor(expr, local_indices)
-            basis_indices = self.get_indices()
-            return gem.Concatenate(block)[basis_indices], (), basis_indices
-
-        if not isinstance(point_set, FacetPointSet) or not point_set._tensor_product_blocks:
+        if not isinstance(point_set, FacetPointSet) or not point_set.tensor_product_blocks:
             return super()._dual_evaluation(fn, coordinate_mapping=coordinate_mapping)
 
         basis_indices = self.get_indices()
         tangential_delta = gem.Delta(self._rule.point_set.indices, basis_indices[1:])
         blocks = []
-        for axis, points in enumerate(point_set._tensor_product_blocks):
-            normal_index, = points.factors[axis].indices
+        for points in point_set.tensor_product_blocks:
+            normal_index, = set(points.indices) - set(self._rule.point_set.indices)
             facet_index = gem.Index(extent=normal_index.extent)
             delta = gem.Delta(normal_index, facet_index) * tangential_delta
             expr = gem.IndexSum(delta * fn(points), points.indices)
@@ -232,17 +221,16 @@ class QuadratureElement(FiniteElementBase):
     def _summand_rules(self):
         """The rules of the summands this element is a direct sum of.
 
-        :returns: one :class:`~finat.quadrature.QuadratureRule` for each point
-            set of a cell rule on a union of multiple point sets, in point
-            order. Return an empty tuple for other rules.
+        :returns: one :class:`~finat.quadrature.QuadratureRule` for each
+            point set of a :class:`~finat.point_set.UnionPointSet` rule, in
+            the order they are stacked, or an empty tuple for other rules.
 
         A union of point sets is how the points of a direct sum are stacked,
         so splitting it back up recovers a rule for each summand, each on
         the points its own functionals evaluate on.
         """
-        # Facet rules repeat the union on each facet, with facets numbered first.
         rule_ps = self._point_set
-        if isinstance(rule_ps, FacetPointSet) or len(rule_ps.point_sets) == 1:
+        if not isinstance(rule_ps, UnionPointSet):
             return ()
 
         rules = []

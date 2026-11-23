@@ -9,6 +9,8 @@ from finat.point_set import PointSet, UnionPointSet
 from finat.quadrature import QuadratureRule, make_quadrature
 from finat.quadrature_element import make_quadrature_element
 from gem.interpreter import evaluate
+from gem.node import traversal
+from gem.unconcatenate import split_contraction
 
 
 @pytest.fixture(params=["interval", "triangle", "interval * interval", "triangle * interval"])
@@ -96,3 +98,29 @@ def test_point_comparison_tolerance(dtype, equal):
     nearby = PointSet(numpy.array([[1e-7]], dtype=dtype))
     assert points.almost_equal(nearby) == equal
     assert not points.almost_equal(nearby, tolerance=1e-12)
+
+
+def test_facet_dual_evaluation_on_runtime_facet():
+    """Evaluate an interpolant into facet quadrature on a facet known only at runtime."""
+    cell = ufc_cell("quadrilateral")
+    degree = 2
+    element = make_quadrature_element(cell, degree, codim=1)
+    rule = make_quadrature(cell.construct_subelement(1), degree)
+    facet = gem.Variable("facet", (), dtype=gem.uint_type)
+    tables = [element.basis_evaluation(0, rule.point_set, entity=(1, f))[(0, 0)]
+              for f in cell.get_topology()[1]]
+    table = gem.select_expression(tables, gem.VariableIndex(facet))
+
+    expr, point_indices, beta = element.dual_evaluation(lambda ps: ps.expression[0] + 2 * ps.expression[1])
+    dofs = gem.ComponentTensor(gem.IndexSum(expr, point_indices), beta)
+    terms = split_contraction(gem.Product(table[beta], dofs[beta]), beta)
+    value = gem.optimise.make_sum([gem.optimise.contraction(gem.IndexSum(term, indices))
+                                   for term, indices in terms])
+    assert not any(isinstance(node, (gem.Concatenate, gem.Delta)) for node in traversal([value]))
+
+    _, facet_points = element.dual_basis
+    x, y = facet_points.points.reshape(*element.index_shape, -1).transpose(2, 0, 1)
+    value = gem.ComponentTensor(value, rule.point_set.indices)
+    for f in range(len(tables)):
+        result, = evaluate([value], {facet: numpy.array(f, dtype=gem.uint_type)})
+        numpy.testing.assert_allclose(result.arr, x[f] + 2 * y[f], rtol=0, atol=1e-12)

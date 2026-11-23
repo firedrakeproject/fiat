@@ -4,7 +4,6 @@ expressions."""
 from collections import OrderedDict, defaultdict
 from functools import singledispatch, partial
 from itertools import combinations, permutations, zip_longest
-from math import prod
 from numbers import Integral
 
 import numpy
@@ -116,23 +115,13 @@ def replace_indices_delta(node, self, subst):
         return Delta(i, j)
 
 
-def _index_concatenation(node: Concatenate, index: int | VariableIndex) -> Node:
-    """Read the requested entry from the ``Concatenate`` node.
+def _index_concatenate(node, index):
+    """Index a :class:`Concatenate` node with a :class:`VariableIndex`.
 
-    The index counts entries across ``node.children`` in order. If the children
-    are ``[a, b]`` and ``[c, d]``, index ``3`` gives ``d``.
-    Use conditionals when the index is known only at runtime.
+    Returns a :class:`Piecewise` over the flattened entries of the blocks.
+    Each entry is contracted here, since nothing cancels deltas inside a
+    :class:`Piecewise` later.
     """
-    if isinstance(index, Integral):
-        for block in node.children:
-            size = prod(block.shape)
-            if index < size:
-                local = tuple(int(i) for i in numpy.unravel_index(index, block.shape))
-                return contraction(Indexed(block, local))
-            index -= size
-        raise IndexError("Invalid literal index")
-
-    # Simplify each entry so contraction can cancel its deltas before they are nested inside a conditional.
     entries = (contraction(Indexed(block, local))
                for block in node.children for local in numpy.ndindex(block.shape))
     pieces = ((value, Comparison("==", index.expression, Literal(k, dtype=int)))
@@ -151,10 +140,10 @@ def replace_indices_indexed(node, self, subst):
         substitute = dict(subst)
         substitute.update(zip(child.multiindex, multiindex))
         return self(child.children[0], tuple(sorted(substitute.items())))
-    elif isinstance(child, Concatenate) and not isinstance(multiindex[0], Index):
+    elif isinstance(child, Concatenate) and isinstance(multiindex[0], VariableIndex):
         child = self(child, subst)
         if isinstance(child, Concatenate):
-            return _index_concatenation(child, multiindex[0])
+            return _index_concatenate(child, multiindex[0])
         return Indexed(child, multiindex)
     else:
         # Replace indices

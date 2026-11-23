@@ -728,6 +728,14 @@ class Indexed(Scalar):
                 return Literal(aggregate.array[multiindex], dtype=aggregate.dtype)
             elif isinstance(aggregate, ListTensor):
                 return aggregate.array[multiindex]
+            elif isinstance(aggregate, Concatenate):
+                # Find the block holding this entry of the flattened blocks
+                k, = multiindex
+                for block in aggregate.children:
+                    size = numpy.prod(block.shape, dtype=int)
+                    if k < size:
+                        return Indexed(block, tuple(map(int, numpy.unravel_index(k, block.shape))))
+                    k -= size
 
         self = super(Indexed, cls).__new__(cls)
         self.children = (aggregate,)

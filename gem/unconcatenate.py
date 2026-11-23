@@ -52,6 +52,7 @@ unconcatenation, and then add up the results.
 
 from functools import singledispatch
 from itertools import chain
+from numbers import Integral
 
 import numpy
 
@@ -59,7 +60,7 @@ from gem.node import Memoizer, reuse_if_untouched, traversal
 from gem.gem import (ComponentTensor, Concatenate, Delta, FlexiblyIndexed,
                      Index, IndexSum, Indexed, Literal, MathFunction, Node,
                      Product, Variable, VariableIndex, partial_indexed, reshape, view)
-from gem.optimise import (make_rename_map, make_renamer,
+from gem.optimise import (delta_elimination, make_rename_map, make_renamer,
                           remove_componenttensors, traverse_product)
 from gem.interpreter import evaluate
 
@@ -340,19 +341,20 @@ def _split_contraction(cache: dict, expression: Node, indices: tuple[Index, ...]
     if concat_group is None:
         return [(expression, indices)]
 
+    # sum_i A_i delta(i, k) = A_k for a fixed or runtime k, so there is nothing to split.
     index, = concat_group[0].multiindex
     _, factors = traverse_product(expression, stop_at=lambda expr: isinstance(expr, IndexSum))
-    for factor in factors:
-        if not isinstance(factor, Delta) or index not in (factor.i, factor.j):
+    for delta in factors:
+        if not isinstance(delta, Delta) or index not in (delta.i, delta.j):
             continue
-        selector = factor.j if factor.i == index else factor.i
-        if isinstance(selector, Index) or (isinstance(selector, VariableIndex) and index in selector.expression.free_indices):
-            continue
-        # Cancel the summed index against the delta to turn the contraction into a single entry lookup.
-        factors.remove(factor)
-        term, = remove_componenttensors([Product(*factors)], ((index, selector),))
-        rest = tuple(i for i in indices if i != index)
-        return _split_contraction(cache, term, rest, contractions)
+        entry, = {delta.i, delta.j} - {index}
+        if isinstance(entry, Integral) or (isinstance(entry, VariableIndex)
+                                           and index not in entry.expression.free_indices):
+            factors.remove(delta)
+            _, factors = delta_elimination([index], [delta, *factors])
+            term, = remove_componenttensors([Product(*factors)])
+            rest = tuple(i for i in indices if i != index)
+            return _split_contraction(cache, term, rest, contractions)
 
     index, multiindices, mappings = split_group(cache, concat_group)
     for variable_ref in find_views([expression], index):

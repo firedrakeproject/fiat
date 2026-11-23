@@ -1,5 +1,6 @@
 import abc
 import hashlib
+from collections import defaultdict
 from functools import cached_property
 from itertools import chain, product
 
@@ -313,9 +314,20 @@ class FacetPointSet(AbstractPointSet):
         return (gem.Index(extent=len(self.entities)), *self.ps.indices)
 
     @cached_property
-    def _tensor_product_blocks(self) -> tuple[TensorPointSet, ...]:
-        """Return one tensor product point set per facet direction."""
-        if not isinstance(self.cell, Hypercube) or self.ps.dimension != self.cell.get_spatial_dimension() - 1:
+    def tensor_product_blocks(self):
+        """The facet points of a hypercube, as one tensor product per facet direction.
+
+        Returns
+        -------
+        tuple
+            A :class:`TensorPointSet` for each direction normal to the facets,
+            with the points of ``ps`` in the tangential factors and the
+            facet endpoints in the normal factor.  The facets of each block
+            are numbered consecutively, in block order.  Return an empty
+            tuple if the cell is not a hypercube or the points do not factor.
+        """
+        sd = self.cell.get_spatial_dimension()
+        if not isinstance(self.cell, Hypercube) or self.ps.dimension != sd - 1:
             return ()
 
         cells = self.cell.product.cells
@@ -323,13 +335,22 @@ class FacetPointSet(AbstractPointSet):
         if len(factors) + 1 != len(cells):
             return ()
 
-        # The facets of a hypercube are numbered by their normal axis.
-        # Within each block, insert the two endpoints along that axis.
+        # Group the facets by the product entity dimension they unflatten to.
+        facets = defaultdict(list)
+        for facet in sorted(self.cell.get_topology()[sd - 1]):
+            dim, _ = self.cell.unflattening_map[(sd - 1, facet)]
+            facets[dim].append(facet)
+        assert list(chain(*facets.values())) == sorted(self.cell.get_topology()[sd - 1])
+
+        origin = numpy.zeros((1, sd - 1))
         blocks = []
-        for axis, cell in enumerate(cells):
-            vertices = cell.get_topology()[0]
-            vertex_ids = chain.from_iterable(vertices[i] for i in sorted(vertices))
-            endpoints = PointSet(cell.get_vertices_of_subcomplex(vertex_ids))
+        for dim, block_facets in facets.items():
+            # The normal axis is the factor whose dimension the facet drops,
+            # and each facet lies at the endpoint its transform maps to.
+            axis, = (i for i, (c, d) in enumerate(zip(cells, dim)) if d < c.get_dimension())
+            endpoints = [self.cell.get_entity_transform(sd - 1, facet)(origin)[0, axis]
+                         for facet in block_facets]
+            endpoints = PointSet(numpy.reshape(endpoints, (-1, 1)))
             blocks.append(TensorPointSet((*factors[:axis], endpoints, *factors[axis:])))
         return tuple(blocks)
 
