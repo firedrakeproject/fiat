@@ -115,7 +115,7 @@ class QuadratureElement(FiniteElementBase):
         tuple or None
             A :class:`~finat.tensor_product.TensorProductElement` for each
             direction the cell's facets lie in, in facet numbering order, or
-            ``None`` if the points are not on the facets of a product cell.
+            ``None`` if the quadrature points do not factor by facet direction.
 
         Notes
         -----
@@ -145,7 +145,8 @@ class QuadratureElement(FiniteElementBase):
 
         cells = self.cell.product.cells
         factors = rule.factors if isinstance(rule, TensorProductQuadratureRule) else (rule,)
-        assert len(factors) + 1 == len(cells)
+        if len(factors) + 1 != len(cells):
+            return None
 
         facet_products = []
         for k, cell in enumerate(cells):
@@ -230,6 +231,15 @@ class QuadratureElement(FiniteElementBase):
             branches = [own if j == k else gem.Zero(tuple(i.extent for i in block.indices))
                         for j, block in enumerate(blocks)]
             delta = gem.Indexed(gem.Concatenate(*branches), basis_indices)
+        elif (facet_products := self._facet_factorisation) is not None:
+            facet_index, *point_indices = basis_indices
+            facet_values = numpy.zeros(facet_index.extent)
+            facet_values[entity_id] = 1
+            # Group the facet selector by the same directions as dual evaluation.
+            facet_blocks = facet_values.reshape(len(facet_products), -1)
+            facet_selector = gem.Concatenate(*(gem.Literal(block) for block in facet_blocks))
+            delta = (gem.Indexed(facet_selector, (facet_index,))
+                     * gem.Delta(ps.indices, tuple(point_indices)))
         else:
             # Return an outer product of identity matrices
             delta = gem.Delta(ps_indices, basis_indices)
