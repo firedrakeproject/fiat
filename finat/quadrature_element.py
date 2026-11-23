@@ -7,6 +7,7 @@ from FIAT.reference_element import Hypercube
 
 import gem
 from gem.interpreter import evaluate
+from gem.optimise import remove_componenttensors
 from gem.utils import cached_property
 
 from finat.finiteelementbase import FiniteElementBase, broadcast_tensor
@@ -253,18 +254,20 @@ class QuadratureElement(FiniteElementBase):
         """Dual evaluate a facet rule one product direction at a time."""
         facet_products = self._facet_factorisation
         if facet_products is not None:
+            facet_index, *facet_point_indices = self.get_indices()
             branches = []
             for k, facet_product in enumerate(facet_products):
                 expr, point_indices, beta = facet_product.dual_evaluation(
                     fn, coordinate_mapping=coordinate_mapping)
                 expr = gem.IndexSum(expr, point_indices)
-                reordered = (beta[k], *beta[:k], *beta[k + 1:])
-                branches.append(gem.ComponentTensor(expr, reordered))
+                point_subst = tuple(zip(beta[:k] + beta[k + 1:], facet_point_indices, strict=True))
+                expr, = remove_componenttensors([expr], point_subst)
+                branches.append(broadcast_tensor(expr, (beta[k],)))
 
-            # The facets of one direction are numbered consecutively, so the
-            # summands stack in order along the flattened basis index.
-            beta = gem.Index(extent=self.space_dimension())
-            return gem.Indexed(gem.Concatenate(*branches), (beta,)), (), (beta,)
+            # Facets of each direction are consecutive in the facet numbering.
+            # Keep the quadrature point axes shared across the directions.
+            expr = gem.Indexed(gem.Concatenate(*branches), (facet_index,))
+            return expr, (), (facet_index, *facet_point_indices)
 
         rule_ps = self._rule.point_set
         if not isinstance(rule_ps, UnionPointSet):

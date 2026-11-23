@@ -47,13 +47,14 @@ def test_facet_dual_evaluation(cellname, degree):
         return table[source_indices]
 
     expr, point_indices, basis_indices = target.dual_evaluation(tabulate)
+    assert tuple(index.extent for index in basis_indices) == target.index_shape
     tables = gem.extract_type([expr], gem.Literal)
     if isinstance(cell, Hypercube):
         assert not point_indices
         concatenated, = gem.extract_type([expr], gem.Concatenate)
         assert len(concatenated.children) == cell.get_spatial_dimension()
-        assert all(block.shape == (2, *target.index_shape[1:]) for block in concatenated.children)
-        assert tables and all(len(table.shape) == 2 for table in tables)
+        assert all(block.shape == (2,) for block in concatenated.children)
+        assert max(len(table.shape) for table in tables) == 2
     else:
         assert not gem.extract_type([expr], gem.Concatenate)
         table, = tables
