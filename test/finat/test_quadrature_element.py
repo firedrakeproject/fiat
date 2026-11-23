@@ -5,8 +5,8 @@ import gem
 from FIAT import ufc_cell
 from FIAT.reference_element import Hypercube
 from finat import FlattenedDimensions, Lagrange, TensorProductElement
-from finat.point_set import PointSet
-from finat.quadrature import make_quadrature
+from finat.point_set import PointSet, UnionPointSet
+from finat.quadrature import QuadratureRule, make_quadrature
 from finat.quadrature_element import make_quadrature_element
 from gem.interpreter import evaluate
 
@@ -66,6 +66,20 @@ def test_facet_dual_evaluation(cellname, degree):
     _, source_points = source.dual_basis
     tabulation = result.arr.reshape(target.space_dimension(), source.space_dimension())
     numpy.testing.assert_allclose(tabulation @ source_points.points, target_points.points, rtol=0, atol=1e-12)
+
+
+def test_facet_dual_evaluation_on_union_of_points() -> None:
+    cell = ufc_cell("quadrilateral")
+    points = UnionPointSet([PointSet([[0.2]]), PointSet([[0.4], [0.7]])])
+    rule = QuadratureRule(points, numpy.ones(3), ref_el=cell.construct_subelement(1))
+    element = make_quadrature_element(cell, None, scheme=rule, codim=1)
+
+    expr, point_indices, basis_indices = element.dual_evaluation(
+        lambda ps: ps.expression[0] + 2 * ps.expression[1])
+    result, = evaluate([gem.ComponentTensor(gem.IndexSum(expr, point_indices), basis_indices)])
+    _, facet_points = element.dual_basis
+    x, y = facet_points.points.T
+    numpy.testing.assert_allclose(result.arr, (x + 2 * y).reshape(element.index_shape))
 
 
 def test_point_rule_weight():

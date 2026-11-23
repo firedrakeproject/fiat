@@ -4,6 +4,7 @@ expressions."""
 from collections import OrderedDict, defaultdict
 from functools import singledispatch, partial
 from itertools import combinations, permutations, zip_longest
+from math import prod
 from numbers import Integral
 
 import numpy
@@ -11,8 +12,8 @@ import numpy
 from gem.utils import groupby
 from gem.node import (Memoizer, MemoizerArg, reuse_if_untouched,
                       reuse_if_untouched_arg, traversal)
-from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
-                     Product, Sum, Comparison, Conditional, Division,
+from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero, Concatenate,
+                     Product, Sum, Comparison, Conditional, Division, Piecewise,
                      Index, VariableIndex, Indexed, FlexiblyIndexed,
                      IndexSum, ComponentTensor, ListTensor, Delta,
                      partial_indexed, one)
@@ -115,6 +116,30 @@ def replace_indices_delta(node, self, subst):
         return Delta(i, j)
 
 
+def _index_concatenation(node: Concatenate, index: int | VariableIndex) -> Node:
+    """Read the requested entry from the ``Concatenate`` node.
+
+    The index counts entries across ``node.children`` in order. If the children
+    are ``[a, b]`` and ``[c, d]``, index ``3`` gives ``d``.
+    Use conditionals when the index is known only at runtime.
+    """
+    if isinstance(index, Integral):
+        for block in node.children:
+            size = prod(block.shape)
+            if index < size:
+                local = tuple(int(i) for i in numpy.unravel_index(index, block.shape))
+                return contraction(Indexed(block, local))
+            index -= size
+        raise IndexError("Invalid literal index")
+
+    # Simplify each entry so contraction can cancel its deltas before they are nested inside a conditional.
+    entries = (contraction(Indexed(block, local))
+               for block in node.children for local in numpy.ndindex(block.shape))
+    pieces = ((value, Comparison("==", index.expression, Literal(k, dtype=int)))
+              for k, value in enumerate(entries))
+    return Piecewise(*pieces, (Zero(dtype=node.dtype), True))
+
+
 @replace_indices.register(Indexed)
 def replace_indices_indexed(node, self, subst):
     multiindex = tuple(_replace_indices_atomic(i, self, subst) for i in node.multiindex)
@@ -126,6 +151,11 @@ def replace_indices_indexed(node, self, subst):
         substitute = dict(subst)
         substitute.update(zip(child.multiindex, multiindex))
         return self(child.children[0], tuple(sorted(substitute.items())))
+    elif isinstance(child, Concatenate) and not isinstance(multiindex[0], Index):
+        child = self(child, subst)
+        if isinstance(child, Concatenate):
+            return _index_concatenation(child, multiindex[0])
+        return Indexed(child, multiindex)
     else:
         # Replace indices
         child = self(child, subst)

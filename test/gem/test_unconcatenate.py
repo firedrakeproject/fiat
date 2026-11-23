@@ -163,6 +163,23 @@ def test_split_contraction_blocks_matching_concatenations() -> None:
     assert numpy.array_equal(original_result.arr, split_result.arr)
 
 
+@pytest.mark.parametrize("runtime", [False, True])
+def test_split_contraction_selects_delta_entry(runtime: bool) -> None:
+    """Cancel the concatenation index against a delta before splitting."""
+    values = numpy.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    beta = gem.Index(extent=len(values))
+    blocks = gem.Concatenate(gem.Literal(values[:4].reshape(2, 2)), gem.Literal(values[4]))
+    entry = gem.Variable("entry", (), dtype=gem.uint_type)
+    index = gem.VariableIndex(entry) if runtime else 2
+    (expression, indices), = split_contraction(gem.Delta(beta, index) * blocks[beta], (beta,))
+    assert not indices
+    assert not gem.extract_type([expression], (gem.Delta, gem.Product))
+
+    for i in range(len(values)) if runtime else (index,):
+        result, = evaluate([expression], {entry: numpy.array(i, dtype=gem.uint_type)})
+        assert result.arr == values[i]
+
+
 def test_split_contraction_recurses_over_multiple_indices() -> None:
     """Split direct sums nested in a contraction over several indices."""
     beta = gem.Index(extent=5)

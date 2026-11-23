@@ -1,18 +1,14 @@
-from finat.point_set import UnknownPointSet, FacetPointSet, UnionPointSet
-
 import numpy
 
 import FIAT
-from FIAT.reference_element import Hypercube
 
 import gem
 from gem.interpreter import evaluate
-from gem.optimise import remove_componenttensors
 from gem.utils import cached_property
 
-from finat.finiteelementbase import FiniteElementBase, broadcast_tensor
-from finat.quadrature import (make_quadrature, AbstractQuadratureRule,
-                              QuadratureRule, TensorProductQuadratureRule)
+from finat.finiteelementbase import FiniteElementBase
+from finat.point_set import FacetPointSet, UnionPointSet, UnknownPointSet
+from finat.quadrature import make_quadrature, AbstractQuadratureRule, QuadratureRule
 
 
 def make_quadrature_element(fiat_ref_cell, degree, scheme="default", codim=0):
@@ -106,56 +102,6 @@ class QuadratureElement(FiniteElementBase):
         sd = self.cell.get_spatial_dimension()
         return ps if ps.dimension == sd else FacetPointSet(self.cell, ps)
 
-    @cached_property
-    def _facet_factorisation(self):
-        """The products this element is the direct sum of, one per direction.
-
-        Returns
-        -------
-        tuple or None
-            A :class:`~finat.tensor_product.TensorProductElement` for each
-            direction the cell's facets lie in, in facet numbering order, or
-            ``None`` if the quadrature points do not factor by facet direction.
-
-        Notes
-        -----
-        The facets of a product lie in the direction of one factor at a time:
-        ``d(A x B) = dA x B  u  A x dB``.  One direction's facets are a
-        product, and only then do the points factor, which is what dual
-        evaluation needs of them; all the facets at once are not.
-
-        So the rule on a facet is a product of rules on all but one of the
-        factors, and the factor left out contributes its two vertices, which
-        are the whole of its own boundary.
-
-        The sum cannot be brought outermost as
-        :func:`~finat.enriched.as_enriched` does, because the summands number
-        their degrees of freedom in each product's order rather than this
-        element's; :meth:`dual_evaluation` renumbers them.
-        """
-        # Avoid circular import dependency
-        from finat.tensor_product import TensorProductElement
-
-        if not isinstance(self.cell, Hypercube):
-            return None
-
-        rule = self._rule
-        if rule.point_set.dimension != self.cell.get_spatial_dimension() - 1:
-            return None
-
-        cells = self.cell.product.cells
-        factors = rule.factors if isinstance(rule, TensorProductQuadratureRule) else (rule,)
-        if len(factors) + 1 != len(cells):
-            return None
-
-        facet_products = []
-        for k, cell in enumerate(cells):
-            ends = make_quadrature(cell.construct_subelement(0), 0)
-            rules = (*factors[:k], ends, *factors[k:])
-            facet_products.append(TensorProductElement(
-                [QuadratureElement(c, r) for c, r in zip(cells, rules)]))
-        return tuple(facet_products)
-
     @property
     def index_shape(self):
         ps = self._point_set
@@ -231,15 +177,6 @@ class QuadratureElement(FiniteElementBase):
             branches = [own if j == k else gem.Zero(tuple(i.extent for i in block.indices))
                         for j, block in enumerate(blocks)]
             delta = gem.Indexed(gem.Concatenate(*branches), basis_indices)
-        elif (facet_products := self._facet_factorisation) is not None:
-            facet_index, *point_indices = basis_indices
-            facet_values = numpy.zeros(facet_index.extent)
-            facet_values[entity_id] = 1
-            # Group the facet selector by the same directions as dual evaluation.
-            facet_blocks = facet_values.reshape(len(facet_products), -1)
-            facet_selector = gem.Concatenate(*(gem.Literal(block) for block in facet_blocks))
-            delta = (gem.Indexed(facet_selector, (facet_index,))
-                     * gem.Delta(ps.indices, tuple(point_indices)))
         else:
             # Return an outer product of identity matrices
             delta = gem.Delta(ps_indices, basis_indices)
@@ -260,59 +197,52 @@ class QuadratureElement(FiniteElementBase):
         Q = gem.ComponentTensor(Q, multiindex)
         return Q, ps
 
-    def dual_evaluation(self, fn, coordinate_mapping=None):
-        """Dual evaluate a facet rule one product direction at a time."""
-        facet_products = self._facet_factorisation
-        if facet_products is not None:
-            facet_index, *facet_point_indices = self.get_indices()
-            branches = []
-            for k, facet_product in enumerate(facet_products):
-                expr, point_indices, beta = facet_product.dual_evaluation(
-                    fn, coordinate_mapping=coordinate_mapping)
-                expr = gem.IndexSum(expr, point_indices)
-                point_subst = tuple(zip(beta[:k] + beta[k + 1:], facet_point_indices, strict=True))
-                expr, = remove_componenttensors([expr], point_subst)
-                branches.append(broadcast_tensor(expr, (beta[k],)))
+    def _dual_evaluation(self, fn, coordinate_mapping=None):
+        """Evaluate the dual basis while preserving the quadrature point layout."""
+        point_set = self._point_set
+        if isinstance(point_set, UnionPointSet):
+            # A single summand still uses the flat basis index of the union.
+            points, = point_set.point_sets
+            point_indices = points.indices
+            local_indices = tuple(gem.Index(extent=i.extent) for i in point_indices)
+            delta = gem.Delta(point_indices, local_indices)
+            expr = gem.IndexSum(delta * fn(points), point_indices)
+            block = gem.ComponentTensor(expr, local_indices)
+            basis_indices = self.get_indices()
+            return gem.Concatenate(block)[basis_indices], (), basis_indices
 
-            # Facets of each direction are consecutive in the facet numbering.
-            # Keep the quadrature point axes shared across the directions.
-            expr = gem.Indexed(gem.Concatenate(*branches), (facet_index,))
-            return expr, (), (facet_index, *facet_point_indices)
-
-        rule_ps = self._rule.point_set
-        if not isinstance(rule_ps, UnionPointSet):
-            return super().dual_evaluation(fn, coordinate_mapping=coordinate_mapping)
-
-        evals = []
-        offset = 0
-        for ps in rule_ps.point_sets:
-            n = len(ps.points)
-            rule = QuadratureRule(ps, self._weights[offset:offset + n], ref_el=self._rule.ref_el)
-            element = QuadratureElement(self.cell, rule)
-            expr, point_indices, indices = element.dual_evaluation(
-                fn, coordinate_mapping=coordinate_mapping)
-            evals.append(broadcast_tensor(
-                gem.IndexSum(expr, point_indices), indices))
-            offset += n
+        if not isinstance(point_set, FacetPointSet) or not point_set._tensor_product_blocks:
+            return super()._dual_evaluation(fn, coordinate_mapping=coordinate_mapping)
 
         basis_indices = self.get_indices()
-        return gem.Indexed(gem.Concatenate(*evals), basis_indices), (), basis_indices
+        tangential_delta = gem.Delta(self._rule.point_set.indices, basis_indices[1:])
+        blocks = []
+        for axis, points in enumerate(point_set._tensor_product_blocks):
+            normal_index, = points.factors[axis].indices
+            facet_index = gem.Index(extent=normal_index.extent)
+            delta = gem.Delta(normal_index, facet_index) * tangential_delta
+            expr = gem.IndexSum(delta * fn(points), points.indices)
+            blocks.append(gem.ComponentTensor(expr, (facet_index,)))
+
+        # Stack the normal axes and share the tangential indices.
+        expr = gem.Concatenate(*blocks)[basis_indices[0]]
+        return expr, (), basis_indices
 
     @cached_property
     def _summand_rules(self):
         """The rules of the summands this element is a direct sum of.
 
-        :returns: one :class:`~finat.quadrature.QuadratureRule` for each
-            point set of a :class:`~finat.point_set.UnionPointSet` rule, in
-            the order they are stacked, or an empty tuple if the rule has a
-            single point set.
+        :returns: one :class:`~finat.quadrature.QuadratureRule` for each point
+            set of a cell rule on a union of multiple point sets, in point
+            order. Return an empty tuple for other rules.
 
         A union of point sets is how the points of a direct sum are stacked,
         so splitting it back up recovers a rule for each summand, each on
         the points its own functionals evaluate on.
         """
-        rule_ps = self._rule.point_set
-        if len(rule_ps.point_sets) == 1:
+        # Facet rules repeat the union on each facet, with facets numbered first.
+        rule_ps = self._point_set
+        if isinstance(rule_ps, FacetPointSet) or len(rule_ps.point_sets) == 1:
             return ()
 
         rules = []

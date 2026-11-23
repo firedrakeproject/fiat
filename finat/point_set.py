@@ -6,6 +6,7 @@ from itertools import chain, product
 import numpy
 
 from FIAT.precision import calibrate_tolerance
+from FIAT.reference_element import Hypercube
 
 import gem
 from gem.utils import safe_repr
@@ -310,6 +311,27 @@ class FacetPointSet(AbstractPointSet):
     def indices(self):
         """An Index tuple of the facet index and the reference point indices."""
         return (gem.Index(extent=len(self.entities)), *self.ps.indices)
+
+    @cached_property
+    def _tensor_product_blocks(self) -> tuple[TensorPointSet, ...]:
+        """Return one tensor product point set per facet direction."""
+        if not isinstance(self.cell, Hypercube) or self.ps.dimension != self.cell.get_spatial_dimension() - 1:
+            return ()
+
+        cells = self.cell.product.cells
+        factors = self.ps.factors if isinstance(self.ps, TensorPointSet) else (self.ps,)
+        if len(factors) + 1 != len(cells):
+            return ()
+
+        # The facets of a hypercube are numbered by their normal axis.
+        # Within each block, insert the two endpoints along that axis.
+        blocks = []
+        for axis, cell in enumerate(cells):
+            vertices = cell.get_topology()[0]
+            vertex_ids = chain.from_iterable(vertices[i] for i in sorted(vertices))
+            endpoints = PointSet(cell.get_vertices_of_subcomplex(vertex_ids))
+            blocks.append(TensorPointSet((*factors[:axis], endpoints, *factors[axis:])))
+        return tuple(blocks)
 
     @cached_property
     def expression(self):

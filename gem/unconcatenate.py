@@ -56,11 +56,11 @@ from itertools import chain
 import numpy
 
 from gem.node import Memoizer, reuse_if_untouched, traversal
-from gem.gem import (ComponentTensor, Concatenate, FlexiblyIndexed,
+from gem.gem import (ComponentTensor, Concatenate, Delta, FlexiblyIndexed,
                      Index, IndexSum, Indexed, Literal, MathFunction, Node,
-                     Product, Variable, partial_indexed, reshape, view)
+                     Product, Variable, VariableIndex, partial_indexed, reshape, view)
 from gem.optimise import (make_rename_map, make_renamer,
-                          remove_componenttensors)
+                          remove_componenttensors, traverse_product)
 from gem.interpreter import evaluate
 
 
@@ -339,6 +339,20 @@ def _split_contraction(cache: dict, expression: Node, indices: tuple[Index, ...]
     concat_group = find_group([expression], set(indices))
     if concat_group is None:
         return [(expression, indices)]
+
+    index, = concat_group[0].multiindex
+    _, factors = traverse_product(expression, stop_at=lambda expr: isinstance(expr, IndexSum))
+    for factor in factors:
+        if not isinstance(factor, Delta) or index not in (factor.i, factor.j):
+            continue
+        selector = factor.j if factor.i == index else factor.i
+        if isinstance(selector, Index) or (isinstance(selector, VariableIndex) and index in selector.expression.free_indices):
+            continue
+        # Cancel the summed index against the delta to turn the contraction into a single entry lookup.
+        factors.remove(factor)
+        term, = remove_componenttensors([Product(*factors)], ((index, selector),))
+        rest = tuple(i for i in indices if i != index)
+        return _split_contraction(cache, term, rest, contractions)
 
     index, multiindices, mappings = split_group(cache, concat_group)
     for variable_ref in find_views([expression], index):
