@@ -52,16 +52,15 @@ unconcatenation, and then add up the results.
 
 from functools import singledispatch
 from itertools import chain
-from numbers import Integral
 
 import numpy
 
 from gem.node import Memoizer, reuse_if_untouched, traversal
-from gem.gem import (ComponentTensor, Concatenate, Delta, FlexiblyIndexed,
+from gem.gem import (ComponentTensor, Concatenate, FlexiblyIndexed,
                      Index, IndexSum, Indexed, Literal, MathFunction, Node,
-                     Product, Variable, VariableIndex, partial_indexed, reshape, view)
-from gem.optimise import (contraction, delta_elimination, make_rename_map, make_renamer,
-                          remove_componenttensors, traverse_product)
+                     Product, Variable, partial_indexed, reshape, view)
+from gem.optimise import (make_rename_map, make_renamer,
+                          remove_componenttensors)
 from gem.interpreter import evaluate
 
 
@@ -204,36 +203,20 @@ def _replace_node(node, self):
     try:
         return self.mapping[node]
     except KeyError:
-        result = reuse_if_untouched(node, self)
-    if self.contract and isinstance(result, IndexSum) and result is not node:
-        # A product of tables (indexed Literals) and coefficient values
-        # (variable views) was sum factorised by contraction while its
-        # tables were still Indexed(Concatenate(...), (j,)).  With each
-        # table replaced by one block, the best contraction order may differ
-        # between blocks, so it is chosen again.
-        _, factors = traverse_product(result)
-        if all(is_variable_view(f)
-               or (isinstance(f, Indexed) and isinstance(f.children[0], Literal))
-               for f in factors):
-            result = contraction(result)
-    return result
+        return reuse_if_untouched(node, self)
 
 
-def replace_node(expression, mapping, cut=None, contract=False):
+def replace_node(expression, mapping, cut=None):
     """Replace subexpressions using a given mapping.
 
     :param expression: a GEM expression
     :param mapping: a :py:class:`dict` containing the substitutions
     :param cut: cutting predicate; if returns true, it is assumed that
                 no replacements would take place in the subexpression.
-    :param contract: whether to apply :py:func:`gem.optimise.contraction`
-                to each rebuilt :py:class:`IndexSum` whose factors are all
-                indexed :py:class:`Literal` nodes or variable views.
     """
     mapper = Memoizer(_replace_node)
     mapper.mapping = mapping
     mapper.cut = cut or (lambda node: False)
-    mapper.contract = contract
     return mapper(expression)
 
 
@@ -300,7 +283,7 @@ def _unconcatenate(cache, pairs):
             split_pairs.append((var, expr))
         elif isinstance(var, FlexiblyIndexed):
             for v, m in zip(split_variable(var, index, multiindices), mappings):
-                split_pairs.append((v, replace_node(expr, m, cut, contract=True)))
+                split_pairs.append((v, replace_node(expr, m, cut)))
         else:
             # A computed variable is split along its own Concatenate nodes
             for m in mappings:
@@ -324,9 +307,7 @@ def unconcatenate(pairs: list[tuple[Node, Node]], cache: dict | None = None) -> 
         v_j = f(Concatenate(A, B)_j)  ==>  v_ja = f(A_ja),  v_jb = f(B_jb).
 
     The split repeats until no such Concatenate is left.  A computed variable
-    is split along its own Concatenate nodes rather than sliced.  A split
-    product of tables and coefficient values is contracted again, as
-    :py:func:`replace_node` describes, so that its order suits the block.
+    is split along its own Concatenate nodes rather than sliced.
 
     Parameters
     ----------
@@ -359,20 +340,6 @@ def _split_contraction(cache: dict, expression: Node, indices: tuple[Index, ...]
     if concat_group is None:
         return [(expression, indices)]
 
-    # sum_i A_i delta(i, k) = A_k for a fixed or runtime k, so there is nothing to split.
-    index, = concat_group[0].multiindex
-    rest = tuple(i for i in indices if i != index)
-    _, factors = traverse_product(expression, stop_at=lambda expr: isinstance(expr, IndexSum))
-    for delta in factors:
-        if not isinstance(delta, Delta) or index not in (delta.i, delta.j):
-            continue
-        entry, = {delta.i, delta.j} - {index}
-        if isinstance(entry, Integral) or (isinstance(entry, VariableIndex)
-                                           and index not in entry.expression.free_indices):
-            _, factors = delta_elimination([index], factors)
-            term, = remove_componenttensors([Product(*factors)])
-            return _split_contraction(cache, term, rest, contractions)
-
     index, multiindices, mappings = split_group(cache, concat_group)
     for variable_ref in find_views([expression], index):
         for mapping, sub_ref in zip(mappings, split_variable(variable_ref, index, multiindices)):
@@ -385,6 +352,7 @@ def _split_contraction(cache: dict, expression: Node, indices: tuple[Index, ...]
         """Do not rebuild nodes independent of the concatenation index."""
         return index not in node.free_indices
 
+    rest = tuple(i for i in indices if i != index)
     terms = []
     for multiindex, mapping in zip(multiindices, mappings):
         term = replace_node(expression, mapping, cut)

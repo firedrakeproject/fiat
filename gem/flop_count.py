@@ -171,7 +171,8 @@ def flops_solve(expr, temporaries):
 
 @flops.register(gem.ComponentTensor)
 def flops_componenttensor(expr, temporaries):
-    raise ValueError("Not expecting ComponentTensor")
+    child, = expr.children
+    return numpy.prod(expr.shape, dtype=int) * expression_flops(child, temporaries)
 
 
 def expression_flops(expression, temporaries, top=False):

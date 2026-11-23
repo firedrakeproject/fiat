@@ -34,7 +34,7 @@ def test_create_from_quadrature(cell):
 @pytest.mark.parametrize("cellname", ["interval", "triangle", "tetrahedron", "quadrilateral", "hexahedron"])
 @pytest.mark.parametrize("degree", range(1, 6))
 def test_facet_dual_evaluation(cellname, degree):
-    """Check tabulation structure and reproduction of coordinate functions."""
+    """Compare the interpolation matrix with tabulation at the mapped facet points."""
     cell = ufc_cell(cellname)
     target = make_quadrature_element(cell, degree, codim=1)
     if isinstance(cell, Hypercube):
@@ -50,29 +50,12 @@ def test_facet_dual_evaluation(cellname, degree):
 
     expr, point_indices, basis_indices = target.dual_evaluation(tabulate)
     assert tuple(index.extent for index in basis_indices) == target.index_shape
-    nfacets, *point_shape = target.index_shape
-    assert tuple(index.extent for index in point_indices) == tuple(point_shape)
-    # The tabulations and the points are stacked over the facets.
-    concatenated = gem.extract_type([expr], gem.Concatenate)
-    assert concatenated
-    assert all(len(c.children) == nfacets for c in concatenated)
-    tables = gem.extract_type([expr], gem.Literal)
-    if isinstance(cell, Hypercube):
-        # Each factor is tabulated on each facet at a vertex or at the
-        # points of a tangential factor.
-        nq = point_shape[-1]
-        assert len(concatenated) == cell.get_spatial_dimension()
-        assert {table.shape for table in tables} == {(2,), (2, nq)}
-    else:
-        assert len(concatenated) == 1
-        assert {table.shape for table in tables} == {source.index_shape + tuple(point_shape)}
-
+    _, target_points = target.dual_basis
+    points = PointSet(target_points.points)
+    expected, = evaluate([gem.ComponentTensor(tabulate(points), points.indices + source_indices)])
     result, = evaluate([gem.ComponentTensor(gem.IndexSum(expr, point_indices),
                                             basis_indices + source_indices)])
-    _, target_points = target.dual_basis
-    _, source_points = source.dual_basis
-    tabulation = result.arr.reshape(target.space_dimension(), source.space_dimension())
-    numpy.testing.assert_allclose(tabulation @ source_points.points, target_points.points, rtol=0, atol=1e-12)
+    numpy.testing.assert_allclose(result.arr.reshape(expected.arr.shape), expected.arr, atol=1e-12)
 
 
 def test_facet_dual_evaluation_on_union_of_points() -> None:

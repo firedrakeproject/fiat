@@ -11,7 +11,7 @@ from FIAT.orientation_utils import make_entity_permutations_tensorproduct
 import gem
 from gem.utils import cached_property
 
-from finat.finiteelementbase import FiniteElementBase, stack_tabulations
+from finat.finiteelementbase import FiniteElementBase
 from finat.point_set import FacetPointSet, PointSingleton, PointSet, TensorPointSet
 
 
@@ -140,47 +140,28 @@ class TensorProductElement(FiniteElementBase):
             return self._stack_tabulations(order, ps, entity,
                                            coordinate_mapping=coordinate_mapping)
         if isinstance(ps, FacetPointSet):
-            return self._stack_facet_tabulations(order, ps, coordinate_mapping=coordinate_mapping)
+            # Tabulate on each facet and select the table with the facet index.
+            # Each table remains a product of normal and tangential factors.
+            # Coefficient evaluation contracts these factors one at a time.
+            facets = ps.entities
+            if isinstance(ps.cell, Hypercube):
+                facets = [ps.cell.unflattening_map[facet] for facet in facets]
+            tables = [self.basis_evaluation(order, ps.ps, facet) for facet in facets]
+            f = ps.indices[0]
+            indices = (*self.get_indices(), *self.get_value_indices())
+            return {alpha: gem.ComponentTensor(
+                gem.ListTensor([table[alpha][indices] for table in tables])[f], indices)
+                for alpha in tables[0]}
 
-        return self._merge_evaluations(self._factor_evaluations(order, ps, entity))
-
-    def _factor_evaluations(self, order, ps, entity):
-        """Tabulate each factor on its own factor of a point set.
-
-        :arg order: return derivatives up to this order.
-        :arg ps: the point set to tabulate on.
-        :arg entity: the cell entity on which to tabulate.
-        :returns: the tabulation of each factor, as :meth:`basis_evaluation`
-            returns.
-        """
         entities = self._factor_entity(entity)
         entity_dim, _ = zip(*entities)
+
         ps_factors = factor_point_set(self.cell, entity_dim, ps)
-        return [fe.basis_evaluation(order, ps_, e)
-                for fe, ps_, e in zip(self.factors, ps_factors, entities)]
 
-    def _stack_facet_tabulations(self, order, ps, coordinate_mapping=None):
-        """Tabulate each factor on each facet, stacking on the facet index.
+        factor_results = [fe.basis_evaluation(order, ps_, e)
+                          for fe, ps_, e in zip(self.factors, ps_factors, entities)]
 
-        :arg order: return derivatives up to this order.
-        :arg ps: the :class:`~finat.point_set.FacetPointSet` to tabulate on.
-        :arg coordinate_mapping: a :class:`~.physically_mapped.PhysicalGeometry`
-            object that provides physical geometry callbacks (may be None).
-        :returns: the tabulation on the whole of ``ps``, as
-            :meth:`basis_evaluation` returns.
-
-        On a facet, the factor normal to it is tabulated at a vertex and the
-        others at the factors of ``ps.ps``.  Stacking factor by factor keeps
-        this product structure on each facet, to be sum factorised.
-        """
-        facets = ps.entities
-        if isinstance(ps.cell, Hypercube):
-            facets = [ps.cell.unflattening_map[facet] for facet in facets]
-
-        tables = [self._factor_evaluations(order, ps.ps, facet) for facet in facets]
-        f = ps.indices[0]
-        return self._merge_evaluations([stack_tabulations(fe, factor_tables, f)
-                                        for fe, factor_tables in zip(self.factors, zip(*tables))])
+        return self._merge_evaluations(factor_results)
 
     def point_evaluation(self, order, point, entity=None, coordinate_mapping=None):
         entities = self._factor_entity(entity)

@@ -27,33 +27,6 @@ def broadcast_tensor(expression, multiindex):
     return gem.ComponentTensor(expression, multiindex)
 
 
-def stack_tabulations(element, tables, index, point_indices=None):
-    """Stack tabulations of an element on an index.
-
-    :arg element: the :class:`FiniteElementBase` the tabulations are of.
-    :arg tables: the tabulations, as :meth:`FiniteElementBase.basis_evaluation`
-        returns, in the order they are stacked.
-    :arg index: the index to stack the tabulations on.
-    :arg point_indices: for each tabulation, the free point indices to
-        promote to a shape before stacking, or None to stack the
-        tabulations with their point indices left free.
-    :returns: the stacked tabulation, as
-        :meth:`FiniteElementBase.basis_evaluation` returns.
-    """
-    keys, = set(map(frozenset, tables))
-    multiindex = tuple(chain(element.get_indices(), element.get_value_indices()))
-    if point_indices is None:
-        point_indices = [()] * len(tables)
-
-    def concatenate(alpha):
-        pieces = [broadcast_tensor(gem.Indexed(table[alpha], multiindex), indices)
-                  for table, indices in zip(tables, point_indices)]
-        return gem.ComponentTensor(
-            gem.Indexed(gem.Concatenate(*pieces), (index,)), multiindex)
-
-    return {alpha: concatenate(alpha) for alpha in keys}
-
-
 class FiniteElementBase(metaclass=ABCMeta):
 
     @abstractproperty
@@ -225,29 +198,20 @@ class FiniteElementBase(metaclass=ABCMeta):
         tables = [self.basis_evaluation(order, sub, entity,
                                         coordinate_mapping=coordinate_mapping)
                   for sub in ps.point_sets]
-        # The point indices are free in each table, so promote them to a
-        # shape before concatenating the tables along it.
+        keys, = set(map(frozenset, tables))
         p, = ps.indices
-        return stack_tabulations(self, tables, p, [sub.indices for sub in ps.point_sets])
+        multiindex = tuple(chain(self.get_indices(), self.get_value_indices()))
 
-    def _stack_facet_tabulations(self, order, ps, coordinate_mapping=None):
-        """Tabulate on each facet of a facet point set, stacking on the facet index.
+        def concatenate(alpha):
+            # The point indices of each table are free indices.
+            # Promote them to a shape that Concatenate can join.
+            pieces = [broadcast_tensor(gem.Indexed(table[alpha], multiindex),
+                                       sub.indices)
+                      for table, sub in zip(tables, ps.point_sets)]
+            return gem.ComponentTensor(
+                gem.Indexed(gem.Concatenate(*pieces), (p,)), multiindex)
 
-        :arg order: return derivatives up to this order.
-        :arg ps: the :class:`~finat.point_set.FacetPointSet` to tabulate on.
-        :arg coordinate_mapping: a :class:`~.physically_mapped.PhysicalGeometry`
-            object that provides physical geometry callbacks (may be None).
-        :returns: the tabulation on the whole of ``ps``, as
-            :meth:`basis_evaluation` returns.
-
-        The facet index of ``ps`` enters only through the
-        :class:`gem.Concatenate` of the tabulations on each facet, where it
-        can be split off as the facet index of a basis.
-        """
-        tables = [self.basis_evaluation(order, ps.ps, facet,
-                                        coordinate_mapping=coordinate_mapping)
-                  for facet in ps.entities]
-        return stack_tabulations(self, tables, ps.indices[0])
+        return {alpha: concatenate(alpha) for alpha in keys}
 
     @abstractmethod
     def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):

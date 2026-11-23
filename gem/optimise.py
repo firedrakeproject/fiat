@@ -3,7 +3,7 @@ expressions."""
 
 from collections import OrderedDict, defaultdict
 from functools import singledispatch, partial
-from itertools import chain, combinations, permutations, zip_longest
+from itertools import combinations, permutations, zip_longest
 from numbers import Integral
 
 import numpy
@@ -11,7 +11,7 @@ import numpy
 from gem.utils import groupby
 from gem.node import (Memoizer, MemoizerArg, reuse_if_untouched,
                       reuse_if_untouched_arg, traversal)
-from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero, Concatenate,
+from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
                      Product, Sum, Comparison, Conditional, Division,
                      Index, VariableIndex, Indexed, FlexiblyIndexed,
                      IndexSum, ComponentTensor, ListTensor, Delta,
@@ -115,16 +115,6 @@ def replace_indices_delta(node, self, subst):
         return Delta(i, j)
 
 
-def _index_concatenate(node, index):
-    """Index a :class:`Concatenate` node with a :class:`VariableIndex`.
-
-    Selects from the flattened entries of the blocks.  Each entry is
-    contracted here, since nothing cancels deltas inside a selection later.
-    """
-    entries = [contraction(Indexed(node, (k,))) for k in range(node.shape[0])]
-    return select_expression(entries, index)
-
-
 @replace_indices.register(Indexed)
 def replace_indices_indexed(node, self, subst):
     multiindex = tuple(_replace_indices_atomic(i, self, subst) for i in node.multiindex)
@@ -139,8 +129,6 @@ def replace_indices_indexed(node, self, subst):
     else:
         # Replace indices
         child = self(child, subst)
-        if isinstance(child, Concatenate) and isinstance(multiindex[0], VariableIndex):
-            return _index_concatenate(child, multiindex[0])
 
         # Remove fixed indices
         if isinstance(child, (Constant, ListTensor)):
@@ -258,28 +246,6 @@ def _select_expression(expressions, index, cache):
         return cache.setdefault(expressions, _select_expression_uncached(expressions, index, cache))
 
 
-def _broadcast_literal(expression, free):
-    """Fold an indexed :class:`Literal` into a :class:`Literal` over ``free``.
-
-    :arg expression: a :class:`Zero`, or a :class:`Literal` indexed with
-        fixed indices and a subset of ``free``.
-    :arg free: the indices the result is a tensor over.
-    """
-    shape = tuple(i.extent for i in free)
-    if isinstance(expression, Zero):
-        return Zero(shape, dtype=expression.dtype)
-    literal, = expression.children
-    multiindex = expression.multiindex
-    if not isinstance(literal, Literal) or any(isinstance(i, VariableIndex) for i in multiindex):
-        raise NotImplementedError("Cannot select between expressions on different indices.")
-    array = literal.array[tuple(slice(None) if isinstance(i, Index) else i for i in multiindex)]
-    indices = tuple(i for i in multiindex if isinstance(i, Index))
-    # A[i_1, ..., i_n] with the i's in the order of free, then broadcast
-    array = array.transpose(numpy.argsort([free.index(i) for i in indices]))
-    array = array.reshape(tuple(i.extent if i in indices else 1 for i in free))
-    return Literal(numpy.broadcast_to(array, shape), dtype=literal.dtype)
-
-
 def _select_expression_uncached(expressions, index, cache):
     expr = expressions[0]
     if all(e == expr for e in expressions):
@@ -289,10 +255,9 @@ def _select_expression_uncached(expressions, index, cache):
     if types <= {Indexed, Zero}:
         multiindices = set(e.multiindex for e in expressions if isinstance(e, Indexed))
         if len(multiindices) > 1:
-            # Tables on different indices: broadcast each over all of them.
-            free = tuple(OrderedDict.fromkeys(chain(*(e.free_indices for e in expressions))))
-            return Indexed(_select_expression(tuple(_broadcast_literal(e, free) for e in expressions),
-                                              index, cache), free)
+            # Each expression is indexed by a different multiindex.
+            # Select the indexed expressions, not the tensors they index.
+            return Indexed(ListTensor(expressions), (index,))
         multiindex, = multiindices
         # Shape only determined by free indices
         shape = tuple(i.extent for i in multiindex if isinstance(i, Index))
@@ -379,6 +344,20 @@ def delta_elimination(sum_indices, factors, index_replacer=None):
             return index_replacer(expression, ((from_, to_),))
         else:
             return Indexed(ComponentTensor(expression, (from_,)), (to_,))
+
+    # Replace each literal vector that has a single unit entry k and is
+    # indexed by a summation index i with the equivalent Delta(i, k).
+    # The loop below then eliminates i.
+    factors = list(factors)
+    for k, factor in enumerate(factors):
+        if not isinstance(factor, Indexed) or len(factor.multiindex) != 1:
+            continue
+        index, = factor.multiindex
+        table, = factor.children
+        if index in sum_indices and isinstance(table, Literal):
+            entries = numpy.flatnonzero(table.array)
+            if len(entries) == 1 and table.array[entries[0]] == 1:
+                factors[k] = Delta(index, int(entries[0]), dtype=factor.dtype)
 
     delta_queue = [(f, index)
                    for f in factors if isinstance(f, Delta)

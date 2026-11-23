@@ -337,7 +337,7 @@ def _evaluate_concatenate(e, self):
         # Create temporary with correct shape
         arr = numpy.empty(fshape + o.shape)
         # Broadcast for extra free indices
-        arr[...] = o.broadcast(fids)
+        arr[:] = o.broadcast(fids)
         # Flatten shape
         arr = arr.reshape(arr.shape[:arr.ndim-len(o.shape)] + (-1,))
         arrs.append(arr)

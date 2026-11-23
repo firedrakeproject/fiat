@@ -313,17 +313,8 @@ class FacetPointSet(AbstractPointSet):
 
     @cached_property
     def expression(self):
-        """The points, stacked over the facets on the facet index.
-
-        Like the tabulations on a FacetPointSet, the facet index enters only
-        through a :class:`gem.Concatenate` of the points on each facet.
-        """
-        f, *q = self.indices
-        shape = tuple(i.extent for i in q)
-        i = gem.Index(extent=self.dimension)
-        points = self.points.reshape(len(self.entities), *shape, self.dimension)
-        blocks = [gem.Indexed(gem.Literal(block), (*q, i)) for block in points]
-        return gem.ComponentTensor(gem.Indexed(gem.Concatenate(*blocks), (f,)), (i,))
+        shape = tuple(i.extent for i in self.indices) + (self.dimension,)
+        return gem.partial_indexed(gem.Literal(self.points.reshape(shape)), self.indices)
 
     def almost_equal(self, other, tolerance=None):
         """Approximate numerical equality of point sets"""
