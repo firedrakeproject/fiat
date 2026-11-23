@@ -361,6 +361,7 @@ def _split_contraction(cache: dict, expression: Node, indices: tuple[Index, ...]
 
     # sum_i A_i delta(i, k) = A_k for a fixed or runtime k, so there is nothing to split.
     index, = concat_group[0].multiindex
+    rest = tuple(i for i in indices if i != index)
     _, factors = traverse_product(expression, stop_at=lambda expr: isinstance(expr, IndexSum))
     for delta in factors:
         if not isinstance(delta, Delta) or index not in (delta.i, delta.j):
@@ -368,10 +369,8 @@ def _split_contraction(cache: dict, expression: Node, indices: tuple[Index, ...]
         entry, = {delta.i, delta.j} - {index}
         if isinstance(entry, Integral) or (isinstance(entry, VariableIndex)
                                            and index not in entry.expression.free_indices):
-            factors.remove(delta)
-            _, factors = delta_elimination([index], [delta, *factors])
+            _, factors = delta_elimination([index], factors)
             term, = remove_componenttensors([Product(*factors)])
-            rest = tuple(i for i in indices if i != index)
             return _split_contraction(cache, term, rest, contractions)
 
     index, multiindices, mappings = split_group(cache, concat_group)
@@ -386,7 +385,6 @@ def _split_contraction(cache: dict, expression: Node, indices: tuple[Index, ...]
         """Do not rebuild nodes independent of the concatenation index."""
         return index not in node.free_indices
 
-    rest = tuple(i for i in indices if i != index)
     terms = []
     for multiindex, mapping in zip(multiindices, mappings):
         term = replace_node(expression, mapping, cut)

@@ -121,8 +121,7 @@ def _index_concatenate(node, index):
     Selects from the flattened entries of the blocks.  Each entry is
     contracted here, since nothing cancels deltas inside a selection later.
     """
-    entries = [contraction(Indexed(block, local))
-               for block in node.children for local in numpy.ndindex(block.shape)]
+    entries = [contraction(Indexed(node, (k,))) for k in range(node.shape[0])]
     return select_expression(entries, index)
 
 
@@ -137,14 +136,11 @@ def replace_indices_indexed(node, self, subst):
         substitute = dict(subst)
         substitute.update(zip(child.multiindex, multiindex))
         return self(child.children[0], tuple(sorted(substitute.items())))
-    elif isinstance(child, Concatenate) and isinstance(multiindex[0], VariableIndex):
-        child = self(child, subst)
-        if isinstance(child, Concatenate):
-            return _index_concatenate(child, multiindex[0])
-        return Indexed(child, multiindex)
     else:
         # Replace indices
         child = self(child, subst)
+        if isinstance(child, Concatenate) and isinstance(multiindex[0], VariableIndex):
+            return _index_concatenate(child, multiindex[0])
 
         # Remove fixed indices
         if isinstance(child, (Constant, ListTensor)):
@@ -290,15 +286,14 @@ def _select_expression_uncached(expressions, index, cache):
         return expr
 
     types = set(map(type, expressions))
-    if types <= {Indexed, Zero} and len(set(e.multiindex for e in expressions
-                                            if isinstance(e, Indexed))) > 1:
-        # Tables on different indices: broadcast each over all of them.
-        free = tuple(OrderedDict.fromkeys(chain(*(e.free_indices for e in expressions))))
-        return Indexed(_select_expression(tuple(_broadcast_literal(e, free) for e in expressions),
-                                          index, cache), free)
-
     if types <= {Indexed, Zero}:
-        multiindex, = set(e.multiindex for e in expressions if isinstance(e, Indexed))
+        multiindices = set(e.multiindex for e in expressions if isinstance(e, Indexed))
+        if len(multiindices) > 1:
+            # Tables on different indices: broadcast each over all of them.
+            free = tuple(OrderedDict.fromkeys(chain(*(e.free_indices for e in expressions))))
+            return Indexed(_select_expression(tuple(_broadcast_literal(e, free) for e in expressions),
+                                              index, cache), free)
+        multiindex, = multiindices
         # Shape only determined by free indices
         shape = tuple(i.extent for i in multiindex if isinstance(i, Index))
 

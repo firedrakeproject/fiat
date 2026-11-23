@@ -11,7 +11,7 @@ from FIAT.orientation_utils import make_entity_permutations_tensorproduct
 import gem
 from gem.utils import cached_property
 
-from finat.finiteelementbase import FiniteElementBase
+from finat.finiteelementbase import FiniteElementBase, stack_tabulations
 from finat.point_set import FacetPointSet, PointSingleton, PointSet, TensorPointSet
 
 
@@ -142,15 +142,22 @@ class TensorProductElement(FiniteElementBase):
         if isinstance(ps, FacetPointSet):
             return self._stack_facet_tabulations(order, ps, coordinate_mapping=coordinate_mapping)
 
+        return self._merge_evaluations(self._factor_evaluations(order, ps, entity))
+
+    def _factor_evaluations(self, order, ps, entity):
+        """Tabulate each factor on its own factor of a point set.
+
+        :arg order: return derivatives up to this order.
+        :arg ps: the point set to tabulate on.
+        :arg entity: the cell entity on which to tabulate.
+        :returns: the tabulation of each factor, as :meth:`basis_evaluation`
+            returns.
+        """
         entities = self._factor_entity(entity)
         entity_dim, _ = zip(*entities)
-
         ps_factors = factor_point_set(self.cell, entity_dim, ps)
-
-        factor_results = [fe.basis_evaluation(order, ps_, e)
-                          for fe, ps_, e in zip(self.factors, ps_factors, entities)]
-
-        return self._merge_evaluations(factor_results)
+        return [fe.basis_evaluation(order, ps_, e)
+                for fe, ps_, e in zip(self.factors, ps_factors, entities)]
 
     def _stack_facet_tabulations(self, order, ps, coordinate_mapping=None):
         """Tabulate each factor on each facet, stacking on the facet index.
@@ -170,25 +177,10 @@ class TensorProductElement(FiniteElementBase):
         if isinstance(ps.cell, Hypercube):
             facets = [ps.cell.unflattening_map[facet] for facet in facets]
 
-        tables = []
-        for facet in facets:
-            entities = self._factor_entity(facet)
-            entity_dim, _ = zip(*entities)
-            ps_factors = factor_point_set(self.cell, entity_dim, ps.ps)
-            tables.append([fe.basis_evaluation(order, ps_, e, coordinate_mapping=coordinate_mapping)
-                           for fe, ps_, e in zip(self.factors, ps_factors, entities)])
-
+        tables = [self._factor_evaluations(order, ps.ps, facet) for facet in facets]
         f = ps.indices[0]
-        factor_results = []
-        for fe, factor_tables in zip(self.factors, zip(*tables)):
-            multiindex = tuple(chain(fe.get_indices(), fe.get_value_indices()))
-            keys, = set(map(frozenset, factor_tables))
-            factor_results.append({
-                alpha: gem.ComponentTensor(gem.Indexed(gem.Concatenate(
-                    *(gem.Indexed(table[alpha], multiindex) for table in factor_tables)), (f,)),
-                    multiindex)
-                for alpha in keys})
-        return self._merge_evaluations(factor_results)
+        return self._merge_evaluations([stack_tabulations(fe, factor_tables, f)
+                                        for fe, factor_tables in zip(self.factors, zip(*tables))])
 
     def point_evaluation(self, order, point, entity=None, coordinate_mapping=None):
         entities = self._factor_entity(entity)
