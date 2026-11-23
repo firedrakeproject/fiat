@@ -6,7 +6,7 @@ import gem
 from gem.interpreter import evaluate
 from gem.utils import cached_property
 
-from finat.finiteelementbase import FiniteElementBase
+from finat.finiteelementbase import FiniteElementBase, broadcast_tensor
 from finat.point_set import FacetPointSet, UnionPointSet, UnknownPointSet
 from finat.quadrature import make_quadrature, AbstractQuadratureRule, QuadratureRule
 
@@ -198,24 +198,35 @@ class QuadratureElement(FiniteElementBase):
         return Q, ps
 
     def _dual_evaluation(self, fn, coordinate_mapping=None):
-        """Evaluate the dual basis while preserving the quadrature point layout."""
-        point_set = self._point_set
-        if not isinstance(point_set, FacetPointSet) or not point_set.tensor_product_blocks:
+        """Dual evaluate on each facet, identifying the facet index with the basis.
+
+        :arg fn: Callable representing the function to dual evaluate.
+            Callable should take in an :class:`AbstractPointSet` and return a
+            GEM expression for evaluation of the function at those points.
+        :arg coordinate_mapping: a :class:`~.physically_mapped.PhysicalGeometry`
+            object that provides physical geometry callbacks (may be None).
+        :returns: an ``(evaluation, point_indices, basis_indices)`` triple, as
+            :meth:`~finat.finiteelementbase.FiniteElementBase.dual_evaluation`
+            returns.
+
+        A functional on a facet evaluates at the points of that facet, so the
+        facet index of a :class:`~finat.point_set.FacetPointSet` is the facet
+        index of the basis.  Only the points within a facet are contracted
+        with the dual basis.  The facet index enters ``fn`` only through
+        :class:`gem.Concatenate` nodes, so it is split off before the
+        contraction.
+        """
+        ps = self._point_set
+        if not isinstance(ps, FacetPointSet):
             return super()._dual_evaluation(fn, coordinate_mapping=coordinate_mapping)
 
-        basis_indices = self.get_indices()
-        tangential_delta = gem.Delta(self._rule.point_set.indices, basis_indices[1:])
-        blocks = []
-        for points in point_set.tensor_product_blocks:
-            normal_index, = set(points.indices) - set(self._rule.point_set.indices)
-            facet_index = gem.Index(extent=normal_index.extent)
-            delta = gem.Delta(normal_index, facet_index) * tangential_delta
-            expr = gem.IndexSum(delta * fn(points), points.indices)
-            blocks.append(gem.ComponentTensor(expr, (facet_index,)))
-
-        # Stack the normal axes and share the tangential indices.
-        expr = gem.Concatenate(*blocks)[basis_indices[0]]
-        return expr, (), basis_indices
+        f, *q = ps.indices
+        facet, *beta = self.get_indices()
+        expr = fn(ps)
+        assert expr.shape == ()
+        expr = gem.Indexed(broadcast_tensor(expr, (f,)), (facet,))
+        evaluation = gem.Delta(tuple(q), tuple(beta)) * expr
+        return evaluation, tuple(q), (facet, *beta)
 
     @cached_property
     def _summand_rules(self):

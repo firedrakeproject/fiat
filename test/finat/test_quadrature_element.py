@@ -50,17 +50,22 @@ def test_facet_dual_evaluation(cellname, degree):
 
     expr, point_indices, basis_indices = target.dual_evaluation(tabulate)
     assert tuple(index.extent for index in basis_indices) == target.index_shape
+    nfacets, *point_shape = target.index_shape
+    assert tuple(index.extent for index in point_indices) == tuple(point_shape)
+    # The tabulations and the points are stacked over the facets.
+    concatenated = gem.extract_type([expr], gem.Concatenate)
+    assert concatenated
+    assert all(len(c.children) == nfacets for c in concatenated)
     tables = gem.extract_type([expr], gem.Literal)
     if isinstance(cell, Hypercube):
-        assert not point_indices
-        concatenated, = gem.extract_type([expr], gem.Concatenate)
-        assert len(concatenated.children) == cell.get_spatial_dimension()
-        assert all(block.shape == (2,) for block in concatenated.children)
-        assert max(len(table.shape) for table in tables) == 2
+        # Each factor is tabulated on each facet at a vertex or at the
+        # points of a tangential factor.
+        nq = point_shape[-1]
+        assert len(concatenated) == cell.get_spatial_dimension()
+        assert {table.shape for table in tables} == {(2,), (2, nq)}
     else:
-        assert not gem.extract_type([expr], gem.Concatenate)
-        table, = tables
-        assert table.shape == source.index_shape + target.index_shape
+        assert len(concatenated) == 1
+        assert {table.shape for table in tables} == {source.index_shape + tuple(point_shape)}
 
     result, = evaluate([gem.ComponentTensor(gem.IndexSum(expr, point_indices),
                                             basis_indices + source_indices)])

@@ -1,13 +1,11 @@
 import abc
 import hashlib
-from collections import defaultdict
 from functools import cached_property
 from itertools import chain, product
 
 import numpy
 
 from FIAT.precision import calibrate_tolerance
-from FIAT.reference_element import Hypercube
 
 import gem
 from gem.utils import safe_repr
@@ -314,49 +312,18 @@ class FacetPointSet(AbstractPointSet):
         return (gem.Index(extent=len(self.entities)), *self.ps.indices)
 
     @cached_property
-    def tensor_product_blocks(self):
-        """The facet points of a hypercube, as one tensor product per facet direction.
-
-        Returns
-        -------
-        tuple
-            A :class:`TensorPointSet` for each direction normal to the facets,
-            with the points of ``ps`` in the tangential factors and the
-            facet endpoints in the normal factor.  The facets of each block
-            are numbered consecutively, in block order.  Return an empty
-            tuple if the cell is not a hypercube or the points do not factor.
-        """
-        sd = self.cell.get_spatial_dimension()
-        if not isinstance(self.cell, Hypercube) or self.ps.dimension != sd - 1:
-            return ()
-
-        cells = self.cell.product.cells
-        factors = self.ps.factors if isinstance(self.ps, TensorPointSet) else (self.ps,)
-        if len(factors) + 1 != len(cells):
-            return ()
-
-        # Group the facets by the product entity dimension they unflatten to.
-        facets = defaultdict(list)
-        for facet in sorted(self.cell.get_topology()[sd - 1]):
-            dim, _ = self.cell.unflattening_map[(sd - 1, facet)]
-            facets[dim].append(facet)
-        assert list(chain(*facets.values())) == sorted(self.cell.get_topology()[sd - 1])
-
-        origin = numpy.zeros((1, sd - 1))
-        blocks = []
-        for dim, block_facets in facets.items():
-            # The normal axis is the factor whose dimension the facet drops,
-            # and each facet lies at the endpoint its transform maps to.
-            axis, = (i for i, (c, d) in enumerate(zip(cells, dim)) if d < c.get_dimension())
-            endpoints = [self.cell.get_entity_transform(sd - 1, facet)(origin)[0, axis]
-                         for facet in block_facets]
-            endpoints = PointSet(numpy.reshape(endpoints, (-1, 1)))
-            blocks.append(TensorPointSet((*factors[:axis], endpoints, *factors[axis:])))
-        return tuple(blocks)
-
-    @cached_property
     def expression(self):
-        raise NotImplementedError("Symbolic point expression is not yet implemented for FacetPointSet.")
+        """The points, stacked over the facets on the facet index.
+
+        Like the tabulations on a FacetPointSet, the facet index enters only
+        through a :class:`gem.Concatenate` of the points on each facet.
+        """
+        f, *q = self.indices
+        shape = tuple(i.extent for i in q)
+        i = gem.Index(extent=self.dimension)
+        points = self.points.reshape(len(self.entities), *shape, self.dimension)
+        blocks = [gem.Indexed(gem.Literal(block), (*q, i)) for block in points]
+        return gem.ComponentTensor(gem.Indexed(gem.Concatenate(*blocks), (f,)), (i,))
 
     def almost_equal(self, other, tolerance=None):
         """Approximate numerical equality of point sets"""

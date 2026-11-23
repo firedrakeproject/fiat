@@ -213,6 +213,33 @@ class FiniteElementBase(metaclass=ABCMeta):
 
         return {alpha: concatenate(alpha) for alpha in keys}
 
+    def _stack_facet_tabulations(self, order, ps, coordinate_mapping=None):
+        """Tabulate on each facet of a facet point set, stacking on the facet index.
+
+        :arg order: return derivatives up to this order.
+        :arg ps: the :class:`~finat.point_set.FacetPointSet` to tabulate on.
+        :arg coordinate_mapping: a :class:`~.physically_mapped.PhysicalGeometry`
+            object that provides physical geometry callbacks (may be None).
+        :returns: the tabulation on the whole of ``ps``, as
+            :meth:`basis_evaluation` returns.
+
+        The facet index of ``ps`` enters only through the
+        :class:`gem.Concatenate` of the tabulations on each facet, where it
+        can be split off as the facet index of a basis.
+        """
+        tables = [self.basis_evaluation(order, ps.ps, facet,
+                                        coordinate_mapping=coordinate_mapping)
+                  for facet in ps.entities]
+        keys, = set(map(frozenset, tables))
+        f = ps.indices[0]
+        multiindex = tuple(chain(self.get_indices(), self.get_value_indices()))
+
+        def concatenate(alpha):
+            blocks = [gem.Indexed(table[alpha], multiindex) for table in tables]
+            return gem.ComponentTensor(gem.Indexed(gem.Concatenate(*blocks), (f,)), multiindex)
+
+        return {alpha: concatenate(alpha) for alpha in keys}
+
     @abstractmethod
     def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
         '''Return code for evaluating the element at an arbitrary points on

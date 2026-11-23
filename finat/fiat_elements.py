@@ -4,7 +4,7 @@ import numpy as np
 from gem.utils import cached_property
 
 from finat.finiteelementbase import FiniteElementBase
-from finat.point_set import PointSet, PointSingleton
+from finat.point_set import FacetPointSet, PointSet, PointSingleton
 
 
 class FiatElement(FiniteElementBase):
@@ -78,6 +78,8 @@ class FiatElement(FiniteElementBase):
         :param ps: the point set.
         :param entity: the cell entity on which to tabulate.
         '''
+        if isinstance(ps, FacetPointSet):
+            return self._stack_facet_tabulations(order, ps, coordinate_mapping=coordinate_mapping)
         fiat_element = self._element
         fiat_result = fiat_element.tabulate(order, ps.points, entity)
         # In almost all cases, we have
