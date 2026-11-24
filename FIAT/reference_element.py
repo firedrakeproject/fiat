@@ -1330,12 +1330,10 @@ class TensorProductCell(Cell):
             other = other.product
         if isinstance(other, TensorProductCell):
             return all(op(a, b) for a, b in zip(self.cells, other.cells))
-        else:
-            if op == operator.gt or op == operator.lt or operator.ne:
-                return not op(other, self)
-            if op == operator.ge or op == operator.le:
-                return not op(other, self) or operator.eq(self, other)
-            raise ValueError("Unknown operator in cell comparison")
+        # other is not a product: compare from its side with the reflected operator
+        reflected = {operator.gt: operator.lt, operator.lt: operator.gt,
+                     operator.ge: operator.le, operator.le: operator.ge}
+        return reflected[op](other, self)
 
     def __gt__(self, other):
         return self.compare(operator.gt, other)

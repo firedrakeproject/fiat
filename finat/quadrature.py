@@ -66,7 +66,13 @@ def make_quadrature(ref_el, degree, scheme="default"):
         fiat_rule = fiat_scheme(ref_el, degree, scheme)
         point_set = PointSet(fiat_rule.get_points())
 
-    return QuadratureRule(point_set, fiat_rule.get_weights(), ref_el=ref_el, io_ornt_map_tuple=fiat_rule._intrinsic_orientation_permutation_map_tuple)
+    io_ornt_map_tuple = fiat_rule._intrinsic_orientation_permutation_map_tuple
+    if hasattr(ref_el, "orientation_point_permutations"):
+        # The cell defines its own orientations, so it says how they permute the points
+        perms = ref_el.orientation_point_permutations(point_set.points)
+        if perms is not None:
+            io_ornt_map_tuple = (perms,)
+    return QuadratureRule(point_set, fiat_rule.get_weights(), ref_el=ref_el, io_ornt_map_tuple=io_ornt_map_tuple)
 
 
 class AbstractQuadratureRule(metaclass=ABCMeta):

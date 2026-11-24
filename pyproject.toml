@@ -14,7 +14,6 @@ dependencies = [
   "scipy",
   "symengine",
   "sympy",
-  "fuse-element @ git+https://github.com/firedrakeproject/fuse.git",
 ]
 requires-python = ">=3.11"
 authors = [
