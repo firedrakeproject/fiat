@@ -27,19 +27,6 @@ one = gem.Literal(1.0)
 Pullback = namedtuple("Pullback", ["forward", "inverse"])
 
 
-class NeedsCoordinateMappingElement(metaclass=ABCMeta):
-    """Abstract class for elements that require physical information
-    either to map or construct their basis functions."""
-
-    @property
-    def needs_coordinate_mapping(self):
-        """Whether element evaluation requires a coordinate mapping."""
-        return True
-
-    def dual_transformation(self, Q, coordinate_mapping=None):
-        raise NotImplementedError(f"Dual evaluation for {type(self).__name__} is not implemented.")
-
-
 class MappedTabulation(Mapping):
     """A lazy tabulation dict that applies the basis transformation only
     on the requested derivatives.
@@ -264,7 +251,7 @@ class PhysicallyMappedFunctional:
         return one / dilation if p < 0 else gem.as_gem(dilation)
 
 
-class PhysicallyMappedElement(NeedsCoordinateMappingElement):
+class PhysicallyMappedElement(metaclass=ABCMeta):
     """A mixin that applies a "physical" transformation to tabulated
     basis functions."""
 
@@ -280,6 +267,11 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         super().__init__(*args, **kwargs)
         cite("Kirby2018zany")
         cite("Kirby2019zany")
+
+    @property
+    def needs_coordinate_mapping(self):
+        """Whether element evaluation requires a coordinate mapping."""
+        return True
 
     def basis_transformation(self, coordinate_mapping):
         r"""Transformation matrix for the basis functions.
@@ -667,10 +659,18 @@ class VandermondeMatrix:
         return chi
 
 
-class DirectlyDefinedElement(NeedsCoordinateMappingElement):
-    """Base class for directly defined elements such as direct
-    serendipity that bypass a coordinate mapping."""
-    pass
+class DirectlyDefinedElement(metaclass=ABCMeta):
+    """A mixin for elements such as direct serendipity whose basis
+    functions are constructed directly on the physical cell rather than
+    pulled back from a reference element."""
+
+    @property
+    def needs_coordinate_mapping(self):
+        """Whether element evaluation requires a coordinate mapping."""
+        return True
+
+    def dual_transformation(self, Q, coordinate_mapping=None):
+        raise NotImplementedError(f"Dual evaluation for {type(self).__name__} is not implemented.")
 
 
 class PhysicalGeometry(metaclass=ABCMeta):
