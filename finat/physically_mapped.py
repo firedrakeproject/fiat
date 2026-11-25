@@ -31,6 +31,11 @@ class NeedsCoordinateMappingElement(metaclass=ABCMeta):
     """Abstract class for elements that require physical information
     either to map or construct their basis functions."""
 
+    @property
+    def needs_coordinate_mapping(self):
+        """Whether element evaluation requires a coordinate mapping."""
+        return True
+
     def dual_transformation(self, Q, coordinate_mapping=None):
         raise NotImplementedError(f"Dual evaluation for {type(self).__name__} is not implemented.")
 

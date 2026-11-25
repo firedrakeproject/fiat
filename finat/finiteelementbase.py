@@ -6,7 +6,6 @@ import numpy
 from gem.interpreter import evaluate
 from gem.utils import cached_property
 
-from finat.physically_mapped import NeedsCoordinateMappingElement
 from finat.quadrature import make_quadrature
 
 
@@ -33,7 +32,7 @@ class FiniteElementBase(metaclass=ABCMeta):
     @property
     def needs_coordinate_mapping(self):
         """Whether element evaluation requires a coordinate mapping."""
-        return isinstance(self, NeedsCoordinateMappingElement)
+        return False
 
     @abstractproperty
     def cell(self):
