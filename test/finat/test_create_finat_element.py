@@ -3,7 +3,7 @@ import pytest
 import ufl
 import finat.ufl
 import finat
-from finat.element_factory import create_element, supported_elements
+from finat.element_factory import create_element, defelement_names, supported_elements
 
 
 @pytest.fixture(params=["BDM",
@@ -25,6 +25,10 @@ def ufl_element(triangle_names):
 def test_triangle_basic(ufl_element):
     element = create_element(ufl_element)
     assert isinstance(element, supported_elements[ufl_element.family()])
+
+
+def test_defelement_names_has_every_supported_element():
+    assert defelement_names.keys() == supported_elements.keys()
 
 
 @pytest.fixture
