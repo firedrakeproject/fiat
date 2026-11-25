@@ -88,31 +88,9 @@ class EnrichedElement(FiniteElement):
     def tabulate(self, order, points, entity=None):
         """Return tabulated values of derivatives up to given order of
         basis functions at given points."""
-
-        num_components = numpy.prod(self.value_shape())
-        table_shape = (self.space_dimension(), num_components, len(points))
-
-        table = {}
-        irange = slice(0)
-        for element in self._elements:
-
-            etable = element.tabulate(order, points, entity)
-            irange = slice(irange.stop, irange.stop + element.space_dimension())
-
-            # Insert element table into table
-            for dtuple in etable.keys():
-
-                if dtuple not in table:
-                    if num_components == 1:
-                        table[dtuple] = numpy.zeros((self.space_dimension(), len(points)),
-                                                    dtype=etable[dtuple].dtype)
-                    else:
-                        table[dtuple] = numpy.zeros(table_shape,
-                                                    dtype=etable[dtuple].dtype)
-
-                table[dtuple][irange][:] = etable[dtuple]
-
-        return table
+        tables = [e.tabulate(order, points, entity) for e in self._elements]
+        return {alpha: numpy.concatenate([t[alpha] for t in tables])
+                for alpha in tables[0]}
 
     def value_shape(self):
         """Return the value shape of the finite element functions."""

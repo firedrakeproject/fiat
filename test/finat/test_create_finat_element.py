@@ -3,7 +3,7 @@ import pytest
 import ufl
 import finat.ufl
 import finat
-from finat.element_factory import create_element, supported_elements
+from finat.element_factory import create_element, defelement_names, supported_elements
 
 
 @pytest.fixture(params=["BDM",
@@ -32,6 +32,10 @@ def test_reduced_hermite(cell):
     element = create_element(finat.ufl.FiniteElement("HER-red", cell, 3))
     assert isinstance(element, finat.ReducedHermite)
     assert element.space_dimension() == (cell.topological_dimension + 1)**2
+
+
+def test_defelement_names_has_every_supported_element():
+    assert defelement_names.keys() == supported_elements.keys()
 
 
 @pytest.fixture
