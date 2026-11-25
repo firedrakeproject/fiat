@@ -67,7 +67,7 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">ufc_cell</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"as_fiat_cell"</span><span class="p">,</span> <span class="s2">"create_base_element"</span><span class="p">,</span>
-           <span class="s2">"create_element"</span><span class="p">,</span> <span class="s2">"supported_elements"</span><span class="p">)</span>
+           <span class="s2">"create_element"</span><span class="p">,</span> <span class="s2">"defelement_names"</span><span class="p">,</span> <span class="s2">"supported_elements"</span><span class="p">)</span>
 
 
 <span class="c1"># List of supported elements and mapping to element classes</span>
@@ -149,6 +149,84 @@
 <span class="sd">FInAT-equivalent constructors.  If the value is ``None``, the UFL</span>
 <span class="sd">element is supported, but must be handled specially because it doesn't</span>
 <span class="sd">have a direct FInAT equivalent."""</span>
+
+<span class="n">defelement_names</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"Alfeld C2"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">"Alfeld-Sorokina"</span><span class="p">:</span> <span class="s2">"alfeld-sorokina"</span><span class="p">,</span>
+    <span class="s2">"Argyris"</span><span class="p">:</span> <span class="s2">"argyris"</span><span class="p">,</span>
+    <span class="s2">"Arnold-Qin"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">"Bell"</span><span class="p">:</span> <span class="s2">"bell"</span><span class="p">,</span>
+    <span class="s2">"Bernardi-Raugel"</span><span class="p">:</span> <span class="s2">"bernardi-raugel"</span><span class="p">,</span>
+    <span class="s2">"Bernardi-Raugel Bubble"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">"Bernstein"</span><span class="p">:</span> <span class="s2">"bernstein"</span><span class="p">,</span>
+    <span class="s2">"Bramble-Zlamal C2"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">"Brezzi-Douglas-Fortin-Marini"</span><span class="p">:</span> <span class="s2">"brezzi-douglas-fortin-marini"</span><span class="p">,</span>
+    <span class="s2">"Brezzi-Douglas-Marini"</span><span class="p">:</span> <span class="s2">"brezzi-douglas-marini"</span><span class="p">,</span>
+    <span class="s2">"Brezzi-Douglas-Marini Cube Edge"</span><span class="p">:</span> <span class="s2">"scurl"</span><span class="p">,</span>
+    <span class="s2">"Brezzi-Douglas-Marini Cube Face"</span><span class="p">:</span> <span class="s2">"sdiv"</span><span class="p">,</span>
+    <span class="s2">"Bubble"</span><span class="p">:</span> <span class="s2">"bubble"</span><span class="p">,</span>
+    <span class="s2">"Christiansen-Hu"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">"Conforming Arnold-Winther"</span><span class="p">:</span> <span class="s2">"arnold-winther"</span><span class="p">,</span>
+    <span class="s2">"Crouzeix-Raviart"</span><span class="p">:</span> <span class="s2">"crouzeix-raviart"</span><span class="p">,</span>
+    <span class="s2">"Direct Serendipity"</span><span class="p">:</span> <span class="s2">"direct-serendipity"</span><span class="p">,</span>
+    <span class="s2">"Discontinuous Lagrange"</span><span class="p">:</span> <span class="s2">"discontinuous-lagrange"</span><span class="p">,</span>
+    <span class="s2">"Discontinuous Lagrange L2"</span><span class="p">:</span> <span class="s2">"discontinuous-lagrange"</span><span class="p">,</span>
+    <span class="s2">"Discontinuous Raviart-Thomas"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">"Discontinuous Taylor"</span><span class="p">:</span> <span class="s2">"taylor"</span><span class="p">,</span>
+    <span class="s2">"DPC"</span><span class="p">:</span> <span class="s2">"dpc"</span><span class="p">,</span>
+    <span class="s2">"DPC L2"</span><span class="p">:</span> <span class="s2">"dpc"</span><span class="p">,</span>
+    <span class="s2">"DQ"</span><span class="p">:</span> <span class="s2">"discontinuous-lagrange"</span><span class="p">,</span>
+    <span class="s2">"DQ L2"</span><span class="p">:</span> <span class="s2">"discontinuous-lagrange"</span><span class="p">,</span>
+    <span class="s2">"FacetBubble"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">"Gauss-Legendre"</span><span class="p">:</span> <span class="s2">"gauss-legendre"</span><span class="p">,</span>
+    <span class="s2">"Gauss-Legendre L2"</span><span class="p">:</span> <span class="s2">"gauss-legendre"</span><span class="p">,</span>
+    <span class="s2">"Gauss-Lobatto-Legendre"</span><span class="p">:</span> <span class="s2">"lagrange"</span><span class="p">,</span>
+    <span class="s2">"Gopalakrishnan-Lederer-Schoberl 1st kind"</span><span class="p">:</span> <span class="s2">"gopalakrishnan-lederer-schoberl"</span><span class="p">,</span>
+    <span class="s2">"Gopalakrishnan-Lederer-Schoberl 2nd kind"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">"Guzman-Neilan 1st kind H1"</span><span class="p">:</span> <span class="s2">"guzman-neilan"</span><span class="p">,</span>
+    <span class="s2">"Guzman-Neilan 2nd kind H1"</span><span class="p">:</span> <span class="s2">"guzman-neilan2"</span><span class="p">,</span>
+    <span class="s2">"Guzman-Neilan Bubble"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">"Guzman-Neilan H1(div)"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">"HDiv Trace"</span><span class="p">:</span> <span class="s2">"lagrange"</span><span class="p">,</span>
+    <span class="s2">"Hellan-Herrmann-Johnson"</span><span class="p">:</span> <span class="s2">"hellan-herrmann-johnson"</span><span class="p">,</span>
+    <span class="s2">"Hermite"</span><span class="p">:</span> <span class="s2">"hermite"</span><span class="p">,</span>
+    <span class="s2">"Hsieh-Clough-Tocher"</span><span class="p">:</span> <span class="s2">"hsieh-clough-tocher"</span><span class="p">,</span>
+    <span class="s2">"Hu-Zhang"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">"Johnson-Mercier"</span><span class="p">:</span> <span class="s2">"johnson-mercier"</span><span class="p">,</span>
+    <span class="s2">"Kong-Mulder-Veldhuizen"</span><span class="p">:</span> <span class="s2">"kong-mulder-veldhuizen"</span><span class="p">,</span>
+    <span class="s2">"Lagrange"</span><span class="p">:</span> <span class="s2">"lagrange"</span><span class="p">,</span>
+    <span class="s2">"Mardal-Tai-Winther"</span><span class="p">:</span> <span class="s2">"mardal-tai-winther"</span><span class="p">,</span>
+    <span class="s2">"Morley"</span><span class="p">:</span> <span class="s2">"morley"</span><span class="p">,</span>
+    <span class="s2">"NCE"</span><span class="p">:</span> <span class="s2">"nedelec1"</span><span class="p">,</span>
+    <span class="s2">"NCF"</span><span class="p">:</span> <span class="s2">"raviart-thomas"</span><span class="p">,</span>
+    <span class="s2">"Nedelec 1st kind H(curl)"</span><span class="p">:</span> <span class="s2">"nedelec1"</span><span class="p">,</span>
+    <span class="s2">"Nedelec 2nd kind H(curl)"</span><span class="p">:</span> <span class="s2">"nedelec2"</span><span class="p">,</span>
+    <span class="s2">"Nonconforming Arnold-Winther"</span><span class="p">:</span> <span class="s2">"nonconforming-arnold-winther"</span><span class="p">,</span>
+    <span class="s2">"Nonconforming Robust Wu-Xu"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">"Nonconforming Wu-Xu"</span><span class="p">:</span> <span class="s2">"wu-xu"</span><span class="p">,</span>
+    <span class="s2">"Q"</span><span class="p">:</span> <span class="s2">"lagrange"</span><span class="p">,</span>
+    <span class="s2">"QuadraticPowellSabin12"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">"QuadraticPowellSabin6"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">"Raviart-Thomas"</span><span class="p">:</span> <span class="s2">"raviart-thomas"</span><span class="p">,</span>
+    <span class="s2">"Real"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">"Reduced-Arnold-Qin"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">"Reduced-Hermite"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">"Reduced-Hsieh-Clough-Tocher"</span><span class="p">:</span> <span class="s2">"reduced-hsieh-clough-tocher"</span><span class="p">,</span>
+    <span class="s2">"Reduced-Walkington"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">"Regge"</span><span class="p">:</span> <span class="s2">"regge"</span><span class="p">,</span>
+    <span class="s2">"Rotated-Bernardi-Raugel"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">"RTCE"</span><span class="p">:</span> <span class="s2">"nedelec1"</span><span class="p">,</span>
+    <span class="s2">"RTCF"</span><span class="p">:</span> <span class="s2">"raviart-thomas"</span><span class="p">,</span>
+    <span class="s2">"S"</span><span class="p">:</span> <span class="s2">"serendipity"</span><span class="p">,</span>
+    <span class="s2">"SminusCurl"</span><span class="p">:</span> <span class="s2">"trimmed-serendipity-curl"</span><span class="p">,</span>
+    <span class="s2">"SminusDiv"</span><span class="p">:</span> <span class="s2">"trimmed-serendipity-div"</span><span class="p">,</span>
+    <span class="s2">"SminusE"</span><span class="p">:</span> <span class="s2">"trimmed-serendipity-curl"</span><span class="p">,</span>
+    <span class="s2">"SminusF"</span><span class="p">:</span> <span class="s2">"trimmed-serendipity-div"</span><span class="p">,</span>
+    <span class="s2">"Walkington"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="sd">"""A :class:`.dict` mapping each key of :data:`supported_elements` to the name</span>
+<span class="sd">of its DefElement page, ``https://defelement.org/elements/&lt;name&gt;.html``.  If</span>
+<span class="sd">the value is ``None``, DefElement has no page for that family."""</span>
 
 
 <div class="viewcode-block" id="as_fiat_cell">
