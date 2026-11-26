@@ -1,4 +1,7 @@
+import inspect
 from abc import ABCMeta, abstractmethod, abstractproperty
+from collections.abc import Hashable
+from functools import cache
 from itertools import chain
 
 import gem
@@ -27,7 +30,58 @@ def broadcast_tensor(expression, multiindex):
     return gem.ComponentTensor(expression, multiindex)
 
 
+@cache
+def _init_signature(cls):
+    """Return the signature of the ``__init__`` method of cls."""
+    return inspect.signature(cls.__init__)
+
+
+def _freeze(value):
+    """Return an immutable and hashable copy of value."""
+    if isinstance(value, (list, tuple)):
+        return tuple(map(_freeze, value))
+    elif isinstance(value, dict):
+        return frozenset((k, _freeze(v)) for k, v in value.items())
+    elif isinstance(value, numpy.ndarray):
+        return (numpy.ndarray, value.dtype.str, value.shape, value.tobytes())
+    else:
+        assert isinstance(value, Hashable)
+        return value
+
+
 class FiniteElementBase(metaclass=ABCMeta):
+    """Abstract base class for FInAT finite elements."""
+
+    def __new__(cls, *args, **kwargs):
+        self = super().__new__(cls)
+        self._init_args = (args, kwargs)
+        return self
+
+    def __getnewargs_ex__(self):
+        return self._init_args
+
+    @cached_property
+    def _hash_key(self):
+        """The hash key of this element, which holds its type and its constructor arguments."""
+        args, kwargs = self._init_args
+        bound = _init_signature(type(self)).bind(self, *args, **kwargs)
+        bound.apply_defaults()
+        arguments = tuple(bound.arguments.items())[1:]
+        return (type(self), _freeze(arguments))
+
+    def __hash__(self):
+        return hash(self._hash_key)
+
+    def __eq__(self, other):
+        """Return whether self and other are the same element.
+
+        Two elements compare equal when they have the same type and were
+        constructed with the same arguments. The arguments are matched to the
+        parameters of ``__init__`` before the comparison, so
+        ``Lagrange(cell, 2)`` and ``Lagrange(cell, degree=2)`` are equal, and
+        so are ``Hermite(cell)`` and ``Hermite(cell, degree=3)``.
+        """
+        return type(self) is type(other) and self._hash_key == other._hash_key
 
     @abstractproperty
     def cell(self):
