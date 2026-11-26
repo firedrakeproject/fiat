@@ -5,9 +5,9 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "firedrake-fiat"
 # TODO RELEASE
-version = "2026.5.0.dev0"
+version = "2026.10.2.dev0"
 dependencies = [
-  "fenics-ufl==2026.2",
+  "fenics-ufl==2026.2.*",
   "numpy>=1.16",
   "recursivenodes",
   "scipy",
