@@ -3,7 +3,7 @@ import pytest
 import ufl
 import finat.ufl
 import finat
-from finat.element_factory import create_element, supported_elements
+from finat.element_factory import create_element, defelement_names, supported_elements
 
 
 @pytest.fixture(params=["BDM",
@@ -25,6 +25,17 @@ def ufl_element(triangle_names):
 def test_triangle_basic(ufl_element):
     element = create_element(ufl_element)
     assert isinstance(element, supported_elements[ufl_element.family()])
+
+
+@pytest.mark.parametrize("cell", [ufl.triangle, ufl.tetrahedron])
+def test_reduced_hermite(cell):
+    element = create_element(finat.ufl.FiniteElement("HER-red", cell, 3))
+    assert isinstance(element, finat.ReducedHermite)
+    assert element.space_dimension() == (cell.topological_dimension + 1)**2
+
+
+def test_defelement_names_has_every_supported_element():
+    assert defelement_names.keys() == supported_elements.keys()
 
 
 @pytest.fixture

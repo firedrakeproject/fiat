@@ -215,3 +215,20 @@ class Nedelec(finite_element.CiarletElement):
         dual = NedelecDual(ref_el, degree, variant, interpolant_deg, quad_scheme)
         formdegree = 1  # 1-form
         super().__init__(poly_set, dual, degree, formdegree, mapping="covariant piola")
+
+
+def contravariant_piola_dual(J, values, avg=False):
+    r"""Map test functions so their moments commute with contravariant Piola.
+
+    With quadrature weights scaled by :math:`|\det J|`, the factor is
+    :math:`\operatorname{sign}(\det J)J^{-T}`. With averaged weights, the
+    factor is :math:`\det J J^{-T}`.
+
+    :arg J: Square Jacobian mapping reference to physical coordinates.
+    :arg values: Reference test functions, shaped ``(nbasis, dim, npoints)``.
+    :arg avg: Whether the quadrature weights omit the Jacobian measure.
+    """
+    detJ = numpy.linalg.det(J)
+    scale = detJ if avg else numpy.sign(detJ)
+    transform = scale * numpy.linalg.inv(J).T
+    return numpy.einsum("ij,bjq->biq", transform, values)
