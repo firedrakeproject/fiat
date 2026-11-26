@@ -89,6 +89,27 @@ def test_list_tensor_specialisation_with_independent_selector():
     assert set(result.children) == {specialised, selector}
 
 
+def test_list_tensor_specialisation_with_selector_in_entries():
+    # The gradient of a vector-valued basis repeats the component
+    # selector in the entry for each direction.
+    row, source, target, direction = (gem.Index(extent=2) for _ in range(4))
+    point = gem.Index()
+    weights = gem.Literal([[2, 3], [5, 7]])[direction, point]
+    values = gem.Variable("values", (2,))[point]
+    tables = [gem.ListTensor([values, 2 * values])[row],
+              gem.ListTensor([3 * values, 5 * values])[row]]
+    selector = gem.Delta(source, target)
+
+    def gradient(selector):
+        entries = gem.ListTensor([selector * table for table in tables])
+        return gem.IndexSum(entries[direction] * weights, (direction, point))
+
+    specialised = optimise_contraction(gradient(gem.Literal(1)))
+    result = optimise_contraction(gradient(selector))
+    assert isinstance(result, gem.Product)
+    assert set(result.children) == {specialised, selector}
+
+
 def test_delta_substitution_under_sum():
     i, j = gem.indices(2)
     table = gem.Literal([[1, 2], [8, 16]])

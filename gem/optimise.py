@@ -711,11 +711,51 @@ def traverse_sum(expression, stop_at=None):
     return result
 
 
+def pull_common_factors(expression):
+    r"""Pull the factors shared by every entry out of an indexed ListTensor.
+
+    .. math::
+        [c x_0, \dots, c x_{n-1}]_i = c \, [x_0, \dots, x_{n-1}]_i
+
+    A ListTensor of derivatives of a tensor-valued basis repeats in
+    every entry the Delta that couples a basis function to its value
+    component.  Pulling it out lets it cancel like any other Delta.
+
+    Parameters
+    ----------
+    expression : Node
+        Scalar GEM expression.
+
+    Returns
+    -------
+    tuple
+        The factors shared by every entry, and the indexed ListTensor
+        of the remaining factors.  If ``expression`` is not an indexed
+        ListTensor, or its entries share no factor, the factors are
+        empty and the expression is ``expression`` itself.
+    """
+    if not (isinstance(expression, Indexed) and isinstance(expression.children[0], ListTensor)):
+        return (), expression
+    tensor, = expression.children
+    entries = [traverse_product(entry, stop_at=lambda node: not isinstance(node, Product))[1]
+               for entry in tensor.array.flat]
+    common = [f for f in OrderedDict.fromkeys(entries[0])
+              if all(f in factors for factors in entries[1:])]
+    if not common:
+        return (), expression
+    for factors in entries:
+        for f in common:
+            factors.remove(f)
+    rest = numpy.array([Product(*factors) for factors in entries]).reshape(tensor.shape)
+    return tuple(common), Indexed(ListTensor(rest), expression.multiindex)
+
+
 def contraction(expression):
     """Cancel Deltas and sum-factorise the tensor product at the root.
 
     This function flattens the product tree at the root into factors
-    and summation indices, cancels Deltas against the summation
+    and summation indices, pulls out the factors shared by every entry
+    of an indexed ListTensor, cancels Deltas against the summation
     indices, and sum-factorises the remaining contraction.
 
     A ListTensor indexed by a free index of ``expression`` hides its
@@ -753,8 +793,17 @@ def contraction(expression):
     expression = index_replacer(expression, ())
 
     def decompose(expression):
-        """Flatten the product at the root and cancel its Deltas."""
+        """Flatten the product at the root, out of ListTensors too, and cancel its Deltas."""
         sum_indices, factors = traverse_product(expression, index_replacer=index_replacer)
+        stack = factors[::-1]
+        factors = []
+        while stack:
+            common, rest = pull_common_factors(stack.pop())
+            if common:
+                stack.append(rest)
+                stack.extend(reversed(common))
+            else:
+                factors.append(rest)
         sum_indices, factors = delta_elimination(sum_indices, factors, index_replacer=index_replacer)
         return sum_indices, [index_replacer(f, ()) for f in factors]
 
