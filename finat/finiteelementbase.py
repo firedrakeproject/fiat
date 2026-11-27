@@ -83,6 +83,11 @@ class FiniteElementBase(metaclass=ABCMeta):
         """
         return type(self) is type(other) and self._hash_key == other._hash_key
 
+    @property
+    def needs_coordinate_mapping(self):
+        """Whether element evaluation requires a coordinate mapping."""
+        return False
+
     @abstractproperty
     def cell(self):
         '''The reference cell on which the element is defined.'''

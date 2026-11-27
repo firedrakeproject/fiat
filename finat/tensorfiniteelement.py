@@ -52,6 +52,10 @@ class TensorFiniteElement(FiniteElementBase):
         return self._base_element
 
     @property
+    def needs_coordinate_mapping(self):
+        return self.base_element.needs_coordinate_mapping
+
+    @property
     def cell(self):
         return self._base_element.cell
 
