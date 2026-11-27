@@ -102,6 +102,16 @@ def test_flatten_indexsum(A):
     assert result == expected
 
 
+def test_indexed_gather(X):
+    i, j = gem.indices(2)
+    perm = gem.Literal(numpy.array([1, 0]), dtype=gem.uint_type)
+    gathered = gem.ComponentTensor(gem.Indexed(X, (gem.VariableIndex(gem.Indexed(perm, (i,))), j)), (i, j))
+
+    k, l = gem.indices(2)
+    result = gem.Indexed(gathered, (k, l))
+    assert set(result.free_indices) == {k, l}
+
+
 @pytest.mark.parametrize("shape", [(), (3,), (7, 2), (2, 3, 4)])
 def test_constant_fold_zero_table(shape):
     """A Literal of any shape that holds only zeros folds to a Zero."""
