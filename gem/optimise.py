@@ -3,7 +3,8 @@ expressions."""
 
 from collections import OrderedDict, defaultdict
 from functools import singledispatch, partial
-from itertools import combinations, permutations, zip_longest
+from itertools import combinations, permutations
+from math import prod
 from numbers import Integral
 
 import numpy
@@ -167,6 +168,29 @@ def replace_indices_flexiblyindexed(node, self, subst):
         return node
     else:
         return FlexiblyIndexed(child, dim2idxs)
+
+
+@replace_indices.register(IndexSum)
+def replace_indices_indexsum(node, self, subst):
+    targets = set()
+    for _, replacement in subst:
+        if isinstance(replacement, Index):
+            targets.add(replacement)
+        elif isinstance(replacement, VariableIndex):
+            targets.update(replacement.expression.free_indices)
+
+    # A replacement can introduce a free index with the name of a local sum.
+    renames = {i: Index(extent=i.extent) for i in node.multiindex if i in targets}
+    indices = tuple(renames.get(i, i) for i in node.multiindex)
+    child, = node.children
+    summand = self(child, tuple(sorted((*subst, *renames.items()))))
+    if not renames and summand == child:
+        return node
+
+    # Specialising a ListTensor entry can make the summand invariant in an index.
+    active = tuple(i for i in indices if i in summand.free_indices)
+    extent = prod(i.extent for i in indices if i not in summand.free_indices)
+    return Product(Literal(extent, dtype=summand.dtype), IndexSum(summand, active))
 
 
 def filtered_replace_indices(node, self, subst):
@@ -368,10 +392,6 @@ def associate(operator, operands):
 
     :returns: (reduced expression, # of floating-point operations)
     """
-    if len(operands) > 32:
-        # O(N^3) algorithm
-        raise NotImplementedError("Not expected such a complicated expression!")
-
     def count(pair):
         """Operation count to reduce a pair of GEM expressions"""
         a, b = pair
@@ -379,6 +399,14 @@ def associate(operator, operands):
         return numpy.prod(extents, dtype=int)
 
     flops = 0
+    if len(operands) > 32:
+        # A linear pass bounds compile time for large products and sums.
+        result, *rest = operands
+        for operand in rest:
+            flops += count((result, operand))
+            result = operator(result, operand)
+        return result, flops
+
     while len(operands) > 1:
         # Greedy algorithm: choose a pair of operands that are the
         # cheapest to reduce.
@@ -447,9 +475,12 @@ def _contract(terms, sum_index):
     deferred = [t for t in terms if sum_index not in t.free_indices]
 
     # Optimise associativity
-    product, flops = associate(Product, contract)
-    term = IndexSum(product, (sum_index,))
-    flops += numpy.prod([i.extent for i in product.free_indices], dtype=int)
+    if contract:
+        product, flops = associate(Product, contract)
+        term = IndexSum(product, (sum_index,))
+        flops += numpy.prod([i.extent for i in product.free_indices], dtype=int)
+    else:
+        term, flops = Literal(sum_index.extent), 0
 
     # Replace the contracted terms with the result of the contraction.
     return deferred + [term], flops
@@ -625,6 +656,7 @@ def traverse_product(expression, stop_at=None, renamer=None, index_replacer=None
     """
     if renamer is None:
         renamer = make_renamer(make_rename_map())
+        renamer(expression.free_indices)
     if index_replacer is None:
         index_replacer = MemoizerArg(filtered_replace_indices)
 
@@ -679,15 +711,79 @@ def traverse_sum(expression, stop_at=None):
     return result
 
 
+def pull_common_factors(expression):
+    r"""Pull the factors shared by every entry out of an indexed ListTensor.
+
+    .. math::
+        [c x_0, \dots, c x_{n-1}]_i = c \, [x_0, \dots, x_{n-1}]_i
+
+    A ListTensor of derivatives of a tensor-valued basis repeats in
+    every entry the Delta that couples a basis function to its value
+    component.  Pulling it out lets it cancel like any other Delta.
+
+    Parameters
+    ----------
+    expression : Node
+        Scalar GEM expression.
+
+    Returns
+    -------
+    tuple
+        The factors shared by every entry, and the indexed ListTensor
+        of the remaining factors.  If ``expression`` is not an indexed
+        ListTensor, or its entries share no factor, the factors are
+        empty and the expression is ``expression`` itself.
+    """
+    if not (isinstance(expression, Indexed) and isinstance(expression.children[0], ListTensor)):
+        return (), expression
+    tensor, = expression.children
+    entries = [traverse_product(entry, stop_at=lambda node: not isinstance(node, Product))[1]
+               for entry in tensor.array.flat]
+    common = [f for f in OrderedDict.fromkeys(entries[0])
+              if all(f in factors for factors in entries[1:])]
+    if not common:
+        return (), expression
+    for factors in entries:
+        for f in common:
+            factors.remove(f)
+    rest = numpy.array([Product(*factors) for factors in entries]).reshape(tensor.shape)
+    return tuple(common), Indexed(ListTensor(rest), expression.multiindex)
+
+
 def contraction(expression):
-    """Optimise the contractions of the tensor product at the root of
-    the expression, including:
+    """Cancel Deltas and sum-factorise the tensor product at the root.
 
-    - IndexSum-Delta cancellation
-    - Sum factorisation
+    This function flattens the product tree at the root into factors
+    and summation indices, pulls out the factors shared by every entry
+    of an indexed ListTensor, cancels Deltas against the summation
+    indices, and sum-factorises the remaining contraction.
 
-    This routine was designed with finite element coefficient
-    evaluation in mind.
+    A ListTensor indexed by a free index of ``expression`` hides its
+    entries from sum factorisation.  Such ListTensors compose the value
+    shape of tensor product H(div) and H(curl) elements, and the basis
+    transformation of physically mapped elements.  To expose the
+    entries, this function splits the factors into independent
+    contractions, and turns each contraction that contains such a
+    ListTensor into a new ListTensor of sum-factorised entries.
+    Factors that share no summation index with the ListTensor stay
+    outside it.
+
+    A Delta in ``expression`` usually selects a component of a
+    vector-valued Argument, and :func:`gem.refactorise.collect_monomials`
+    must find it outside every ListTensor.  This function therefore
+    does not split a contraction if one of its factors carries a free
+    index of a Delta.
+
+    Parameters
+    ----------
+    expression : Node
+        Scalar GEM expression to optimise.
+
+    Returns
+    -------
+    Node
+        An equivalent expression with the same free indices and
+        optimised contractions.
     """
 
     # Common memoizer to remove ComponentTensors
@@ -696,38 +792,74 @@ def contraction(expression):
     # Eliminate annoying ComponentTensors
     expression = index_replacer(expression, ())
 
-    # Flatten product tree, eliminate deltas, sum factorise
-    def rebuild(expression):
+    def decompose(expression):
+        """Flatten the product at the root, out of ListTensors too, and cancel its Deltas."""
         sum_indices, factors = traverse_product(expression, index_replacer=index_replacer)
+        stack = factors[::-1]
+        factors = []
+        while stack:
+            common, rest = pull_common_factors(stack.pop())
+            if common:
+                stack.append(rest)
+                stack.extend(reversed(common))
+            else:
+                factors.append(rest)
         sum_indices, factors = delta_elimination(sum_indices, factors, index_replacer=index_replacer)
-        factors = [index_replacer(f, ()) for f in factors]
+        return sum_indices, [index_replacer(f, ()) for f in factors]
+
+    # Cancel Deltas before grouping: a Delta can be the only factor
+    # that links a ListTensor to an otherwise independent factor.
+    sum_indices, factors = decompose(expression)
+
+    # Only free indices of the whole expression can become ListTensor axes.
+    eligible = set(expression.free_indices)
+
+    def find_list_indices(node, recurse):
+        """Eligible indices that index a ListTensor in ``node``."""
+        # Ignore indices that are not free in node.
+        allowed = eligible.intersection(node.free_indices)
+        if not allowed:
+            return ()
+
+        children = node.children
+        if isinstance(node, (Indexed, FlexiblyIndexed)):
+            children += node.indirect_children
+        indices = OrderedDict.fromkeys(i for child in children for i in recurse(child) if i in allowed)
+        if isinstance(node, Indexed) and isinstance(node.children[0], ListTensor):
+            indices.update((i, None) for i in node.multiindex if i in allowed)
+        return tuple(indices)
+
+    list_indices = Memoizer(find_list_indices)
+
+    if not any(list_indices(factor) for factor in factors):
         return sum_factorise(sum_indices, factors)
 
-    # Sometimes the value shape is composed as a ListTensor, which
-    # could get in the way of decomposing factors.  In particular,
-    # this is the case for H(div) and H(curl) conforming tensor
-    # product elements.  So if ListTensors are used, they are pulled
-    # out to be outermost, so we can straightforwardly factorise each
-    # of its entries.
-    lt_fis = OrderedDict()  # ListTensor free indices
-    for node in traversal((expression,)):
-        if isinstance(node, Indexed):
-            child, = node.children
-            if isinstance(child, ListTensor):
-                lt_fis.update(zip_longest(node.multiindex, ()))
-    lt_fis = tuple(index for index in lt_fis if index in expression.free_indices)
+    # Free indices of component selectors.  Delta cancellation may move
+    # them from the Delta onto other factors, so collect them from the
+    # original expression.
+    selector_indices = {i for node in traversal((expression,)) if isinstance(node, Delta)
+                        for i in node.free_indices if i in eligible}
 
-    if lt_fis:
-        # Rebuild each split component
-        tensor = ComponentTensor(expression, lt_fis)
-        entries = [Indexed(tensor, zeta) for zeta in numpy.ndindex(tensor.shape)]
-        entries = [index_replacer(e, ()) for e in entries]
-        return Indexed(ListTensor(
-            numpy.array(list(map(rebuild, entries))).reshape(tensor.shape)
-        ), lt_fis)
-    else:
-        # Rebuild whole expression at once
-        return rebuild(expression)
+    def rebuild(indices, group):
+        """Sum-factorise one contraction, split along its ListTensor indices."""
+        axes = tuple(OrderedDict.fromkeys(i for f in group for i in list_indices(f)))
+        if not axes or any(not selector_indices.isdisjoint(f.free_indices) for f in group):
+            return sum_factorise(indices, group)
+
+        # Each entry gives the ListTensor indices fixed values, which
+        # reduces every ListTensor in it to a single component.
+        tensor = ComponentTensor(IndexSum(Product(*group), indices), axes)
+        entries = [sum_factorise(*decompose(index_replacer(Indexed(tensor, zeta), ())))
+                   for zeta in numpy.ndindex(tensor.shape)]
+        return Indexed(ListTensor(numpy.array(entries).reshape(tensor.shape)), axes)
+
+    # Contractions share only free indices, so their results multiply
+    # pointwise and each one can be split on its own.  Factors without
+    # a summation index form contractions of their own.
+    groups, terms = _independent_contractions(sum_indices, factors)
+    terms = [rebuild([], [factor]) for factor in terms]
+    terms.extend(rebuild(indices, group) for indices, group in groups)
+    return sum_factorise((), terms)
 
 
 @singledispatch

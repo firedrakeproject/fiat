@@ -1,9 +1,12 @@
 from functools import partial
 
+import numpy
 import pytest
 
 import gem
+from gem.interpreter import evaluate
 from gem.node import traversal
+from gem.optimise import contraction
 from gem.refactorise import ATOMIC, COMPOUND, OTHER, Monomial, collect_monomials
 
 
@@ -16,6 +19,103 @@ def classify(atomics_set, expression):
             return COMPOUND
 
     return OTHER
+
+
+@pytest.mark.parametrize("same_index", (False, True))
+def test_refactorise_contracted_list_tensor(same_index):
+    """A Delta that does not depend on the ListTensor index must stay
+    outside the ListTensor, so that collect_monomials can find it."""
+    i, q, source, target = (gem.Index(extent=2) for _ in range(4))
+    component = i if same_index else gem.Index(extent=2)
+    values = gem.Variable("values", (2,))
+    value = values[q]
+    table = gem.ListTensor([value, 2 * value])
+    weights = gem.Literal([3, 5])
+    tabulation = gem.IndexSum(table[i] * weights[q], (q,))
+    selector = gem.IndexSum(gem.Delta(source, component) * gem.Delta(component, target), (component,))
+    expression = tabulation * selector
+
+    delta = gem.Delta(source, target)
+    classifier = partial(classify, {delta})
+    monomials, = collect_monomials([contraction(expression)], classifier)
+    monomial, = monomials
+    assert monomial.atomics == (delta,)
+    assert monomial.sum_indices == ()
+    result = gem.Product(*monomial.atomics, monomial.rest)
+    tensor = gem.ComponentTensor(result, (i, source, target))
+    actual, = evaluate([tensor], bindings={values: numpy.array([2, 7])})
+    numpy.testing.assert_array_equal(actual.arr, [41 * numpy.eye(2), 82 * numpy.eye(2)])
+
+
+@pytest.mark.parametrize("lookup", ("linked", "shared", "bound"))
+def test_refactorise_list_tensor_selector(lookup):
+    i, q, s, t = (gem.Index(extent=2) for _ in range(4))
+    values = gem.Literal([2, 3])
+    table = gem.ListTensor([values[q], 2 * values[q]])
+    if lookup == "linked":
+        expression = gem.IndexSum(table[i] * gem.Delta(q, s) * gem.Delta(q, t), (q,))
+        delta = gem.Delta(s, t)
+    else:
+        tabulation = gem.IndexSum(table[i], (i, q) if lookup == "bound" else (q,))
+        delta = gem.Delta(i, t)
+        expression = tabulation * delta
+
+    monomials, = collect_monomials([contraction(expression)], partial(classify, {delta}))
+    monomial, = monomials
+    assert monomial.atomics == (delta,)
+    original, result = evaluate([expression, gem.Product(*monomial.atomics, monomial.rest)])
+    numpy.testing.assert_array_equal(result.broadcast(original.fids), original.arr)
+
+
+def test_refactorise_list_tensor_with_coupled_selector():
+    row, component, value = (gem.Index(extent=2) for _ in range(3))
+    point = gem.Index()
+    weights = gem.Literal([2, 3])[point]
+    table = gem.ListTensor([weights, 2 * weights])
+    selector = gem.Delta(component, value)
+    expression = gem.IndexSum(table[row] * (weights * selector + 1), (point,))
+
+    monomials, = collect_monomials([contraction(expression)], partial(classify, {selector}))
+    assert any(selector in monomial.atomics for monomial in monomials)
+    result = gem.Sum(*(gem.IndexSum(gem.Product(*m.atomics, m.rest), m.sum_indices)
+                       for m in monomials))
+    expected, actual = evaluate([expression, result])
+    numpy.testing.assert_array_equal(actual.broadcast(expected.fids), expected.arr)
+
+
+@pytest.mark.parametrize("nested", (False, True))
+def test_refactorise_free_sum_index(nested):
+    i, = gem.indices(1)
+    x = gem.Literal([2, 3])[i]
+    y = gem.Literal([7, 11])[i]
+    reduction = gem.IndexSum(y, (i,))
+    expression = x * (reduction + 1 if nested else reduction)
+
+    def classify_y(node):
+        if isinstance(node, gem.Indexed) and node.children == y.children:
+            return ATOMIC
+        return COMPOUND if any(isinstance(n, gem.Indexed) and n.children == y.children
+                               for n in traversal((node,))) else OTHER
+
+    monomials, = collect_monomials([expression], classify_y)
+    result = gem.Sum(*(gem.IndexSum(gem.Product(*m.atomics, m.rest), m.sum_indices)
+                       for m in monomials))
+    actual, = evaluate([result])
+    assert actual.fids == (i,)
+    numpy.testing.assert_array_equal(actual.arr, [38, 57] if nested else [36, 54])
+
+
+def test_refactorise_delta_trace():
+    i, j = (gem.Index(extent=2) for _ in range(2))
+    k, = gem.indices(1)
+    a = gem.Literal([2, 3])[k]
+    expression = gem.IndexSum(a * gem.Delta(i, j), (i, j))
+
+    monomials, = collect_monomials([expression], partial(classify, {a}))
+    monomial, = monomials
+    result, = evaluate([gem.Product(*monomial.atomics, monomial.rest)])
+    assert monomial.sum_indices == ()
+    numpy.testing.assert_array_equal(result.arr, [4, 6])
 
 
 def test_refactorise_rebound_sum_index():
