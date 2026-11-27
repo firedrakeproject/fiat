@@ -1,5 +1,3 @@
-from finat.point_set import UnknownPointSet, FacetPointSet
-
 import numpy
 
 import FIAT
@@ -9,6 +7,7 @@ from gem.interpreter import evaluate
 from gem.utils import cached_property
 
 from finat.finiteelementbase import FiniteElementBase
+from finat.point_set import FacetPointSet, UnionPointSet, UnknownPointSet
 from finat.quadrature import make_quadrature, AbstractQuadratureRule, QuadratureRule
 
 
@@ -204,15 +203,14 @@ class QuadratureElement(FiniteElementBase):
 
         :returns: one :class:`~finat.quadrature.QuadratureRule` for each
             point set of a :class:`~finat.point_set.UnionPointSet` rule, in
-            the order they are stacked, or an empty tuple if the rule has a
-            single point set.
+            the order they are stacked, or an empty tuple for other rules.
 
         A union of point sets is how the points of a direct sum are stacked,
         so splitting it back up recovers a rule for each summand, each on
         the points its own functionals evaluate on.
         """
-        rule_ps = self._rule.point_set
-        if len(rule_ps.point_sets) == 1:
+        rule_ps = self._point_set
+        if not isinstance(rule_ps, UnionPointSet):
             return ()
 
         rules = []

@@ -112,8 +112,8 @@ def test_mixed_enriched_element_dual_evaluation():
     check_nodal(mixed)
 
 
-@pytest.mark.parametrize("repeated", (False, True))
-def test_quadrature_element_on_union_of_points(repeated: bool):
+@pytest.mark.parametrize("layout", ("distinct", "repeated", "single"))
+def test_quadrature_element_on_union_of_points(layout: str):
     # Firedrake interpolates through a quadrature space on the points of the
     # target's dual basis, which for a direct sum is a union.  That element
     # has to evaluate on each point set of the union, just as the sum does.
@@ -121,8 +121,10 @@ def test_quadrature_element_on_union_of_points(repeated: bool):
     enriched = restricted_lagrange_sum(cell)
 
     _, ps = enriched.dual_basis
-    if repeated:
+    if layout == "repeated":
         ps = UnionPointSet([ps, PointSet(ps.point_sets[0].points.copy())])
+    elif layout == "single":
+        ps = UnionPointSet(ps.point_sets[:1])
     # The weights are not used, this quadrature scheme is not for integration.
     rule = QuadratureRule(ps, numpy.full(len(ps.points), numpy.nan), ref_el=cell)
     element = QuadratureElement(cell, rule)

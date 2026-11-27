@@ -5,6 +5,8 @@ from itertools import chain, product
 
 import numpy
 
+from FIAT.precision import calibrate_tolerance
+
 import gem
 from gem.utils import safe_repr
 
@@ -46,6 +48,14 @@ class AbstractPointSet(abc.ABC):
     def expression(self):
         """GEM expression describing the points, with free indices
         ``self.indices`` and shape (point dimension,)."""
+
+    def almost_equal(self, other, tolerance=None):
+        """Approximate numerical equality of point sets."""
+        if type(self) is not type(other) or self.points.shape != other.points.shape:
+            return False
+        if tolerance is None:
+            tolerance = calibrate_tolerance(1e-12, self.points.dtype)
+        return numpy.allclose(self.points, other.points, rtol=0, atol=tolerance)
 
     @cached_property
     def point_sets(self):
@@ -172,12 +182,6 @@ class PointSet(AbstractPointSet):
     def expression(self):
         return gem.partial_indexed(gem.Literal(self.points), self.indices)
 
-    def almost_equal(self, other, tolerance=1e-12):
-        """Approximate numerical equality of point sets"""
-        return type(self) is type(other) and \
-            self.points.shape == other.points.shape and \
-            numpy.allclose(self.points, other.points, rtol=0, atol=tolerance)
-
 
 class GaussLegendrePointSet(PointSet):
     """Gauss-Legendre quadrature points on the interval.
@@ -234,7 +238,7 @@ class TensorPointSet(AbstractPointSet):
                 result.append(gem.Indexed(point_set.expression, (i,)))
         return gem.ListTensor(result)
 
-    def almost_equal(self, other, tolerance=1e-12):
+    def almost_equal(self, other, tolerance=None):
         """Approximate numerical equality of point sets"""
         return type(self) is type(other) and \
             len(self.factors) == len(other.factors) and \
@@ -309,9 +313,10 @@ class FacetPointSet(AbstractPointSet):
 
     @cached_property
     def expression(self):
-        raise NotImplementedError("Symbolic point expression is not yet implemented for FacetPointSet.")
+        shape = tuple(i.extent for i in self.indices) + (self.dimension,)
+        return gem.partial_indexed(gem.Literal(self.points.reshape(shape)), self.indices)
 
-    def almost_equal(self, other, tolerance=1e-12):
+    def almost_equal(self, other, tolerance=None):
         """Approximate numerical equality of point sets"""
         return type(self) is type(other) and \
             self.cell == other.cell and \

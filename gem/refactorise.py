@@ -7,7 +7,7 @@ from itertools import product
 from sys import intern
 
 from gem.node import Memoizer, MemoizerArg, traversal
-from gem.gem import (Node, Conditional, IndexSum, Zero, Product, Sum,
+from gem.gem import (Node, Conditional, Delta, IndexSum, Zero, Product, Sum,
                      Indexed, ListTensor, one, MathFunction)
 from gem.optimise import (delta_elimination, filtered_replace_indices,
                           remove_componenttensors, sum_factorise,
@@ -266,7 +266,14 @@ def _collect_monomials_mathfunction(expression, self):
         child_ms, = map(self, expression.children)
         result = MonomialSum()
         for k, v in child_ms.monomials.items():
-            result.monomials[k] = MathFunction(name, v)
+            # Move the Delta factors outside the math function.
+            # A Delta is real, so conj, real and imag do not change it.
+            # Outside the math function, delta elimination can remove it.
+            _, factors = traverse_product(v, stop_at=lambda e: not isinstance(e, Product))
+            deltas = [f for f in factors if isinstance(f, Delta)]
+            if deltas:
+                v = Product(*(f for f in factors if not isinstance(f, Delta)))
+            result.monomials[k] = Product(*deltas, MathFunction(name, v))
         result.ordering = child_ms.ordering.copy()
         return result
     else:

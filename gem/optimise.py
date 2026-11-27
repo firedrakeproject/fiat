@@ -253,7 +253,12 @@ def _select_expression_uncached(expressions, index, cache):
 
     types = set(map(type, expressions))
     if types <= {Indexed, Zero}:
-        multiindex, = set(e.multiindex for e in expressions if isinstance(e, Indexed))
+        multiindices = set(e.multiindex for e in expressions if isinstance(e, Indexed))
+        if len(multiindices) > 1:
+            # Each expression is indexed by a different multiindex.
+            # Select the indexed expressions, not the tensors they index.
+            return Indexed(ListTensor(expressions), (index,))
+        multiindex, = multiindices
         # Shape only determined by free indices
         shape = tuple(i.extent for i in multiindex if isinstance(i, Index))
 
@@ -339,6 +344,20 @@ def delta_elimination(sum_indices, factors, index_replacer=None):
             return index_replacer(expression, ((from_, to_),))
         else:
             return Indexed(ComponentTensor(expression, (from_,)), (to_,))
+
+    # Replace each literal vector that has a single unit entry k and is
+    # indexed by a summation index i with the equivalent Delta(i, k).
+    # The loop below then eliminates i.
+    factors = list(factors)
+    for k, factor in enumerate(factors):
+        if not isinstance(factor, Indexed) or len(factor.multiindex) != 1:
+            continue
+        index, = factor.multiindex
+        table, = factor.children
+        if index in sum_indices and isinstance(table, Literal):
+            entries = numpy.flatnonzero(table.array)
+            if len(entries) == 1 and table.array[entries[0]] == 1:
+                factors[k] = Delta(index, int(entries[0]), dtype=factor.dtype)
 
     delta_queue = [(f, index)
                    for f in factors if isinstance(f, Delta)

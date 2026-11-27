@@ -85,8 +85,11 @@ def flops_zero(expr, temporaries):
 @flops.register(gem.LogicalAnd)
 @flops.register(gem.LogicalOr)
 @flops.register(gem.ListTensor)
+@flops.register(gem.FloorDiv)
+@flops.register(gem.Remainder)
 def flops_zeroplus(expr, temporaries):
     # These nodes contribute 0 floating point operations, but their children may not.
+    # FloorDiv and Remainder are integer arithmetic on indices.
     return 0 + sum(expression_flops(child, temporaries)
                    for child in expr.children)
 
@@ -168,7 +171,8 @@ def flops_solve(expr, temporaries):
 
 @flops.register(gem.ComponentTensor)
 def flops_componenttensor(expr, temporaries):
-    raise ValueError("Not expecting ComponentTensor")
+    child, = expr.children
+    return numpy.prod(expr.shape, dtype=int) * expression_flops(child, temporaries)
 
 
 def expression_flops(expression, temporaries, top=False):

@@ -277,7 +277,7 @@ def _evaluate_indexed(e, self):
             idx.append(slice(None))
         elif isinstance(i, gem.VariableIndex):
             # Variable index, evaluate inner expression
-            result, = self(i.expression)
+            result = self(i.expression)
             assert not result.tshape
             idx.append(result[()])
         else:

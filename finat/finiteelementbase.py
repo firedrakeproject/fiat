@@ -257,8 +257,8 @@ class FiniteElementBase(metaclass=ABCMeta):
         multiindex = tuple(chain(self.get_indices(), self.get_value_indices()))
 
         def concatenate(alpha):
-            # The point indices are free in each table, so promote them to a
-            # shape before concatenating the tables along it.
+            # The point indices of each table are free indices.
+            # Promote them to a shape that Concatenate can join.
             pieces = [broadcast_tensor(gem.Indexed(table[alpha], multiindex),
                                        sub.indices)
                       for table, sub in zip(tables, ps.point_sets)]

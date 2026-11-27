@@ -5,14 +5,14 @@ import numpy
 
 import FIAT
 from FIAT.polynomial_set import mis
-from FIAT.reference_element import TensorProductCell
+from FIAT.reference_element import Hypercube, TensorProductCell
 from FIAT.orientation_utils import make_entity_permutations_tensorproduct
 
 import gem
 from gem.utils import cached_property
 
 from finat.finiteelementbase import FiniteElementBase
-from finat.point_set import PointSingleton, PointSet, TensorPointSet
+from finat.point_set import FacetPointSet, PointSingleton, PointSet, TensorPointSet
 
 
 class TensorProductElement(FiniteElementBase):
@@ -139,6 +139,19 @@ class TensorProductElement(FiniteElementBase):
             # factorised.
             return self._stack_tabulations(order, ps, entity,
                                            coordinate_mapping=coordinate_mapping)
+        if isinstance(ps, FacetPointSet):
+            # Tabulate on each facet and select the table with the facet index.
+            # Each table remains a product of normal and tangential factors.
+            # Coefficient evaluation contracts these factors one at a time.
+            facets = ps.entities
+            if isinstance(ps.cell, Hypercube):
+                facets = [ps.cell.unflattening_map[facet] for facet in facets]
+            tables = [self.basis_evaluation(order, ps.ps, facet) for facet in facets]
+            f = ps.indices[0]
+            indices = (*self.get_indices(), *self.get_value_indices())
+            return {alpha: gem.ComponentTensor(
+                gem.ListTensor([table[alpha][indices] for table in tables])[f], indices)
+                for alpha in tables[0]}
 
         entities = self._factor_entity(entity)
         entity_dim, _ = zip(*entities)
@@ -323,6 +336,16 @@ def factor_point_set(product_cell, product_dim, point_set):
                    for ps, dim in zip(point_set.factors, point_dims))
         return point_set.factors
 
+    # A vertex holds a single point.
+    vertex = PointSingleton(numpy.zeros((0,)))
+    if isinstance(point_set, TensorPointSet) and \
+       len(point_set.factors) == sum(dim > 0 for dim in point_dims):
+        # Give the factors to the subelements not on a vertex.
+        factors = iter(point_set.factors)
+        result = [next(factors) if dim else vertex for dim in point_dims]
+        assert all(ps.dimension == dim for ps, dim in zip(result, point_dims))
+        return result
+
     # Split the point coordinates along the point dimensions
     # required by the subelements.
     assert point_set.dimension == sum(point_dims)
@@ -333,6 +356,9 @@ def factor_point_set(product_cell, product_dim, point_set):
         # Use the same point index for the new point sets.
         result = []
         for s in slices:
+            if s.start == s.stop:
+                result.append(vertex)
+                continue
             ps = PointSet(point_set.points[:, s])
             ps.indices = point_set.indices
             result.append(ps)

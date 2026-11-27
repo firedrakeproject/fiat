@@ -75,6 +75,14 @@ def test_number_operand_takes_the_dtype_of_an_integer_node(build, dtype, expecte
     assert numpy.array_equal(result.arr, expected)
 
 
+def test_literal_equality_compares_dtype():
+    """Literals with equal entries and different dtypes are different nodes."""
+    integers = gem.Literal(numpy.array([1, 2]), dtype=gem.uint_type)
+    floats = gem.Literal(numpy.array([1, 2]))
+    assert integers != floats
+    assert len({integers, floats}) == 2
+
+
 def test_number_operand_of_an_untyped_node_is_float():
     """A number with an untyped node converts to a float literal."""
     expression = gem.Variable("x", ()) - 3
